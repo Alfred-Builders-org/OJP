@@ -640,7 +640,8 @@ function CoursAppliques({
   }
 
   return (
-    <div className="space-y-2 border-t pt-3">
+    // Pas de bordure ici : la ligne précédente fournit déjà le séparateur.
+    <div className="space-y-2 pt-1">
       <div className="flex items-center justify-between">
         <span className="text-muted-foreground">Cours appliqués</span>
         <span className="text-xs text-muted-foreground">
@@ -650,15 +651,31 @@ function CoursAppliques({
       <div className="flex flex-wrap gap-1.5">
         {metaux.map((m) => (
           <Badge key={m.label} variant="outline" className="font-normal tabular-nums">
-            {m.label} {formatCurrency(m.valeur as number)}/g
+            {m.label} {formatCoursGramme(m.valeur as number)}
           </Badge>
         ))}
         {coefficient != null && coefficient > 0 && (
           <Badge variant="outline" className="font-normal tabular-nums">
-            Coefficient &times;{coefficient}
+            Coefficient &times;{formatNombre(coefficient)}
           </Badge>
         )}
       </div>
     </div>
   );
+}
+
+/**
+ * Les cours sont stockés au millième d'euro : on les affiche tels quels plutôt
+ * qu'arrondis au centime, pour que le montant proposé sur une référence puisse
+ * être refait à la calculatrice.
+ */
+function formatCoursGramme(valeur: number): string {
+  return `${formatNombre(valeur, 3)} €/g`;
+}
+
+function formatNombre(valeur: number, maxDecimales = 4): string {
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: maxDecimales,
+  }).format(valeur);
 }
