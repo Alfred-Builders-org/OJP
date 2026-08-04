@@ -18,6 +18,7 @@ import {
   Diamond,
   Coins,
   Receipt,
+  Warning,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
@@ -262,6 +263,12 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
               {lot.date_finalisation && (
                 <DetailRow label="Date de finalisation" value={formatDate(lot.date_finalisation)} />
               )}
+              <CoursAppliques
+                or={lot.cours_or_snapshot}
+                argent={lot.cours_argent_snapshot}
+                platine={lot.cours_platine_snapshot}
+                coefficient={lot.coefficient_rachat_snapshot}
+              />
             </CardContent>
           </Card>
 
@@ -593,6 +600,65 @@ function DetailRow({ label, value, noBorder }: { label: string; value: React.Rea
     <div className={`flex items-center justify-between py-2 ${noBorder ? "" : "border-b last:border-0"}`}>
       <span className="text-muted-foreground shrink-0">{label}</span>
       <span className="font-medium text-right">{value}</span>
+    </div>
+  );
+}
+
+/**
+ * Cours et coefficient figés à la création du lot. Ce sont eux — et non les
+ * paramètres du jour — qui déterminent les prix proposés sur ce lot, d'où
+ * l'intérêt de les rendre visibles au moment d'expertiser.
+ */
+function CoursAppliques({
+  or,
+  argent,
+  platine,
+  coefficient,
+}: {
+  or: number | null;
+  argent: number | null;
+  platine: number | null;
+  coefficient: number | null;
+}) {
+  const metaux = [
+    { label: "Or", valeur: or },
+    { label: "Argent", valeur: argent },
+    { label: "Platine", valeur: platine },
+  ].filter((m) => m.valeur != null && m.valeur > 0);
+
+  if (metaux.length === 0) {
+    return (
+      <div className="flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:bg-amber-900/10 dark:text-amber-400">
+        <Warning size={16} weight="duotone" className="mt-0.5 shrink-0" />
+        <span>
+          Aucun cours n&apos;est associé à ce lot : les prix proposés seront à
+          zéro. Renseignez les cours dans les paramètres, puis créez un nouveau
+          lot.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <div className="flex items-center justify-between">
+        <span className="text-muted-foreground">Cours appliqués</span>
+        <span className="text-xs text-muted-foreground">
+          figés à la création
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {metaux.map((m) => (
+          <Badge key={m.label} variant="outline" className="font-normal tabular-nums">
+            {m.label} {formatCurrency(m.valeur as number)}/g
+          </Badge>
+        ))}
+        {coefficient != null && coefficient > 0 && (
+          <Badge variant="outline" className="font-normal tabular-nums">
+            Coefficient &times;{coefficient}
+          </Badge>
+        )}
+      </div>
     </div>
   );
 }

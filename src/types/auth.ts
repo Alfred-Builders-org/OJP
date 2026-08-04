@@ -29,4 +29,5 @@ export const OWNER_ONLY_PREFIXES = [
   "/utilisateurs/",
   "/api/email/",
   "/api/users/",
+  "/api/cours",
 ];

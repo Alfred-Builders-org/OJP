@@ -11,6 +11,7 @@ import {
   FileText,
   Bell,
   EnvelopeSimple,
+  ArrowsClockwise,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useSaveParametres } from "@/hooks/use-save-setting";
@@ -99,6 +100,7 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
   const [prixArgent, setPrixArgent] = useState(parametres.prix_argent.toString());
   const [prixPlatine, setPrixPlatine] = useState(parametres.prix_platine.toString());
   const { saving: savingPrix, save: savePrix } = useSaveParametres("Prix du cours mis à jour");
+  const [actualisation, setActualisation] = useState(false);
 
   // Coefficient state
   const [coefficient, setCoefficient] = useState(parametres.coefficient_rachat.toString());
@@ -107,6 +109,38 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
 
   const initialPrix = useRef({ prixOr: parametres.prix_or.toString(), prixArgent: parametres.prix_argent.toString(), prixPlatine: parametres.prix_platine.toString() });
   const initialCoeff = useRef({ coefficient: parametres.coefficient_rachat.toString(), coefficientVente: parametres.coefficient_vente.toString() });
+
+  // Actualisation des cours depuis goldapi.io. Les valeurs récupérées sont
+  // déjà enregistrées côté serveur : on aligne l'état du formulaire pour que
+  // les champs n'apparaissent pas comme modifiés.
+  const actualiserCours = useCallback(async () => {
+    setActualisation(true);
+    const { toast } = await import("sonner");
+    try {
+      const res = await fetch("/api/cours", { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error ?? "Impossible de récupérer les cours.");
+        return;
+      }
+
+      const { prix_or, prix_argent, prix_platine } = data.cours;
+      setPrixOr(prix_or.toString());
+      setPrixArgent(prix_argent.toString());
+      setPrixPlatine(prix_platine.toString());
+      initialPrix.current = {
+        prixOr: prix_or.toString(),
+        prixArgent: prix_argent.toString(),
+        prixPlatine: prix_platine.toString(),
+      };
+      toast.success("Cours actualisés depuis le marché");
+    } catch {
+      toast.error("Le service de cours est injoignable. Réessayez dans un instant.");
+    } finally {
+      setActualisation(false);
+    }
+  }, []);
 
   // Register prix save function when prix section is active
   const prixSaveFn = useCallback(async () => {
@@ -232,15 +266,32 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
           {activeSection === "prix" && (
             <div className="mx-auto max-w-3xl space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CurrencyEur size={20} weight="duotone" />
-                    Prix du cours des métaux
-                  </CardTitle>
-                  <CardDescription>
-                    Prix au gramme de l&apos;or pur, l&apos;argent et le platine.
-                    Base de tous les calculs de titrage (ex : or 750 = 75% du cours).
-                  </CardDescription>
+                <CardHeader className="flex flex-row items-start justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <CardTitle className="flex items-center gap-2">
+                      <CurrencyEur size={20} weight="duotone" />
+                      Prix du cours des métaux
+                    </CardTitle>
+                    <CardDescription>
+                      Prix au gramme de l&apos;or pur, l&apos;argent et le platine.
+                      Base de tous les calculs de titrage (ex : or 750 = 75% du cours).
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={actualisation}
+                    onClick={actualiserCours}
+                  >
+                    <ArrowsClockwise
+                      size={14}
+                      weight="duotone"
+                      className={actualisation ? "animate-spin" : undefined}
+                    />
+                    {actualisation ? "Récupération..." : "Actualiser au cours du marché"}
+                  </Button>
                 </CardHeader>
                 <CardContent className="space-y-4 pb-6">
                   <div className="grid grid-cols-3 gap-4">
