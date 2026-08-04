@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { sensitiveApiLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
+import { getSiteUrl } from "@/lib/site-url";
 
 export async function POST(
   request: NextRequest,
@@ -63,7 +64,7 @@ export async function POST(
       const parsed = new URL(actionLink);
       const token_hash = parsed.searchParams.get("token") ?? "";
       const type = parsed.searchParams.get("type") ?? "invite";
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3001";
+      const siteUrl = getSiteUrl(request);
       inviteLink = `${siteUrl}/auth/callback?token_hash=${token_hash}&type=${type}&next=/reset-password`;
     }
 

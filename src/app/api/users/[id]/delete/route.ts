@@ -59,7 +59,8 @@ export async function DELETE(
       );
     }
 
-    // Soft delete : marquer comme "deleted" au lieu de supprimer
+    // Suppression logique : le profil est conservé pour que l'historique
+    // reste lisible (« créé par ... » sur les lots, dossiers et clients).
     const { error: profileError } = await getSupabaseAdmin()
       .from("profiles")
       .update({ status: "deleted" })
@@ -73,6 +74,26 @@ export async function DELETE(
     await getSupabaseAdmin().auth.admin.updateUserById(id, {
       ban_duration: "876000h",
     });
+
+    // Neutraliser l'adresse e-mail, sans quoi elle resterait prise dans
+    // auth.users et l'on ne pourrait plus recréer de compte avec elle.
+    // Supabase la stocke à deux endroits (users et identities) : la fonction
+    // dédiée traite les deux, ce que l'API admin ne garantit pas.
+    const { error: emailError } = await getSupabaseAdmin().rpc("liberer_email_compte", {
+      p_user_id: id,
+    });
+
+    if (emailError) {
+      // Le compte est bien supprimé et banni : on le dit, tout en signalant
+      // que l'adresse ne pourra pas resservir tout de suite.
+      return NextResponse.json(
+        {
+          error:
+            "Compte supprimé, mais son adresse e-mail n'a pas pu être libérée. Elle ne pourra pas être réutilisée pour un nouveau compte.",
+        },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch {
