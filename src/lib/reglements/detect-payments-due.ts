@@ -122,6 +122,55 @@ export function detectPaymentsDue({
     }
   }
 
+  // --- RACHAT en retractation : paiement anticipe ---
+  // En boutique, le client repart le plus souvent avec son argent le jour meme,
+  // alors que le delai legal de retractation court encore. On propose donc le
+  // reglement des references en retractation, sans attendre la finalisation.
+  // S'il se retracte ensuite, le remboursement se saisit en reglement negatif.
+  if (lot.type === "rachat" && lot.status === "en_cours") {
+    const refsEnRetractation = lotReferences.filter(
+      (r) => r.status === "en_retractation"
+    );
+
+    if (refsEnRetractation.length > 0) {
+      const contrats = documents.filter(
+        (d) => d.lot_id === lot.id && d.type === "contrat_rachat"
+      );
+      // Comme pour les quittances : on vise le contrat encore en attente.
+      const contrat = contrats.find((d) => d.status !== "regle") ?? contrats[0];
+      const attendu = refsEnRetractation.reduce(
+        (sum, r) => sum + (r.prix_achat - r.montant_taxe) * r.quantite,
+        0
+      );
+      // Rattache au contrat pour ne pas se confondre avec les quittances
+      // reglees separement sur un lot mixte bijoux + or investissement.
+      const dejaPaye = reglements
+        .filter((r) => r.type === "rachat" && r.document_id === (contrat?.id ?? null))
+        .reduce((sum, r) => sum + r.montant, 0);
+      const restant = Math.round(Math.max(0, attendu - dejaPaye) * 100) / 100;
+
+      payments.push({
+        type: "rachat",
+        sens: "sortant",
+        label: contrat
+          ? `Contrat ${contrat.numero} | Paiement client anticipé`
+          : "Rachat | Paiement client anticipé",
+        description: `Montant net des ${refsEnRetractation.length} article${refsEnRetractation.length > 1 ? "s" : ""} en cours de rétractation`,
+        montant_attendu: attendu,
+        montant_deja_paye: dejaPaye,
+        montant_restant: restant,
+        is_fully_paid: restant < 0.01,
+        pre_fill: {
+          type: "rachat",
+          sens: "sortant",
+          montant: restant,
+          client_id: clientId,
+          document_id: contrat?.id,
+        },
+      });
+    }
+  }
+
   // --- RACHAT : on paie le client ---
   if (lot.type === "rachat" && lot.status === "finalise") {
     const attendu = lot.montant_net;
