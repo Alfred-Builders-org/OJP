@@ -11,6 +11,7 @@ import { generateFactureAcompte } from "./facture-acompte";
 import { generateBonCommande } from "./bon-commande";
 import { generateBonLivraison, type BonLivraisonData } from "./bon-livraison";
 import { generateFactureSolde } from "./facture-solde";
+import { generateRemboursementRetractation } from "./remboursement-retractation";
 import { refreshSociete } from "./blocks";
 import type { ClientInfo, DossierInfo, ReferenceLigne, TotauxInfo, DepotVenteReferenceLigne, ConfieReferenceLigne, QuittanceDepotVenteLigne, FactureVenteLigne, BonCommandeLigne, FonderieInfo } from "./blocks";
 import type { DocumentType } from "@/types/document";
@@ -27,6 +28,7 @@ const DEFAULT_PREFIX_MAP: Record<DocumentType, string> = {
   facture_solde: "FSO",
   bon_commande: "CMDF",
   bon_livraison: "BDL",
+  remboursement_retractation: "RBT",
 };
 
 export interface GenerateDocumentParams {
@@ -60,6 +62,9 @@ export interface GenerateDocumentParams {
   dateLimiteSolde?: string;
   // Facture solde specific
   numeroAcompte?: string;
+  // Remboursement apres retractation specific
+  montantRembourse?: number;
+  numeroContrat?: string;
   // Bon de commande specific
   fonderie?: FonderieInfo;
   bonCommandeLignes?: BonCommandeLigne[];
@@ -162,6 +167,12 @@ export async function generateAndStoreDocument(params: GenerateDocumentParams, d
       numeroAcompte: params.numeroAcompte ?? "",
       montantSolde: params.montantSolde!,
       modeReglement: params.modeReglement!,
+    });
+  } else if (type === "remboursement_retractation") {
+    blob = await generateRemboursementRetractation({
+      numero, client, dossier, references,
+      montantRembourse: params.montantRembourse!,
+      numeroContrat: params.numeroContrat ?? "",
     });
   } else if (type === "bon_commande") {
     blob = await generateBonCommande({

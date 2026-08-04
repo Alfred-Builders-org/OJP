@@ -1,9 +1,10 @@
 import { mutate } from "@/lib/supabase/mutation";
 import { triggerEmail } from "@/lib/email/trigger";
 import { createBijouxStockEntry, incrementOrInvestStock } from "./stock-operations";
-import { generateQuittanceRachat, generateContratRachat, generateQuittanceOrInvest } from "./document-operations";
+import { generateQuittanceRachat, generateContratRachat, generateQuittanceOrInvest, generateRemboursementRetractation } from "./document-operations";
 import { checkAndFinalizeLot } from "./reference-actions";
 import type { ActionResult, ActionContext, SupabaseClient } from "./action-types";
+import type { LotReference } from "@/types/lot";
 
 /**
  * Accept a devis at the lot level:
@@ -194,6 +195,12 @@ export async function executeRetracterLot(
   supabase: SupabaseClient,
   ctx: ActionContext
 ): Promise<ActionResult> {
+  // Références concernées, capturées avant la mise à jour : elles alimentent
+  // le reçu de remboursement.
+  const refsRetractees = ctx.lot.references.filter((r) =>
+    ["en_retractation", "bloque"].includes(r.status)
+  );
+
   // Rétracter les refs en rétractation
   const { error: e1 } = await mutate(
     supabase
@@ -205,6 +212,8 @@ export async function executeRetracterLot(
   );
   if (e1) return { success: false };
 
+  await rembourserSiDejaPaye(supabase, ctx, refsRetractees);
+
   triggerEmail({
     notification_type: "interne_retractation",
     lot_id: ctx.lot.id,
@@ -215,4 +224,76 @@ export async function executeRetracterLot(
   await checkAndFinalizeLot(supabase, ctx.lot.id, ctx.dossier.id);
 
   return { success: true };
+}
+
+/**
+ * Le règlement d'un rachat étant possible pendant le délai de rétractation, un
+ * client peut s'être fait payer avant de changer d'avis. Dans ce cas il rend la
+ * somme, et ce mouvement doit laisser une trace : un reçu de remboursement et
+ * un règlement négatif qui ramène le solde du lot à zéro.
+ *
+ * Sans effet si rien n'a été versé — le cas le plus courant.
+ */
+async function rembourserSiDejaPaye(
+  supabase: SupabaseClient,
+  ctx: ActionContext,
+  refsRetractees: LotReference[]
+): Promise<void> {
+  try {
+    const { data: reglements } = await supabase
+      .from("reglements")
+      .select("montant, mode")
+      .eq("lot_id", ctx.lot.id)
+      .eq("type", "rachat");
+
+    const verse = (reglements ?? []).reduce((sum, r) => sum + r.montant, 0);
+    const montantRembourse = Math.round(verse * 100) / 100;
+    if (montantRembourse < 0.01) return;
+
+    const { data: contrat } = await supabase
+      .from("documents")
+      .select("id, numero")
+      .eq("lot_id", ctx.lot.id)
+      .eq("type", "contrat_rachat")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const documentId = await generateRemboursementRetractation(
+      ctx,
+      refsRetractees,
+      montantRembourse,
+      contrat?.numero ?? ""
+    );
+
+    // Le remboursement est un règlement négatif : la somme des règlements du
+    // lot retombe à zéro sans qu'aucun calcul existant n'ait à gérer les sens.
+    await supabase.from("reglements").insert({
+      lot_id: ctx.lot.id,
+      document_id: documentId,
+      client_id: ctx.dossier.client.id,
+      sens: "sortant",
+      type: "rachat",
+      montant: -montantRembourse,
+      // On reprend le mode du dernier versement : le remboursement se fait en
+      // pratique par le même canal.
+      mode: reglements?.[reglements.length - 1]?.mode ?? "especes",
+      date_reglement: new Date().toISOString(),
+      notes: contrat?.numero
+        ? `Remboursement suite à rétractation du client (contrat ${contrat.numero})`
+        : "Remboursement suite à rétractation du client",
+    });
+
+    // Le contrat de rachat n'a plus lieu d'être.
+    if (contrat?.id) {
+      await supabase
+        .from("documents")
+        .update({ status: "annule" })
+        .eq("id", contrat.id);
+    }
+  } catch (err) {
+    // Un échec ici ne doit pas empêcher la rétractation elle-même, qui est
+    // l'acte juridique attendu par le client.
+    console.error("[RETRACTATION] Remboursement non enregistré :", err);
+  }
 }

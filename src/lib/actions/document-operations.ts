@@ -132,6 +132,40 @@ export async function generateContratRachat(
 }
 
 /**
+ * Génère le reçu de remboursement émis quand un client se rétracte après avoir
+ * déjà été payé. Atteste que les sommes versées sont revenues à la société et
+ * solde l'opération.
+ */
+export async function generateRemboursementRetractation(
+  ctx: ActionContext,
+  refs: LotReference[],
+  montantRembourse: number,
+  numeroContrat: string
+): Promise<string | null> {
+  if (refs.length === 0 || montantRembourse <= 0) return null;
+  const now = new Date();
+  try {
+    return await generateDocument({
+      type: "remboursement_retractation",
+      lotId: ctx.lot.id,
+      dossierId: ctx.dossier.id,
+      clientId: ctx.dossier.client.id,
+      client: buildClientInfo(ctx),
+      dossier: buildDossierInfo(ctx, now),
+      references: buildRefLignes(refs),
+      totaux: buildTotaux(refs),
+      montantRembourse,
+      numeroContrat,
+      referenceNumero: numeroContrat,
+      lotReferenceIds: refs.map((r) => r.id),
+    });
+  } catch (err) {
+    console.error("[DOC-GEN] generateRemboursementRetractation error:", err);
+    return null;
+  }
+}
+
+/**
  * Generate a quittance de rachat for or investissement references.
  */
 export async function generateQuittanceOrInvest(

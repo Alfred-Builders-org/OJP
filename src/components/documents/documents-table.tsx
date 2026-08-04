@@ -67,6 +67,10 @@ const TYPE_CONFIG: Record<DocumentType, { label: string; className: string }> = 
     label: "Bon de livraison",
     className: "bg-purple-100 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-400",
   },
+  remboursement_retractation: {
+    label: "Remboursement",
+    className: "bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400",
+  },
 };
 
 const STATUS_CONFIG: Record<DocumentStatus, { label: string; className: string }> = {
