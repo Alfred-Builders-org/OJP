@@ -101,6 +101,17 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
   const [prixPlatine, setPrixPlatine] = useState(parametres.prix_platine.toString());
   const { saving: savingPrix, save: savePrix } = useSaveParametres("Prix du cours mis à jour");
   const [actualisation, setActualisation] = useState(false);
+  const [releveLe, setReleveLe] = useState<string | null>(parametres.cours_maj_le);
+
+  const dernierReleve = releveLe
+    ? new Date(releveLe).toLocaleString("fr-FR", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : null;
 
   // Coefficient state
   const [coefficient, setCoefficient] = useState(parametres.coefficient_rachat.toString());
@@ -134,6 +145,7 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
         prixArgent: prix_argent.toString(),
         prixPlatine: prix_platine.toString(),
       };
+      setReleveLe(data.actualise_le);
       toast.success("Cours actualisés depuis le marché");
     } catch {
       toast.error("Le service de cours est injoignable. Réessayez dans un instant.");
@@ -275,7 +287,14 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
                     <CardDescription>
                       Prix au gramme de l&apos;or pur, l&apos;argent et le platine.
                       Base de tous les calculs de titrage (ex : or 750 = 75% du cours).
+                      Relevés une fois par jour : tous les lots ouverts dans la
+                      journée utilisent le même cours.
                     </CardDescription>
+                    {dernierReleve && (
+                      <p className="text-xs text-muted-foreground">
+                        Dernier relevé {dernierReleve}
+                      </p>
+                    )}
                   </div>
                   <Button
                     type="button"

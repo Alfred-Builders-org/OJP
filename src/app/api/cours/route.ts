@@ -50,10 +50,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { error } = await supabase
-    .from("parametres")
-    .update(resultat.cours)
-    .eq("id", 1);
+  // Même point d'écriture que le relevé quotidien : la date de relevé reste
+  // ainsi cohérente, qu'il soit automatique ou forcé depuis les paramètres.
+  const { error } = await supabase.rpc("appliquer_cours", {
+    p_or: resultat.cours.prix_or,
+    p_argent: resultat.cours.prix_argent,
+    p_platine: resultat.cours.prix_platine,
+  });
 
   if (error) {
     return NextResponse.json(

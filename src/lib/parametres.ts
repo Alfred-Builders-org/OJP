@@ -9,6 +9,7 @@ const DEFAULT_PARAMETRES: Parametres = {
   coefficient_rachat: 0.85,
   coefficient_vente: 1.05,
   updated_at: new Date().toISOString(),
+  cours_maj_le: null,
 };
 
 export async function getParametres(): Promise<Parametres> {

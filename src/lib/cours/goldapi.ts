@@ -118,7 +118,12 @@ export async function recupererCours(apiKey: string): Promise<CoursResult> {
   return { ok: true, cours };
 }
 
-/** Les cours sont stockés en NUMERIC(10,2) : on arrondit au centime. */
+/**
+ * Les cours sont stockés en NUMERIC(10,3) depuis la migration 130 : on
+ * arrondit au millième d'euro. Le centime serait trop grossier pour l'argent,
+ * dont le cours au gramme avoisine 1,6 € — un arrondi à 1,64 introduirait
+ * déjà 0,25 % d'erreur sur chaque rachat.
+ */
 function arrondir(valeur: number): number {
-  return Math.round(valeur * 100) / 100;
+  return Math.round(valeur * 1000) / 1000;
 }

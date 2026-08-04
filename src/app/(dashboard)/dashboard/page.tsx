@@ -8,6 +8,7 @@ import { DashboardAlertsServer } from "@/components/dashboard/dashboard-alerts-s
 import { DashboardLotsServer } from "@/components/dashboard/dashboard-lots-server";
 import { DashboardCommandesServer } from "@/components/dashboard/dashboard-commandes-server";
 import { DashboardActivityServer } from "@/components/dashboard/dashboard-activity-server";
+import { ReleveCoursQuotidien } from "@/components/dashboard/releve-cours-quotidien";
 import type { UserRole } from "@/types/auth";
 
 export default async function DashboardPage() {
@@ -41,6 +42,10 @@ export default async function DashboardPage() {
 
   return (
     <PageWrapper title="Dashboard" fullHeight>
+      {/* Relève les cours une fois par jour, sans retarder l'affichage. */}
+      <Suspense fallback={null}>
+        <ReleveCoursQuotidien />
+      </Suspense>
       <div className="flex h-full flex-col gap-4">
         <div className="flex shrink-0 items-center justify-between">
           <h2 className="text-3xl font-bold tracking-tight">
