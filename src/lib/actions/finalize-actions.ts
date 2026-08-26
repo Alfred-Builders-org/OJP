@@ -352,12 +352,54 @@ function buildTotaux(refList: Ref[]): TotauxInfo {
   return { totalBrut: brut, taxe, netAPayer: brut - taxe, taxeLabel: getTaxeLabel(refList) };
 }
 
-async function genDoc(params: Parameters<typeof generateAndStoreDocument>[0], label: string): Promise<{ path: string | null; error?: string }> {
+async function genDoc(params: Parameters<typeof generateAndStoreDocument>[0], label: string): Promise<{ path: string | null; numero?: string; error?: string }> {
   const result = await generateAndStoreDocument(params, true);
   if (result.error) {
     return { path: null, error: `${label}: ${result.error}` };
   }
-  return { path: result.path };
+  return { path: result.path, numero: result.numero };
+}
+
+/**
+ * Écrit l'enregistrement comptable d'une facture.
+ *
+ * Le PDF est stocké dans `documents`, mais le chiffre d'affaires du tableau de
+ * bord, le montant en attente et la TVA de la page Impôts se lisent dans
+ * `factures`. Sans cette écriture, ces trois indicateurs restent à zéro quel
+ * que soit le volume de ventes réalisé.
+ *
+ * Le numéro est repris du document plutôt que laissé au trigger
+ * `generate_facture_numero` : son format `FAC-YYYY-NNNN` entrerait en collision
+ * avec le préfixe des factures d'acompte.
+ *
+ * Un échec ici n'interrompt pas la finalisation — le PDF est déjà émis et parti
+ * chez le client — mais il est tracé pour pouvoir être rattrapé.
+ */
+async function enregistrerFacture(
+  supabase: SB,
+  params: {
+    numero: string | undefined;
+    lotId: string;
+    clientId: string;
+    montantHT: number;
+    montantTaxe: number;
+    montantTTC: number;
+  },
+): Promise<void> {
+  if (!params.numero) return;
+
+  const { error } = await supabase.from("factures").insert({
+    numero: params.numero,
+    lot_id: params.lotId,
+    client_id: params.clientId,
+    montant_ht: params.montantHT,
+    montant_taxe: params.montantTaxe,
+    montant_ttc: params.montantTTC,
+  });
+
+  if (error) {
+    console.error("[FACTURE] écriture comptable échouée:", params.numero, error.message);
+  }
 }
 
 /* ──────────────────────── RACHAT ──────────────────────── */
@@ -699,6 +741,10 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
     }, "facture_vente");
     if (res.error) docErrors.push(res.error);
     else if (res.path) {
+      await enregistrerFacture(supabase, {
+        numero: res.numero, lotId: lot.id, clientId: dossier.client.id,
+        montantHT: totalHT, montantTaxe: tva, montantTTC: totalTTC,
+      });
       emailTriggers.push({ type: "facture_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: [res.path] });
     }
   }
@@ -725,6 +771,12 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
     }, "facture_acompte");
     if (acompteRes.error) docErrors.push(acompteRes.error);
     else if (acompteRes.path) {
+      // L'acompte et le solde se partagent le montant total : la taxe est
+      // portée par le solde pour n'être comptée qu'une fois.
+      await enregistrerFacture(supabase, {
+        numero: acompteRes.numero, lotId: lot.id, clientId: dossier.client.id,
+        montantHT: montantAcompte, montantTaxe: 0, montantTTC: montantAcompte,
+      });
       emailTriggers.push({ type: "facture_acompte", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: [acompteRes.path] });
     }
 
@@ -749,6 +801,10 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
     }, "facture_solde");
     if (soldeRes.error) docErrors.push(soldeRes.error);
     else if (soldeRes.path) {
+      await enregistrerFacture(supabase, {
+        numero: soldeRes.numero, lotId: lot.id, clientId: dossier.client.id,
+        montantHT: totalHT - montantAcompte, montantTaxe: tva, montantTTC: montantSolde,
+      });
       emailTriggers.push({ type: "facture_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: [soldeRes.path] });
     }
 

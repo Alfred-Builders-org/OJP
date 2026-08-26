@@ -44,6 +44,7 @@ import { LotActionsCard } from "@/components/actions/lot-actions-card";
 
 import { LotStepper } from "@/components/lots/lot-stepper";
 import { ReferenceCard } from "@/components/lots/reference-card";
+import { DestinationSelector } from "@/components/lots/destination-selector";
 import { ReferenceFormBijoux } from "@/components/lots/reference-form-bijoux";
 import { ReferenceFormOrInvest } from "@/components/lots/reference-form-or-invest";
 
@@ -316,6 +317,11 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
           isError={lot.outcome === "retracte" || lot.outcome === "refuse"}
           referenceStatuses={lot.references.map((r) => r.status)}
         />
+
+        {/* Destination des articles — modifiable tant que le lot n'est pas soldé */}
+        {!isTerminal && lot.references.length > 0 && (
+          <DestinationSelector lot={lot} />
+        )}
 
         {/* Actions en attente */}
         {!isBrouillon && !isTerminal && (

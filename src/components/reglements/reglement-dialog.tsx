@@ -88,7 +88,14 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
     });
 
     if (insertError) {
-      setError(insertError.message);
+      // Le garde-fou de la base (migration 135) refuse de payer un client sur
+      // une opération rétractée, refusée ou annulée. Son message est déjà
+      // rédigé pour être lu tel quel ; les autres erreurs restent techniques.
+      setError(
+        insertError.message.includes("operation est close")
+          ? insertError.message
+          : `Le règlement n'a pas pu être enregistré. ${insertError.message}`,
+      );
       setSaving(false);
       return;
     }

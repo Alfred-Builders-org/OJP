@@ -80,8 +80,13 @@ function Doc({ data }: { data: RemboursementRetractationData }) {
       h(View, { style: s.bottomRight },
         h(View, { style: s.totGoldLine }),
         h(View, { style: s.totSep }),
+        // Le libellé tient sur sa propre ligne : « REMBOURSÉ PAR LE CLIENT »
+        // en 12 pt gras dépasse à lui seul la largeur du bloc (200 pt) et
+        // chevauchait le montant.
+        h(View, { style: s.mb4 },
+          h(Text, { style: s.sectionLabel }, "REMBOURSÉ PAR LE CLIENT")),
         h(View, { style: s.netRow },
-          h(Text, { style: s.netLabel }, "REMBOURSÉ PAR LE CLIENT"),
+          h(Text, { style: s.netLabel }, "TOTAL"),
           h(Text, { style: s.netValue }, fmt(montantRembourse))),
         h(View, { style: s.sigBlock },
           h(Text, { style: s.sigLabel }, "Signature du client"),

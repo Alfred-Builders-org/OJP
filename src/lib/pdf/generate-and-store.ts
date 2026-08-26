@@ -75,7 +75,9 @@ export interface GenerateDocumentParams {
   lotReferenceIds?: string[];
 }
 
-export type DocResult = { path: string; error?: never } | { path: null; error: string };
+export type DocResult =
+  | { path: string; numero: string; error?: never }
+  | { path: null; numero?: undefined; error: string };
 
 export async function generateAndStoreDocument(params: GenerateDocumentParams): Promise<string | null>;
 export async function generateAndStoreDocument(params: GenerateDocumentParams, detailed: true): Promise<DocResult>;
@@ -218,7 +220,7 @@ export async function generateAndStoreDocument(params: GenerateDocumentParams, d
   }
 
   console.log("[DOC-STORE] OK:", storagePath);
-  return detailed ? { path: storagePath } as DocResult : storagePath;
+  return detailed ? { path: storagePath, numero } as DocResult : storagePath;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return fail(`Exception: ${msg}`);

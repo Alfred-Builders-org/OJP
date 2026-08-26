@@ -88,6 +88,12 @@ function daysAgo(iso: string) {
   return `${days} jours`;
 }
 
+/** Vrai quand l'échéance est dépassée : l'article attend une action manuelle. */
+function isDelaiEcoule(iso: string) {
+  if (!iso) return false;
+  return new Date(iso).getTime() < Date.now();
+}
+
 function daysUntil(iso: string) {
   const diff = new Date(iso).getTime() - Date.now();
   const days = Math.floor(diff / 86400000);
@@ -120,8 +126,27 @@ function buildAlertItems(
   expiringDocuments: DocumentAlert[],
 ): AlertItem[] {
   const items: AlertItem[] = [];
+  // Seules trois alertes sont visibles sans ouvrir le panneau : ce qui est
+  // échu doit donc passer devant ce qui court encore.
+  const urgents: AlertItem[] = [];
 
   for (const r of retractations) {
+    if (isDelaiEcoule(r.dateFin)) {
+      urgents.push({
+        key: r.id,
+        href: `/lots/${r.id}`,
+        icon: <Timer size={16} weight="duotone" className="shrink-0 text-red-500" />,
+        title: "Délai de rétractation écoulé · à valider",
+        subtitle: `${r.numero} · ${r.clientName}`,
+        badge: (
+          <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            Échu {daysAgo(r.dateFin).toLowerCase()}
+          </Badge>
+        ),
+      });
+      continue;
+    }
+
     items.push({
       key: r.id,
       href: `/lots/${r.id}`,
@@ -155,6 +180,25 @@ function buildAlertItems(
   }
 
   for (const ref of referenceAlerts) {
+    // Une rétractation dont le délai est passé n'avance plus toute seule :
+    // il faut valider l'article pour qu'il entre en stock. Tant que personne
+    // ne le fait, l'opération reste en suspens — d'où la remontée en tête.
+    if (ref.status === "en_retractation" && isDelaiEcoule(ref.dateFin)) {
+      urgents.push({
+        key: ref.id,
+        href: `/lots/${ref.lotId}`,
+        icon: <Timer size={16} weight="duotone" className="shrink-0 text-red-500" />,
+        title: "Délai de rétractation écoulé · à valider",
+        subtitle: `${ref.designation} · ${ref.lotNumero} · ${ref.clientName}`,
+        badge: (
+          <Badge variant="secondary" className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            Échu {daysAgo(ref.dateFin).toLowerCase()}
+          </Badge>
+        ),
+      });
+      continue;
+    }
+
     items.push({
       key: ref.id,
       href: `/lots/${ref.lotId}`,
@@ -182,7 +226,7 @@ function buildAlertItems(
     });
   }
 
-  return items;
+  return [...urgents, ...items];
 }
 
 function AlertRow({ item }: { item: AlertItem }) {

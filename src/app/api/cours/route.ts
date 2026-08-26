@@ -59,9 +59,17 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) {
+    // Le contrôle de vraisemblance (migration 136) rédige un message destiné
+    // à être lu : il nomme le métal et l'écart constaté. Le masquer derrière
+    // un message générique priverait le propriétaire de l'information utile.
+    const estRejetVraisemblance = error.message.includes("invraisemblable");
     return NextResponse.json(
-      { error: "Les cours ont été récupérés mais n'ont pas pu être enregistrés." },
-      { status: 500 }
+      {
+        error: estRejetVraisemblance
+          ? error.message
+          : "Les cours ont été récupérés mais n'ont pas pu être enregistrés.",
+      },
+      { status: estRejetVraisemblance ? 409 : 500 }
     );
   }
 

@@ -130,15 +130,23 @@ export async function sendNotification(
       React.createElement(EmailWrapper, { body: bodyText })
     );
 
-    // 7. Determine recipient
+    // 7. Destinataire
+    //
+    // La redirection vers l'adresse technique ne s'applique qu'à un envoi
+    // explicitement marqué comme test. Auparavant la seule présence de
+    // RESEND_TEST_RECIPIENT détournait *tous* les messages, y compris ceux
+    // destinés aux clients : pendant la recette d'août, aucun client n'a rien
+    // reçu, et les vérifications de boîte mail du script de test étaient donc
+    // impossibles à réaliser.
     const testRecipient = process.env.RESEND_TEST_RECIPIENT;
     let recipientEmail: string;
 
-    if (test || testRecipient) {
-      // Test mode: always send to test recipient
+    if (test) {
       recipientEmail = testRecipient || "";
     } else if (template.category === "interne") {
-      recipientEmail = process.env.RESEND_TEST_RECIPIENT || "";
+      // Une notification interne n'a pas de destinataire naturel : elle part
+      // vers l'adresse de service.
+      recipientEmail = testRecipient || "";
     } else {
       recipientEmail = variables.client_email || "";
     }

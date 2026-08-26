@@ -9,6 +9,7 @@ import {
   Package,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
+import { isOperationAboutie } from "@/components/dashboard/dashboard-helpers";
 import { formatCurrency, formatDate } from "@/lib/format";
 import type { Lot, LotReference } from "@/types/lot";
 import type { VenteLigne } from "@/types/vente";
@@ -157,8 +158,10 @@ export function DossierRecapFinancier({
       });
     }
 
-    // 3. Valeur marchandise acquise (rachat finalisé = actif entrant)
-    if (lot.type === "rachat" && lot.status === "finalise" && lot.total_prix_achat > 0) {
+    // 3. Valeur marchandise acquise (rachat finalisé = actif entrant).
+    // Une rétractation ou un devis refusé produit aussi un lot `finalise`,
+    // mais la marchandise n'est jamais entrée : rien n'a été acquis.
+    if (lot.type === "rachat" && lot.status === "finalise" && isOperationAboutie(lot.outcome) && lot.total_prix_achat > 0) {
       const lotRefs = lotReferences.filter((r) => r.lot_id === lot.id);
       const refCount = lotRefs.length;
       events.push({

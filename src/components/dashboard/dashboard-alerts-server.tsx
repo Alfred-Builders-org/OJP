@@ -8,7 +8,7 @@ import type {
   DocumentAlert,
   PaiementAlert,
 } from "@/components/dashboard/dashboard-alerts";
-import { safe, clientName, extractDossier, extractClient } from "@/components/dashboard/dashboard-helpers";
+import { safe, clientName, extractDossier, extractClient, FILTRE_OPERATION_ABOUTIE } from "@/components/dashboard/dashboard-helpers";
 
 const RETRACTATION_DELAY_MS = 48 * 60 * 60 * 1000; // 48 hours
 
@@ -72,13 +72,16 @@ export async function DashboardAlertsServer({
       .eq("type", "vente")
       .in("status", ["en_cours"])
       .order("created_at", { ascending: false })),
-    // Paiements: Lots rachat finalises sans mode_reglement
+    // Paiements: Lots rachat finalises sans mode_reglement.
+    // Un lot retracte ou dont le devis a ete refuse est lui aussi `finalise`
+    // mais ne doit rien au client : il est ecarte par son `outcome`.
     safe(supabase
       .from("lots")
-      .select(`id, numero, type, status, montant_net, mode_reglement, ${DOSSIER_WITH_CLIENT}`)
+      .select(`id, numero, type, status, outcome, montant_net, mode_reglement, ${DOSSIER_WITH_CLIENT}`)
       .eq("type", "rachat")
       .eq("status", "finalise")
       .is("mode_reglement", null)
+      .or(FILTRE_OPERATION_ABOUTIE)
       .order("created_at", { ascending: false })),
   ]);
 

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from "react";
-import { FileText, DownloadSimple, X, Eye, DotsThree, SpinnerGap, ArrowUp, ArrowDown, ArrowsDownUp } from "@phosphor-icons/react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
+import { FileText, DownloadSimple, Printer, X, Eye, DotsThree, SpinnerGap, ArrowUp, ArrowDown, ArrowsDownUp } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,9 +105,40 @@ const STATUS_CONFIG: Record<DocumentStatus, { label: string; className: string }
   },
 };
 
-function getStorageUrl(path: string): string {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  return `${supabaseUrl}/storage/v1/object/public/documents/${path}`;
+/**
+ * Récupère le PDF depuis le bucket `documents`, qui est privé : seul un
+ * téléchargement authentifié fonctionne. Une URL publique renverrait
+ * « Bucket not found ».
+ */
+async function fetchDocumentBlob(storagePath: string): Promise<Blob | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.storage.from("documents").download(storagePath);
+  if (error || !data) {
+    console.error("PDF download error:", error, "path:", storagePath);
+    return null;
+  }
+  // Le bucket ne renvoie pas toujours le bon type MIME.
+  return new Blob([data], { type: "application/pdf" });
+}
+
+/** Déclenche l'enregistrement du fichier sous le numéro du document. */
+function saveBlob(blobUrl: string, numero: string) {
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = `${numero}.pdf`;
+  a.click();
+}
+
+async function downloadDocument(doc: DocumentRecord) {
+  const blob = await fetchDocumentBlob(doc.storage_path);
+  if (!blob) {
+    toast.error("Impossible de télécharger le document");
+    return;
+  }
+  const url = URL.createObjectURL(blob);
+  saveBlob(url, doc.numero);
+  // Révoquer trop tôt interrompt le téléchargement sur certains navigateurs.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 interface DocumentsTableProps {
@@ -224,7 +256,7 @@ export function DocumentsTable({ documents, title = "Documents", rowActions }: D
                           <DropdownMenuItem
                             onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
-                              window.open(getStorageUrl(doc.storage_path), "_blank");
+                              void downloadDocument(doc);
                             }}
                           >
                             <DownloadSimple size={16} weight="duotone" />
@@ -257,30 +289,24 @@ function PdfViewerModal({ doc, onClose }: { doc: DocumentRecord; onClose: () => 
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     let revoke: string | null = null;
     let cancelled = false;
-    const supabase = createClient();
 
-    supabase.storage
-      .from("documents")
-      .download(doc.storage_path)
-      .then(({ data, error: err }) => {
-        if (cancelled) return;
-        if (err || !data) {
-          console.error("PDF download error:", err, "path:", doc.storage_path);
-          setError(true);
-          setLoading(false);
-          return;
-        }
-        // Force correct MIME type
-        const pdfBlob = new Blob([data], { type: "application/pdf" });
-        const url = URL.createObjectURL(pdfBlob);
-        revoke = url;
-        setBlobUrl(url);
+    fetchDocumentBlob(doc.storage_path).then((pdfBlob) => {
+      if (cancelled) return;
+      if (!pdfBlob) {
+        setError(true);
         setLoading(false);
-      });
+        return;
+      }
+      const url = URL.createObjectURL(pdfBlob);
+      revoke = url;
+      setBlobUrl(url);
+      setLoading(false);
+    });
 
     return () => {
       cancelled = true;
@@ -290,14 +316,31 @@ function PdfViewerModal({ doc, onClose }: { doc: DocumentRecord; onClose: () => 
 
   const handleDownload = useCallback(() => {
     if (blobUrl) {
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = `${doc.numero}.pdf`;
-      a.click();
+      saveBlob(blobUrl, doc.numero);
     } else {
-      window.open(getStorageUrl(doc.storage_path), "_blank");
+      void downloadDocument(doc);
     }
-  }, [blobUrl, doc.numero, doc.storage_path]);
+  }, [blobUrl, doc]);
+
+  /**
+   * Imprime le PDF affiché. `print()` sur l'iframe échoue dans certains
+   * navigateurs selon leur lecteur PDF : on retombe alors sur un onglet
+   * dédié, où le lecteur natif offre son propre bouton d'impression.
+   */
+  const handlePrint = useCallback(() => {
+    const frame = iframeRef.current;
+    try {
+      if (frame?.contentWindow) {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+        return;
+      }
+    } catch {
+      // Repli ci-dessous.
+    }
+    if (blobUrl) window.open(blobUrl, "_blank");
+    else toast.error("Impossible d'ouvrir le document pour impression");
+  }, [blobUrl]);
 
   return (
     <div
@@ -320,6 +363,15 @@ function PdfViewerModal({ doc, onClose }: { doc: DocumentRecord; onClose: () => 
             </Badge>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              disabled={!blobUrl}
+            >
+              <Printer size={14} weight="regular" />
+              Imprimer
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -356,6 +408,7 @@ function PdfViewerModal({ doc, onClose }: { doc: DocumentRecord; onClose: () => 
           )}
           {blobUrl && (
             <iframe
+              ref={iframeRef}
               src={blobUrl}
               className="h-full w-full"
               title={doc.numero}
