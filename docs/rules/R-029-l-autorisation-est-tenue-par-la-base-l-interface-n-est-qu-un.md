@@ -13,7 +13,7 @@ source_feature: F-045
 
 ## Où elle est tenue
 
-`supabase/migrations/040_add_rbac.sql` et `062_*.sql`, adossées aux fonctions de session qui rendent le rôle et le caractère actif du compte.
+`supabase/migrations/040_rbac_rls_policies.sql` et `062_*.sql`, adossées aux fonctions de session qui rendent le rôle et le caractère actif du compte.
 
 ## Pourquoi
 

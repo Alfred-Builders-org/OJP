@@ -1,4 +1,4 @@
-# Méthodologie Design & UX — Or au Juste Prix
+# Méthodologie Design & UX : Or au Juste Prix
 
 > Ce document capture l'intégralité de la méthodologie design et UX construite au fil du projet OJP. Il sert de référence pour reproduire ce niveau de qualité sur d'autres projets.
 
@@ -101,12 +101,12 @@ Toujours via CLI : `npx shadcn@latest add <component>`. Ne jamais créer manuell
 
 | Couleur | Usage | Interdit |
 |---------|-------|----------|
-| `text-foreground` | Texte principal, titres, contenu important | — |
-| `text-muted-foreground` | Labels, texte secondaire, descriptions | — |
+| `text-foreground` | Texte principal, titres, contenu important | Aucun |
+| `text-muted-foreground` | Labels, texte secondaire, descriptions | Aucun |
 | `text-primary` | Uniquement sur `bg-primary` ou fond contrasté | Sur fond blanc/clair |
 | `text-destructive` | Erreurs, suppressions, alertes | Pour de l'info neutre |
-| `bg-muted` | Fonds de sections, hover rows | — |
-| `bg-muted/50` | Fonds subtils (footer, résumés) | — |
+| `bg-muted` | Fonds de sections, hover rows | Aucun |
+| `bg-muted/50` | Fonds subtils (footer, résumés) | Aucun |
 
 ### Couleurs sémantiques de statut
 
@@ -161,10 +161,10 @@ C'est un des éléments clés du design. 4 niveaux de profondeur créent une hi�
 
 | Niveau | Classes | Usage |
 |--------|---------|-------|
-| **0** — Plat | Aucune shadow | Inputs, badges, rows de table, ghost buttons |
-| **1** — Léger | `shadow-sm` | Cards, header, pagination, sidebar, boutons (sauf ghost/link) |
-| **2** — Moyen | `shadow-md ring-1 ring-foreground/10` | Popovers, dropdowns, selects ouverts |
-| **3** — Fort | `shadow-lg ring-1 ring-foreground/10` | Sheets, dialogs, menus imbriqués |
+| **0** (plat) | Aucune shadow | Inputs, badges, rows de table, ghost buttons |
+| **1** (léger) | `shadow-sm` | Cards, header, pagination, sidebar, boutons (sauf ghost/link) |
+| **2** (moyen) | `shadow-md ring-1 ring-foreground/10` | Popovers, dropdowns, selects ouverts |
+| **3** (fort) | `shadow-lg ring-1 ring-foreground/10` | Sheets, dialogs, menus imbriqués |
 
 ### Valeurs CSS custom
 
@@ -174,7 +174,7 @@ C'est un des éléments clés du design. 4 niveaux de profondeur créent une hi�
 --shadow-md: 0px 8px 20px 0px hsl(0 0% 0% / 0.05), 0px 2px 4px -1px hsl(0 0% 0% / 0.05);
 --shadow-lg: 0px 8px 20px 0px hsl(0 0% 0% / 0.05), 0px 4px 6px -1px hsl(0 0% 0% / 0.05);
 
-/* Dark mode — opacité et blur augmentés */
+/* Dark mode : opacité et blur augmentés */
 --shadow-sm: 0px 8px 25px 0px hsl(0 0% 0% / 0.4), 0px 1px 2px -1px hsl(0 0% 0% / 0.4);
 ```
 
@@ -282,17 +282,17 @@ className="grid md:grid-cols-3 gap-4"
 | Taille | Usage |
 |--------|-------|
 | `12` | Très petit (rare) |
-| `14`–`16` | Icônes dans les boutons |
+| `14` à `16` | Icônes dans les boutons |
 | `18` | Icônes dans la navigation sidebar |
 | `20` | Icônes dans les titres de card |
-| `28`–`32` | Icônes d'états vides, d'erreurs |
+| `28` à `32` | Icônes d'états vides, d'erreurs |
 | `48` | Icônes de pages d'erreur |
 
 ### Règles
 
 - **Chaque CardTitle** doit avoir une icône Phosphor duotone devant : `className="flex items-center gap-2"`
 - **Chaque Button** doit avoir une leading icon (icône avant le texte)
-- **Exception** : les composants internes Shadcn UI (sidebar trigger, etc.) qui utilisent Lucide en interne — ne pas les modifier
+- **Exception** : les composants internes Shadcn UI (sidebar trigger, etc.) qui utilisent Lucide en interne, ne pas les modifier
 
 ---
 
@@ -410,7 +410,7 @@ invalid: border-destructive ring-destructive/20
 
 ### Select
 
-- **Toujours `w-full`** sur le `SelectTrigger` (jamais `w-fit` — c'est un bug du défaut Shadcn base-nova)
+- **Toujours `w-full`** sur le `SelectTrigger` (jamais `w-fit`, c'est un bug du défaut Shadcn base-nova)
 - Le dropdown a `shadow-md ring-1 ring-foreground/10` (niveau 2)
 - **Toujours passer les données résolues** en props : le Select affiche la `value` brute, pas le label. Si la value est un UUID, il affichera l'UUID.
 
@@ -582,8 +582,8 @@ Pattern récurrent : icône circulaire dans un fond muted comme premier élémen
 
 | Statut | Couleur | Icône |
 |--------|---------|-------|
-| Brouillon | Gris | — |
-| En cours | Bleu | — |
+| Brouillon | Gris | Aucune |
+| En cours | Bleu | Aucune |
 | Finalisé | Vert emerald | Check |
 | Refusé / Annulé | Rouge | X |
 | En attente | Ambre | Clock |
@@ -756,9 +756,9 @@ Composant central qui affiche les actions disponibles pour une entité :
 
 ```
 ⚡ Actions en attente (3)
-├── 📋 Devis #123 — Client X     [✓ Accepter] [✗ Refuser]
-├── 💳 Paiement — 500,00 €       [Enregistrer le paiement]
-└── 📦 Livraison — Lot #456      [Marquer livré]
+├── 📋 Devis #123 : Client X     [✓ Accepter] [✗ Refuser]
+├── 💳 Paiement : 500,00 €       [Enregistrer le paiement]
+└── 📦 Livraison : Lot #456      [Marquer livré]
 ```
 
 ### Pattern d'une action row
@@ -1066,11 +1066,11 @@ src/components/
 ### Pattern composant feature
 
 Chaque module a typiquement :
-- `<entity>-detail-page.tsx` — Page détail complète
-- `<entity>-create-page.tsx` — Page de création (formulaire)
-- `<entity>-table.tsx` — Table de liste
-- `<entity>-toolbar.tsx` — Toolbar de filtres
-- `<entity>-status-badge.tsx` — Badge de statut custom
+- `<entity>-detail-page.tsx` : page détail complète
+- `<entity>-create-page.tsx` : page de création (formulaire)
+- `<entity>-table.tsx` : table de liste
+- `<entity>-toolbar.tsx` : toolbar de filtres
+- `<entity>-status-badge.tsx` : badge de statut custom
 
 ### Server vs Client
 
@@ -1143,6 +1143,6 @@ Ce qui distingue ce design d'un "simple" projet Shadcn :
 4. **Les leading icons systématiques** : chaque bouton et titre de card a son icône
 5. **L'attention aux détails** : tracking serré, border-radius généreux, animations subtiles
 6. **La consistance absolue** : les mêmes patterns partout, pas d'exception
-7. **Les corrections itératives** : select w-full, text-primary retiré, button elevation ajoutée — chaque feedback intégré
+7. **Les corrections itératives** : select w-full, text-primary retiré, button elevation ajoutée, chaque feedback intégré
 
 Le secret n'est pas dans une seule décision design spectaculaire, mais dans **l'accumulation de dizaines de petites décisions cohérentes** appliquées rigoureusement partout.

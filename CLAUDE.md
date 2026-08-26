@@ -4,20 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-**Or au Juste Prix** — Application web Next.js (App Router).
+**Or au Juste Prix** : application web Next.js (App Router).
 
 ## Commands
 
-- `npm run dev` — Serveur de développement (http://localhost:3000)
-- `npm run build` — Build de production
-- `npm run start` — Démarrer le build de production
-- `npm run lint` — Linter ESLint
+- `npm run dev` : serveur de développement (http://localhost:3000)
+- `npm run build` : build de production
+- `npm run start` : démarrer le build de production
+- `npm run lint` : linter ESLint
 
 ## Architecture
 
 - **Framework**: Next.js 16 avec App Router, React 19, TypeScript
 - **Styling**: Tailwind CSS v4 + thème personnalisé tweakcn (variables CSS oklch dans `globals.css`)
-- **UI Components**: Shadcn UI (style `base-nova`, icônes Lucide)
+- **UI Components**: Shadcn UI (style `base-nova`, icônes Phosphor en style duotone, voir R-033 et ADR-014 ; Lucide n'est toléré que dans les composants internes générés par Shadcn)
 - **Import alias**: `@/*` → `./src/*`
 
 ### Structure
@@ -33,7 +33,7 @@ src/
 ### Conventions
 
 - Ajouter des composants Shadcn via `npx shadcn@latest add <component>` (ne pas créer manuellement dans `ui/`)
-- Les composants dans `src/components/ui/` sont générés par Shadcn — les personnaliser est OK mais préférer les props/variants
+- Les composants dans `src/components/ui/` sont générés par Shadcn (les personnaliser est OK, mais préférer les props/variants)
 - `cn()` de `@/lib/utils` pour combiner les classes Tailwind
 
 ## Elevation System
@@ -49,7 +49,7 @@ src/
 
 - Ne jamais utiliser `shadow` seul → toujours `shadow-sm`, `shadow-md` ou `shadow-lg`
 - Les niveaux 2+ ajoutent `ring-1 ring-foreground/10` pour renforcer le contour
-- Ne pas mélanger `border` et `shadow` pour l'élévation — choisir l'un ou l'autre selon le niveau
+- Ne pas mélanger `border` et `shadow` pour l'élévation, choisir l'un ou l'autre selon le niveau
 
 ## Supabase
 
