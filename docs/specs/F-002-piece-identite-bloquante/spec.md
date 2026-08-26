@@ -19,7 +19,7 @@ Aujourd'hui le vendeur regarde la pièce, la rend au client et ouvre le dossier 
 
 La pièce devient donc une condition d'ouverture, tenue par l'application et non par la mémoire du vendeur. Le refus tombe au plus tôt, avant que l'or ne soit pesé et chiffré, pour que le vendeur ne s'engage pas sur un prix qu'il devra retirer devant le client.
 
-Le caractère valide d'un client est une date de péremption, pas une décision. Une case cochée à la main serait juste le jour où on la coche et fausse le lendemain. Le recalcul à chaque ajout, modification ou suppression de pièce est la seule façon que le verdict soit exact au moment précis où quelqu'un le lit, sans que personne n'ait à repasser derrière.
+Le caractère valide d'un client est une date de péremption, pas une décision. Une case cochée à la main serait juste le jour où on la coche et fausse le lendemain. Le recalcul à chaque ajout, modification ou suppression de pièce est le seul moyen pour que le verdict soit exact au moment précis où on le lit, sans que personne n'ait à repasser derrière.
 
 ## Hors-scope
 
