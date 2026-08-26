@@ -6,6 +6,7 @@ auth: none
 secrets:
   - NEXT_PUBLIC_ENABLE_AGENTATION
 status: active
+docs_url: none
 ---
 
 Outil de confort en développement, monté derrière un drapeau d'environnement. Sans incidence sur le produit servi.
