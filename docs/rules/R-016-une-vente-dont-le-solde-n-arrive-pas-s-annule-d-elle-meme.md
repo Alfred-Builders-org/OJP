@@ -10,3 +10,15 @@ status: active
 risk: risquee
 source_feature: F-023
 ---
+
+## Où elle est tenue
+
+`supabase/migrations/027_auto_cancel_expired_acompte.sql`, fonction `cancel_expired_acompte_lots`.
+
+Les articles retrouvent leur état d'origine : « en stock », ou « en dépôt-vente » s'ils venaient d'un contrat.
+
+## Pourquoi
+
+Un acompte réserve l'article et le sort du stock disponible. Sans échéance, un article resterait indéfiniment immobilisé sur une vente que le client n'honore pas.
+
+Le délai se règle en paramètres, avec les douze autres seuils de [R-024](R-024-les-seuils-du-metier-se-reglent-dans-l-application-pas-dans.md).

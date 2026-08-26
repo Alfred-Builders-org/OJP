@@ -10,3 +10,15 @@ status: active
 risk: risquee
 source_feature: F-007
 ---
+
+## Où elle est tenue
+
+`src/lib/calculations/prix-rachat.ts`, fonction `calculerPrixRachatBijoux`.
+
+Le cours employé n'est pas celui du jour au moment du calcul, mais celui figé sur le lot à sa création (voir [R-019](R-019-les-cours-se-portent-au-millieme-d-euro-sur-toute-la-chaine.md) pour la précision retenue).
+
+## Pourquoi
+
+Un bijou n'est pas en or pur : le titre en millièmes dit quelle fraction de son poids est du métal fin. 750 pour de l'or 18 carats, 800 pour de l'argent courant. Omettre ce facteur surévaluerait le rachat d'un quart.
+
+Le coefficient de rachat porte la marge de la maison. Il se règle sans toucher au code.

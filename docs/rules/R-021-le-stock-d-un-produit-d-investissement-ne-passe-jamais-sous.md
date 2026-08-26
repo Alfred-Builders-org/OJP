@@ -10,3 +10,13 @@ status: active
 risk: standard
 source_feature: F-021
 ---
+
+## Où elle est tenue
+
+`supabase/migrations/087_*.sql` : une contrainte de vérification sur la quantité, doublée d'un message explicite levé par `increment_or_invest_quantite` avant que la contrainte ne se déclenche.
+
+## Pourquoi
+
+Vendre un produit qu'on n'a pas fausse l'inventaire et la comptabilité matière. La contrainte tient l'invariant ; le message rend l'échec lisible pour le vendeur, qui verrait sinon une erreur de base de données.
+
+Les deux se complètent : la contrainte ne peut pas être contournée, le message ne peut pas être seul.

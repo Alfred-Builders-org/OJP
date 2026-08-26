@@ -10,3 +10,13 @@ status: active
 risk: risquee
 source_feature: F-007
 ---
+
+## Où elle est tenue
+
+`src/lib/calculations/prix-rachat.ts`, fonction `calculerPrixRachatOrInvest`.
+
+## Pourquoi
+
+Un lingot ou une pièce d'investissement est en or fin : appliquer un titre reviendrait à le dévaluer d'un facteur qui n'a pas lieu d'être. Le poids vient du catalogue, pas d'une pesée, parce que ces produits sont normalisés.
+
+C'est la seule différence de formule avec le rachat d'un bijou, et elle suffit à justifier deux fonctions distinctes plutôt qu'un paramètre optionnel.

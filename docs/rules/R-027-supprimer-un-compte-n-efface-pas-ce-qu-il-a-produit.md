@@ -10,3 +10,13 @@ status: active
 risk: risquee
 source_feature: F-046
 ---
+
+## Où elle est tenue
+
+`supabase/migrations/076_*.sql` pour la suppression logique, `134_*.sql` pour la libération de l'adresse.
+
+## Pourquoi
+
+Supprimer physiquement un compte emporterait les mentions « créé par » de tous les lots, dossiers et clients qu'il a produits : l'historique deviendrait illisible au moment précis où l'on cherche à comprendre qui a fait quoi.
+
+Mais un compte conservé garde son adresse, qui devient alors impossible à réutiliser. L'adresse est donc neutralisée aux deux endroits où Supabase la stocke, l'originale étant conservée dans les métadonnées pour retracer le compte au besoin. L'opération est rejouable sans effet de bord.
