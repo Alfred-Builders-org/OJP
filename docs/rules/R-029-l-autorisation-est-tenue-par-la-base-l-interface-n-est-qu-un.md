@@ -10,3 +10,13 @@ status: active
 risk: risquee
 source_feature: F-045
 ---
+
+## Où elle est tenue
+
+`supabase/migrations/040_add_rbac.sql` et `062_*.sql`, adossées aux fonctions de session qui rendent le rôle et le caractère actif du compte.
+
+## Pourquoi
+
+Une autorisation portée par l'application seule se contourne par tout accès direct à la base : un outil d'administration, un script de reprise, une requête depuis un autre service. C'est le même raisonnement que pour les règles métier, tranché par [ADR-004](../adr/ADR-004-faire-de-la-securite-au-niveau-des-lignes-l-autorisation-de.md).
+
+Le filtrage d'interface reste utile : il évite d'afficher une page qui se remplirait de vide. Mais il ne protège rien, et il ne faut pas compter dessus pour cela.

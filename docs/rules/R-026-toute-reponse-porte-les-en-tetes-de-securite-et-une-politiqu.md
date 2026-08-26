@@ -9,3 +9,13 @@ d025_class: format_validation
 status: active
 risk: risquee
 ---
+
+## Où elle est tenue
+
+`next.config.ts`, fonction `headers`. La politique de sécurité du contenu y est déclarée en entier.
+
+## Pourquoi
+
+Ces en têtes ferment les vecteurs qui ne dépendent pas du code applicatif : l'affichage du site dans un cadre distant, l'interprétation d'un fichier selon son contenu plutôt que son type déclaré, la fuite de l'adresse consultée vers un tiers, et l'accès à la caméra ou à la position.
+
+La politique de contenu est fermée par défaut et n'ouvre que ce dont l'application a besoin. Toute nouvelle intégration tierce demande de l'y déclarer explicitement, ce qui est voulu : c'est le moment où l'on décide si on lui fait confiance.

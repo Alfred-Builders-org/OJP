@@ -10,3 +10,13 @@ status: active
 risk: standard
 source_feature: F-005
 ---
+
+## Où elle est tenue
+
+`supabase/migrations/056_validate_status_transitions.sql`, fonction `validate_dossier_status_transition`.
+
+## Pourquoi
+
+Un dossier finalisé a produit des pièces contractuelles remises au client et des mouvements d'argent enregistrés. Le rouvrir rendrait ces pièces incohérentes avec son contenu.
+
+Corriger un dossier clos passe donc par une opération explicite qui laisse une trace, jamais par un retour en arrière silencieux.

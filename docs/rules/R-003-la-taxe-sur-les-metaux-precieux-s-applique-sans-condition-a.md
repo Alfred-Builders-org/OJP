@@ -10,3 +10,13 @@ status: active
 risk: risquee
 source_feature: F-014
 ---
+
+## Où elle est tenue
+
+`src/lib/calculations/taxes.ts`, fonction `calculerTMP`.
+
+## Pourquoi
+
+La taxe sur les métaux précieux est le régime de droit commun de la cession d'or d'investissement : elle s'applique sur le montant total, sans condition et sans seuil. C'est ce qui la rend calculable même quand le client n'apporte aucun justificatif.
+
+Elle sert de référence à la comparaison de [R-008](R-008-le-regime-fiscal-retenu-est-le-moins-couteux-pour-le-client.md) : le client paie le moins cher des deux régimes, jamais celui-ci par défaut.

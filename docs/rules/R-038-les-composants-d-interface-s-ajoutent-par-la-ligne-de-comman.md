@@ -9,3 +9,13 @@ d025_class: advisory_irreductible
 status: active
 risk: standard
 ---
+
+## Où elle est tenue
+
+`CLAUDE.md`, et les composants concernés vivent dans `src/components/ui/`.
+
+## Pourquoi
+
+Ces composants sont générés dans le dépôt plutôt qu'installés en dépendance, ce qui est le parti pris de [ADR-015](../adr/ADR-015-batir-l-interface-sur-shadcn-avec-un-theme-en-oklch.md). Ils appartiennent donc au projet et se personnalisent.
+
+Mais un fichier généré modifié à la main diverge de sa source : la prochaine régénération l'écrase, ou bien on ne régénère plus jamais. Passer par les propriétés et les variantes garde les deux possibilités ouvertes.
