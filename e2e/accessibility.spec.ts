@@ -30,7 +30,7 @@ test.describe("Accessibilité", () => {
     await expect(passwordInput).toBeVisible();
 
     // Vérifier que le bouton de connexion est accessible
-    const submitButton = page.getByRole("button", { name: /connexion/i });
+    const submitButton = page.getByRole("button", { name: /se connecter/i });
     await expect(submitButton).toBeVisible();
     await expect(submitButton).toBeEnabled();
   });

@@ -34,7 +34,7 @@ for (const viewport of VIEWPORTS) {
         if (page.path === "/sign-in") {
           await expect(p.locator("input[type='email']")).toBeVisible();
           await expect(p.locator("input[type='password']")).toBeVisible();
-          await expect(p.getByRole("button", { name: /connexion/i })).toBeVisible();
+          await expect(p.getByRole("button", { name: /se connecter/i })).toBeVisible();
         } else if (page.path === "/register") {
           await expect(p.locator("input[type='email']")).toBeVisible();
         } else if (page.path === "/forgot-password") {

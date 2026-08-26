@@ -146,7 +146,7 @@ export function DossierLotsSection({
                       <p className="text-xs text-muted-foreground">{formatCurrency(lot.total_prix_revente)} prix public</p>
                     )}
                   </div>
-                  <LotStatusBadge status={lot.status as LotStatus} outcome={(lot as any).outcome} />
+                  <LotStatusBadge status={lot.status as LotStatus} outcome={lot.outcome} />
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={<Button variant="ghost" size="icon-xs" />}
