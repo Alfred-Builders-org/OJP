@@ -200,7 +200,7 @@ export function LotTable({ data, basePath = "/lots", lotType = "rachat", totalIt
                     </TableCell>
                     <TableCell>{clientName}</TableCell>
                     <TableCell>
-                      <LotStatusBadge status={item.status as LotStatus} outcome={(item as any).outcome} />
+                      <LotStatusBadge status={item.status as LotStatus} outcome={item.outcome} />
                     </TableCell>
                     <TableCell className="font-medium">
                       {formatCurrency(lotType === "depot_vente" ? item.total_prix_revente : item.total_prix_achat)}
