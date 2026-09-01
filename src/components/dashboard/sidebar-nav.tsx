@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SquaresFour, Diamond, Coins, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings, BookOpen } from "@phosphor-icons/react";
+import { SquaresFour, Diamond, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings, BookOpen } from "@phosphor-icons/react";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -17,9 +17,10 @@ import type { UserRole } from "@/types/auth";
 // Un seul inventaire : rachats, depots-vente et achats grossistes vivent dans
 // le meme stock, avec l'origine en colonne. Trois listes separees obligeaient a
 // savoir d'ou venait un article avant de pouvoir le chercher.
+// Le catalogue Or investissement a rejoint les parametres : c'est un
+// referentiel qu'on regle, pas un inventaire qu'on consulte au comptoir.
 const stockItems = [
   { title: "Stock", href: "/stock", icon: Diamond, disabled: false },
-  { title: "Or Investissement", href: "/or-investissement", icon: Coins, disabled: false },
   { title: "Grossistes", href: "/grossistes", icon: Buildings, disabled: false },
 ];
 
