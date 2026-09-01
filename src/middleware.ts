@@ -53,9 +53,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Une route d'API rend son propre verdict et n'est jamais redirigee vers une
+  // page. Rediriger l'appel d'un client non authentifie lui renverrait du HTML
+  // avec un statut 200, la ou il attend un 401 en JSON : les sept routes
+  // verifient toutes la session et repondent 401 elles-memes.
+  const isApiRoute = pathname.startsWith("/api/");
+
   // Redirect unauthenticated users to sign-in
   if (
     !user &&
+    !isApiRoute &&
     !publicRoutes.some((route) => pathname.startsWith(route)) &&
     pathname !== "/"
   ) {
@@ -88,8 +95,9 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Block vendeur from owner-only routes
-    if (profile?.role !== "proprietaire" && profile?.role !== "super_admin") {
+    // Block vendeur from owner-only routes. Meme raison que plus haut : les
+    // routes d'API reservees au proprietaire repondent 403 elles-memes.
+    if (!isApiRoute && profile?.role !== "proprietaire" && profile?.role !== "super_admin") {
       const isOwnerRoute =
         OWNER_ONLY_ROUTES.some((r) => pathname === r) ||
         OWNER_ONLY_PREFIXES.some((r) => pathname.startsWith(r));

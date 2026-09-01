@@ -38,14 +38,12 @@ const typeLabels: Record<string, string> = {
 };
 
 export default function LotPreview({ id }: { id: string }) {
-  const [lot, setLot] = useState<LotData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // L'état porte l'id qu'il décrit : le chargement se dérive de la comparaison
+  // avec l'id demandé, plutôt que d'un setState synchrone en tête d'effet.
+  const [result, setResult] = useState<{ id: string; data: LotData | null; error: string | null } | null>(null);
 
   useEffect(() => {
     let aborted = false;
-    setLoading(true);
-    setError(null);
 
     const supabase = createClient();
     supabase
@@ -55,18 +53,22 @@ export default function LotPreview({ id }: { id: string }) {
       .single()
       .then(({ data, error: err }) => {
         if (aborted) return;
-        if (err || !data) {
-          setError("Impossible de charger le lot.");
-        } else {
-          setLot(data as unknown as LotData);
-        }
-        setLoading(false);
+        setResult(
+          err || !data
+            ? { id, data: null, error: "Impossible de charger le lot." }
+            : { id, data: data as unknown as LotData, error: null }
+        );
       });
 
     return () => {
       aborted = true;
     };
   }, [id]);
+
+  const settled = result?.id === id ? result : null;
+  const loading = settled === null;
+  const error = settled?.error ?? null;
+  const lot = settled?.data ?? null;
 
   if (loading) return <PreviewSkeleton />;
   if (error || !lot) {

@@ -8,14 +8,12 @@ import { formatDate } from "@/lib/format";
 import type { Client } from "@/types/client";
 
 export default function ClientPreview({ id }: { id: string }) {
-  const [client, setClient] = useState<Client | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // L'état porte l'id qu'il décrit : le chargement se dérive de la comparaison
+  // avec l'id demandé, plutôt que d'un setState synchrone en tête d'effet.
+  const [result, setResult] = useState<{ id: string; data: Client | null; error: string | null } | null>(null);
 
   useEffect(() => {
     let aborted = false;
-    setLoading(true);
-    setError(null);
 
     const supabase = createClient();
     supabase
@@ -25,18 +23,22 @@ export default function ClientPreview({ id }: { id: string }) {
       .single()
       .then(({ data, error: err }) => {
         if (aborted) return;
-        if (err) {
-          setError("Impossible de charger le client.");
-        } else {
-          setClient(data);
-        }
-        setLoading(false);
+        setResult(
+          err
+            ? { id, data: null, error: "Impossible de charger le client." }
+            : { id, data, error: null }
+        );
       });
 
     return () => {
       aborted = true;
     };
   }, [id]);
+
+  const settled = result?.id === id ? result : null;
+  const loading = settled === null;
+  const error = settled?.error ?? null;
+  const client = settled?.data ?? null;
 
   if (loading) return <PreviewSkeleton />;
   if (error || !client) {
