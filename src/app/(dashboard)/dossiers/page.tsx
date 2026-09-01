@@ -2,29 +2,72 @@ import { createClient } from "@/lib/supabase/server";
 import { PageWrapper } from "@/components/dashboard/page-wrapper";
 import { DossierTable } from "@/components/dossiers/dossier-table";
 import { DossierCreateButton } from "@/components/dossiers/dossier-create-button";
+import {
+  lireParams,
+  appliquerFiltres,
+  type ParamsTableau,
+  type OptionsRequete,
+} from "@/lib/data-grid/query";
 import type { DossierWithClient } from "@/types/dossier";
 import type { Client } from "@/types/client";
+
+const OPTIONS: OptionsRequete = {
+  // La recherche par nom de client est resolue en amont : PostgREST ne sait pas
+  // melanger, dans un meme OU, une colonne de la table et une colonne jointe.
+  colonnesRecherche: ["numero"],
+  colonnesFiltres: { statut: "status" },
+  colonnesTri: { numero: "numero", statut: "status", date: "created_at" },
+  triParDefaut: { colonne: "created_at", ascendant: false },
+};
 
 export default async function DossiersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; size?: string }>;
+  searchParams: Promise<ParamsTableau>;
 }) {
   const params = await searchParams;
-  const page = Math.max(0, parseInt(params.page ?? "0"));
-  const size = Math.max(1, parseInt(params.size ?? "20"));
-  const from = page * size;
-  const to = from + size - 1;
+  const etat = lireParams(params);
 
   const supabase = await createClient();
 
+  // Un dossier se cherche aussi par le nom de son client : on resout d'abord
+  // les clients correspondants, puis on elargit la clause au lot d'identifiants.
+  let clauseRecherche: string | null = null;
+  if (etat.search) {
+    const terme = etat.search.replace(/[(),]/g, " ").trim();
+    const { data: clientsTrouves } = await supabase
+      .from("clients")
+      .select("id")
+      .or(`first_name.ilike.%${terme}%,last_name.ilike.%${terme}%`)
+      .limit(200);
+
+    const ids = (clientsTrouves ?? []).map((c) => c.id);
+    clauseRecherche = ids.length
+      ? `numero.ilike.%${terme}%,client_id.in.(${ids.join(",")})`
+      : `numero.ilike.%${terme}%`;
+  }
+
+  const etatSansRecherche = { ...etat, search: "" };
+  const appliquerRecherche = <T extends { or: (c: string) => T }>(q: T): T =>
+    clauseRecherche ? q.or(clauseRecherche) : q;
+
   const [{ count }, { data }, { data: clientsData }] = await Promise.all([
-    supabase.from("dossiers").select("*", { count: "exact", head: true }),
-    supabase
-      .from("dossiers")
-      .select("*, client:clients(id, civility, first_name, last_name, is_valid)")
-      .order("created_at", { ascending: false })
-      .range(from, to),
+    appliquerRecherche(
+      appliquerFiltres(
+        supabase.from("dossiers").select("*", { count: "exact", head: true }),
+        etatSansRecherche,
+        { ...OPTIONS, triParDefaut: undefined }
+      )
+    ),
+    appliquerRecherche(
+      appliquerFiltres(
+        supabase
+          .from("dossiers")
+          .select("*, client:clients(id, civility, first_name, last_name, is_valid)"),
+        etatSansRecherche,
+        OPTIONS
+      )
+    ).range(etat.from, etat.to),
     supabase
       .from("clients")
       .select("*")
@@ -96,7 +139,7 @@ export default async function DossiersPage({
       fullHeight
       headerActions={<DossierCreateButton validClients={validClients} />}
     >
-      <DossierTable data={dossiers} totalItems={count ?? 0} page={page} pageSize={size} actionCounts={actionCounts} />
+      <DossierTable data={dossiers} totalItems={count ?? 0} actionCounts={actionCounts} />
     </PageWrapper>
   );
 }

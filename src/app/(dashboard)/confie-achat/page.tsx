@@ -1,19 +1,37 @@
 import { createClient } from "@/lib/supabase/server";
 import { PageWrapper } from "@/components/dashboard/page-wrapper";
 import { ConfieAchatTable, type ConfieAchatItem } from "@/components/confie-achat/confie-achat-table";
+import {
+  lireParams,
+  appliquerFiltres,
+  type ParamsTableau,
+  type OptionsRequete,
+} from "@/lib/data-grid/query";
 import type { BijouxStock } from "@/types/bijoux";
 import type { UserRole } from "@/types/auth";
+
+const OPTIONS: OptionsRequete = {
+  colonnesRecherche: ["nom", "description", "metaux", "qualite"],
+  colonnesFiltres: { statut: "statut", metal: "metaux" },
+  colonnesTri: {
+    nom: "nom",
+    statut: "statut",
+    metal: "metaux",
+    poids: "poids",
+    prix_achat: "prix_achat",
+    prix_revente: "prix_revente",
+    date_depot: "date_creation",
+  },
+  triParDefaut: { colonne: "date_creation", ascendant: false },
+};
 
 export default async function ConfieAchatPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; size?: string }>;
+  searchParams: Promise<ParamsTableau>;
 }) {
   const params = await searchParams;
-  const page = Math.max(0, parseInt(params.page ?? "0"));
-  const size = Math.max(1, parseInt(params.size ?? "20"));
-  const from = page * size;
-  const to = from + size - 1;
+  const etat = lireParams(params);
 
   const supabase = await createClient();
 
@@ -25,16 +43,22 @@ export default async function ConfieAchatPage({
       .select("role")
       .eq("id", user!.id)
       .single(),
-    supabase
-      .from("bijoux_stock")
-      .select("*", { count: "exact", head: true })
-      .not("depot_vente_lot_id", "is", null),
-    supabase
-      .from("bijoux_stock")
-      .select("*")
-      .not("depot_vente_lot_id", "is", null)
-      .order("date_creation", { ascending: false })
-      .range(from, to),
+    appliquerFiltres(
+      supabase
+        .from("bijoux_stock")
+        .select("*", { count: "exact", head: true })
+        .not("depot_vente_lot_id", "is", null),
+      etat,
+      { ...OPTIONS, triParDefaut: undefined }
+    ),
+    appliquerFiltres(
+      supabase
+        .from("bijoux_stock")
+        .select("*")
+        .not("depot_vente_lot_id", "is", null),
+      etat,
+      OPTIONS
+    ).range(etat.from, etat.to),
     supabase
       .from("lot_references")
       .select(
@@ -84,7 +108,7 @@ export default async function ConfieAchatPage({
 
   return (
     <PageWrapper title="Confié d'achat" fullHeight>
-      <ConfieAchatTable data={items} canEdit={role === "proprietaire" || role === "super_admin"} totalItems={count ?? 0} page={page} pageSize={size} />
+      <ConfieAchatTable data={items} canEdit={role === "proprietaire" || role === "super_admin"} totalItems={count ?? 0} />
     </PageWrapper>
   );
 }

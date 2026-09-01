@@ -1,19 +1,37 @@
 import { createClient } from "@/lib/supabase/server";
 import { PageWrapper } from "@/components/dashboard/page-wrapper";
 import { StockTable } from "@/components/stock/stock-table";
+import {
+  lireParams,
+  appliquerFiltres,
+  type ParamsTableau,
+  type OptionsRequete,
+} from "@/lib/data-grid/query";
 import type { BijouxStock, BijouxStockWithOrigin } from "@/types/bijoux";
 import type { UserRole } from "@/types/auth";
+
+const OPTIONS: OptionsRequete = {
+  colonnesRecherche: ["nom", "description", "metaux", "qualite"],
+  colonnesFiltres: { statut: "statut", metal: "metaux" },
+  colonnesTri: {
+    nom: "nom",
+    statut: "statut",
+    metal: "metaux",
+    qualite: "qualite",
+    poids: "poids",
+    prix_achat: "prix_achat",
+    prix_revente: "prix_revente",
+  },
+  triParDefaut: { colonne: "date_creation", ascendant: false },
+};
 
 export default async function StockPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; size?: string }>;
+  searchParams: Promise<ParamsTableau>;
 }) {
   const params = await searchParams;
-  const page = Math.max(0, parseInt(params.page ?? "0"));
-  const size = Math.max(1, parseInt(params.size ?? "20"));
-  const from = page * size;
-  const to = from + size - 1;
+  const etat = lireParams(params);
 
   // Le Stock bijoux montre tout ce qui est physiquement en boutique : articles
   // en stock, en depot-vente, en reparation, et ceux qui attendent un envoi en
@@ -33,16 +51,19 @@ export default async function StockPage({
       .select("role")
       .eq("id", user!.id)
       .single(),
-    supabase
-      .from("bijoux_stock")
-      .select("*", { count: "exact", head: true })
-      .neq("statut", "fondu"),
-    supabase
-      .from("bijoux_stock")
-      .select("*")
-      .neq("statut", "fondu")
-      .order("date_creation", { ascending: false })
-      .range(from, to),
+    appliquerFiltres(
+      supabase
+        .from("bijoux_stock")
+        .select("*", { count: "exact", head: true })
+        .neq("statut", "fondu"),
+      etat,
+      { ...OPTIONS, triParDefaut: undefined }
+    ),
+    appliquerFiltres(
+      supabase.from("bijoux_stock").select("*").neq("statut", "fondu"),
+      etat,
+      OPTIONS
+    ).range(etat.from, etat.to),
     supabase
       .from("lot_references")
       .select(
@@ -89,7 +110,7 @@ export default async function StockPage({
 
   return (
     <PageWrapper title="Bijoux" fullHeight>
-      <StockTable data={bijoux} canEdit={role === "proprietaire" || role === "super_admin"} totalItems={count ?? 0} page={page} pageSize={size} />
+      <StockTable data={bijoux} canEdit={role === "proprietaire" || role === "super_admin"} totalItems={count ?? 0} />
     </PageWrapper>
   );
 }

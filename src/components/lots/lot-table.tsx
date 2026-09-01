@@ -1,262 +1,107 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { ArrowsDownUp, ArrowUp, ArrowDown, DotsThree, Eye, Trash, Package } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { DotsThree, Eye, Package } from "@phosphor-icons/react";
 import type { LotWithDossier, LotStatus } from "@/types/lot";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { DataGrid, type ColonneGrid } from "@/components/ui/data-grid";
 import { LotStatusBadge } from "@/components/lots/lot-status-badge";
-import { LotToolbar } from "@/components/lots/lot-toolbar";
-import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import { formatDate, formatCurrency } from "@/lib/format";
-
-type SortKey = "numero" | "client" | "status" | "total_prix_achat" | "created_at";
-type SortDir = "asc" | "desc";
-
-function SortableHead({
-  children,
-  sortKey,
-  currentSort,
-  currentDir,
-  onSort,
-  className,
-}: {
-  children: React.ReactNode;
-  sortKey: SortKey;
-  currentSort: SortKey | null;
-  currentDir: SortDir;
-  onSort: (key: SortKey) => void;
-  className?: string;
-}) {
-  const isActive = currentSort === sortKey;
-  return (
-    <TableHead className={className}>
-      <button
-        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-        onClick={() => onSort(sortKey)}
-      >
-        {children}
-        {isActive ? (
-          currentDir === "asc" ? (
-            <ArrowUp size={12} weight="regular" />
-          ) : (
-            <ArrowDown size={12} weight="regular" />
-          )
-        ) : (
-          <ArrowsDownUp size={12} weight="regular" className="opacity-40" />
-        )}
-      </button>
-    </TableHead>
-  );
-}
+import { LOT_STATUS_OPTIONS } from "@/lib/validations/lot";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface LotTableProps {
   data: LotWithDossier[];
   basePath?: string;
   lotType?: "rachat" | "depot_vente";
   totalItems: number;
-  page: number;
-  pageSize: number;
 }
 
-export function LotTable({ data, basePath = "/lots", lotType = "rachat", totalItems, page, pageSize }: LotTableProps) {
+export function LotTable({
+  data,
+  basePath = "/lots",
+  lotType = "rachat",
+  totalItems,
+}: LotTableProps) {
   const router = useRouter();
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const [search, setSearch] = useState("");
-  const [statusFilters, setStatusFilters] = useState<LotStatus[]>([]);
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
-  function handleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
-  }
+  const nomClient = (lot: LotWithDossier) =>
+    `${lot.dossier.client.civility === "M" ? "M." : "Mme"} ${lot.dossier.client.first_name} ${lot.dossier.client.last_name}`;
 
-  const filtered = (() => {
-    let result = data;
-
-    if (search) {
-      const q = search.toLowerCase();
-      result = result.filter(
-        (item) =>
-          item.numero.toLowerCase().includes(q) ||
-          item.dossier.numero.toLowerCase().includes(q) ||
-          item.dossier.client.last_name.toLowerCase().includes(q) ||
-          item.dossier.client.first_name.toLowerCase().includes(q)
-      );
-    }
-
-    if (statusFilters.length > 0) {
-      result = result.filter((item) => statusFilters.includes(item.status as LotStatus));
-    }
-
-    if (sortKey) {
-      result = [...result].sort((a, b) => {
-        let cmp = 0;
-        if (sortKey === "client") {
-          cmp = a.dossier.client.last_name.localeCompare(b.dossier.client.last_name, "fr");
-        } else if (sortKey === "total_prix_achat") {
-          cmp = lotType === "depot_vente"
-            ? a.total_prix_revente - b.total_prix_revente
-            : a.total_prix_achat - b.total_prix_achat;
-        } else {
-          const aVal = String(a[sortKey] ?? "");
-          const bVal = String(b[sortKey] ?? "");
-          cmp = aVal.localeCompare(bVal, "fr");
-        }
-        return sortDir === "asc" ? cmp : -cmp;
-      });
-    }
-
-    return result;
-  })();
-
-  function navigatePage(newPage: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", String(newPage));
-    router.push(`${pathname}?${params.toString()}`);
-  }
-
-  function navigatePageSize(newSize: number) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("size", String(newSize));
-    params.set("page", "0");
-    router.push(`${pathname}?${params.toString()}`);
-  }
+  const colonnes: ColonneGrid<LotWithDossier>[] = [
+    {
+      cle: "numero",
+      titre: "Numéro",
+      triable: true,
+      cellule: (l) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+            <Package size={16} weight="duotone" className="text-muted-foreground" />
+          </div>
+          <span className="font-medium">{l.numero}</span>
+        </div>
+      ),
+    },
+    { cle: "client", titre: "Client", cellule: nomClient },
+    {
+      cle: "statut",
+      titre: "Statut",
+      triable: true,
+      cellule: (l) => (
+        <LotStatusBadge status={l.status as LotStatus} outcome={l.outcome} />
+      ),
+      groupe: (l) =>
+        LOT_STATUS_OPTIONS.find((o) => o.value === l.status)?.label ?? l.status,
+    },
+    {
+      cle: "prix",
+      titre: lotType === "depot_vente" ? "Prix de revente" : "Prix de rachat",
+      triable: true,
+      className: "font-medium",
+      cellule: (l) =>
+        formatCurrency(
+          lotType === "depot_vente" ? l.total_prix_revente : l.total_prix_achat
+        ),
+    },
+    {
+      cle: "date",
+      titre: "Date",
+      triable: true,
+      cellule: (l) => formatDate(l.created_at),
+    },
+  ];
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 min-w-0 gap-4">
-      <LotToolbar
-        search={search}
-        onSearchChange={setSearch}
-        statusFilters={statusFilters}
-        onStatusFiltersChange={setStatusFilters}
-      />
-      <div className="flex-1 min-h-0 overflow-auto rounded-lg border bg-white dark:bg-card">
-        <Table className={filtered.length === 0 ? "h-full" : ""}>
-          <TableHeader className="sticky top-0 z-10 bg-muted">
-            <TableRow className="bg-transparent hover:bg-transparent">
-              <SortableHead sortKey="numero" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-4">
-                Numéro
-              </SortableHead>
-              <SortableHead sortKey="client" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                Client
-              </SortableHead>
-              <SortableHead sortKey="status" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                Statut
-              </SortableHead>
-              <SortableHead sortKey="total_prix_achat" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                {lotType === "depot_vente" ? "Prix de revente" : "Prix de rachat"}
-              </SortableHead>
-              <SortableHead sortKey="created_at" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                Date
-              </SortableHead>
-              <TableHead className="w-10 pr-4" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="h-24 px-4 text-center text-muted-foreground">
-                  Aucun lot trouvé.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filtered.map((item) => {
-                const clientName = `${item.dossier.client.civility === "M" ? "M." : "Mme"} ${item.dossier.client.first_name} ${item.dossier.client.last_name}`;
-                return (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer bg-white dark:bg-card"
-                    onClick={() => router.push(`${basePath}/${item.id}`)}
-                  >
-                    <TableCell className="pl-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                          <Package size={16} weight="duotone" className="text-muted-foreground" />
-                        </div>
-                        <span className="font-medium">{item.numero}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{clientName}</TableCell>
-                    <TableCell>
-                      <LotStatusBadge status={item.status as LotStatus} outcome={item.outcome} />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {formatCurrency(lotType === "depot_vente" ? item.total_prix_revente : item.total_prix_achat)}
-                    </TableCell>
-                    <TableCell>{formatDate(item.created_at)}</TableCell>
-                    <TableCell className="pr-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          render={
-                            <Button
-                              variant="ghost"
-                              size="icon-xs"
-                              onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                              aria-label="Actions"
-                            />
-                          }
-                        >
-                          <DotsThree size={16} weight="regular" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              router.push(`/lots/${item.id}`);
-                            }}
-                          >
-                            <Eye size={16} weight="duotone" />
-                            Voir détail
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                            }}
-                          >
-                            <Trash size={16} weight="duotone" />
-                            Supprimer
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <DataTablePagination
-        totalItems={totalItems}
-        pageSize={pageSize}
-        currentPage={page}
-        onPageChange={navigatePage}
-        onPageSizeChange={navigatePageSize}
-      />
-    </div>
+    <DataGrid
+      colonnes={colonnes}
+      donnees={data}
+      totalItems={totalItems}
+      cleLigne={(l) => l.id}
+      onRowClick={(l) => router.push(`${basePath}/${l.id}`)}
+      placeholderRecherche="Rechercher un lot..."
+      messageVide="Aucun lot trouvé."
+      filtres={[{ cle: "statut", label: "Statut", options: LOT_STATUS_OPTIONS }]}
+      groupements={[{ cle: "statut", label: "Statut" }]}
+      actions={(item) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={<Button variant="ghost" size="icon-xs" aria-label="Actions" />}
+          >
+            <DotsThree size={16} weight="regular" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => router.push(`${basePath}/${item.id}`)}>
+              <Eye size={16} weight="duotone" />
+              Voir détail
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+    />
   );
 }

@@ -1,211 +1,130 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowsDownUp, ArrowUp, ArrowDown, Receipt } from "@phosphor-icons/react";
-import type { TaxeRow, TaxeType } from "@/types/impots";
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from "@/components/ui/table";
+import { Receipt } from "@phosphor-icons/react";
+import type { TaxeRow } from "@/types/impots";
 import { TaxeTypeBadge } from "@/components/impots/taxe-type-badge";
-import { ImpotsToolbar } from "@/components/impots/impots-toolbar";
-import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { DataGrid, type ColonneGrid } from "@/components/ui/data-grid";
+import { useDataGridState } from "@/hooks/use-data-grid-state";
 import { formatDate, formatCurrency } from "@/lib/format";
 
-type SortKey = "date" | "reference" | "client_name" | "type" | "montant_brut" | "montant_taxe";
-type SortDir = "asc" | "desc";
-
-function SortableHead({
-  children,
-  sortKey,
-  currentSort,
-  currentDir,
-  onSort,
-  className,
-}: {
-  children: React.ReactNode;
-  sortKey: SortKey;
-  currentSort: SortKey | null;
-  currentDir: SortDir;
-  onSort: (key: SortKey) => void;
-  className?: string;
-}) {
-  const isActive = currentSort === sortKey;
-  return (
-    <TableHead className={className}>
-      <button
-        className="inline-flex items-center gap-1 hover:text-foreground transition-colors"
-        onClick={() => onSort(sortKey)}
-      >
-        {children}
-        {isActive ? (
-          currentDir === "asc" ? (
-            <ArrowUp size={12} weight="regular" />
-          ) : (
-            <ArrowDown size={12} weight="regular" />
-          )
-        ) : (
-          <ArrowsDownUp size={12} weight="regular" className="opacity-40" />
-        )}
-      </button>
-    </TableHead>
-  );
-}
+const TYPE_OPTIONS = [
+  { value: "TMP", label: "TMP" },
+  { value: "TPV", label: "TPV" },
+  { value: "TFOP", label: "TFOP" },
+  { value: "TVA", label: "TVA" },
+] as const;
 
 interface ImpotsTableProps {
   data: TaxeRow[];
 }
 
+/**
+ * Registre des taxes.
+ *
+ * Contrairement aux autres listes, celle-ci n'est pas une table : c'est un
+ * agrégat calculé côté serveur à partir des rachats et des ventes. Le filtrage
+ * reste donc en mémoire — mais il porte bien sur l'ensemble du jeu, et non sur
+ * la seule page affichée.
+ */
 export function ImpotsTable({ data }: ImpotsTableProps) {
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [typeFilters, setTypeFilters] = useState<TaxeType[]>([]);
-  const [sortKey, setSortKey] = useState<SortKey | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
+  const grid = useDataGridState();
 
-  function handleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
-  }
-
-  const filtered = (() => {
+  const filtrees = useMemo(() => {
     let result = data;
 
-    if (search) {
-      const q = search.toLowerCase();
+    if (grid.search) {
+      const q = grid.search.toLowerCase();
       result = result.filter(
-        (item) =>
-          item.reference.toLowerCase().includes(q) ||
-          item.client_name.toLowerCase().includes(q)
+        (r) =>
+          r.reference.toLowerCase().includes(q) ||
+          r.client_name.toLowerCase().includes(q)
       );
     }
 
-    if (typeFilters.length > 0) {
-      result = result.filter((item) => typeFilters.includes(item.type));
+    const types = grid.filters.type;
+    if (types?.length) {
+      result = result.filter((r) => types.includes(r.type));
     }
 
-    if (sortKey) {
+    if (grid.sort) {
+      const cle = grid.sort as keyof TaxeRow;
+      const sens = grid.sortDir === "asc" ? 1 : -1;
       result = [...result].sort((a, b) => {
-        let cmp = 0;
-        if (sortKey === "montant_brut" || sortKey === "montant_taxe") {
-          cmp = a[sortKey] - b[sortKey];
-        } else {
-          const aVal = String(a[sortKey] ?? "");
-          const bVal = String(b[sortKey] ?? "");
-          cmp = aVal.localeCompare(bVal, "fr");
-        }
-        return sortDir === "asc" ? cmp : -cmp;
+        const va = a[cle];
+        const vb = b[cle];
+        if (typeof va === "number" && typeof vb === "number") return (va - vb) * sens;
+        return String(va).localeCompare(String(vb), "fr") * sens;
       });
     }
 
     return result;
-  })();
+  }, [data, grid.search, grid.filters, grid.sort, grid.sortDir]);
 
-  const totalItems = filtered.length;
-  const from = page * pageSize;
-  const to = from + pageSize;
-  const paginated = filtered.slice(from, to);
+  const page = filtrees.slice(
+    grid.page * grid.pageSize,
+    grid.page * grid.pageSize + grid.pageSize
+  );
 
-  function navigatePage(newPage: number) {
-    setPage(newPage);
-  }
-
-  function navigatePageSize(newSize: number) {
-    setPageSize(newSize);
-    setPage(0);
-  }
+  const colonnes: ColonneGrid<TaxeRow>[] = [
+    {
+      cle: "date",
+      titre: "Date",
+      triable: true,
+      cellule: (t) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+            <Receipt size={16} weight="duotone" className="text-muted-foreground" />
+          </div>
+          <span>{formatDate(t.date)}</span>
+        </div>
+      ),
+    },
+    { cle: "reference", titre: "Référence", triable: true, className: "font-medium", cellule: (t) => t.reference },
+    {
+      cle: "client_name",
+      titre: "Client",
+      triable: true,
+      cellule: (t) => t.client_name,
+      groupe: (t) => t.client_name,
+    },
+    {
+      cle: "type",
+      titre: "Type",
+      triable: true,
+      cellule: (t) => <TaxeTypeBadge type={t.type} />,
+      groupe: (t) => t.type,
+    },
+    { cle: "montant_brut", titre: "Montant brut", triable: true, cellule: (t) => formatCurrency(t.montant_brut) },
+    {
+      cle: "montant_taxe",
+      titre: "Taxe",
+      triable: true,
+      className: "font-medium",
+      cellule: (t) => formatCurrency(t.montant_taxe),
+    },
+  ];
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 min-w-0 gap-4">
-      <ImpotsToolbar
-        search={search}
-        onSearchChange={setSearch}
-        typeFilters={typeFilters}
-        onTypeFiltersChange={setTypeFilters}
-      />
-      <div className="flex-1 min-h-0 overflow-auto rounded-lg border bg-white dark:bg-card">
-        <Table className={paginated.length === 0 ? "h-full" : ""}>
-          <TableHeader className="sticky top-0 z-10 bg-muted">
-            <TableRow className="bg-transparent hover:bg-transparent">
-              <SortableHead sortKey="date" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} className="pl-4">
-                Date
-              </SortableHead>
-              <SortableHead sortKey="reference" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                Référence
-              </SortableHead>
-              <SortableHead sortKey="client_name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                Client
-              </SortableHead>
-              <SortableHead sortKey="type" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                Type
-              </SortableHead>
-              <SortableHead sortKey="montant_brut" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                Montant brut
-              </SortableHead>
-              <SortableHead sortKey="montant_taxe" currentSort={sortKey} currentDir={sortDir} onSort={handleSort}>
-                Taxe
-              </SortableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {paginated.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="h-24 px-4 text-center text-muted-foreground">
-                  Aucune taxe trouvée.
-                </TableCell>
-              </TableRow>
-            ) : (
-              paginated.map((item) => (
-                <TableRow
-                  key={item.id}
-                  className="cursor-pointer bg-white dark:bg-card"
-                  onClick={() => {
-                    if (item.source_type === "rachat") {
-                      router.push(`/lots/${item.source_id}`);
-                    } else {
-                      router.push(`/ventes/${item.source_id}`);
-                    }
-                  }}
-                >
-                  <TableCell className="pl-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                        <Receipt size={16} weight="duotone" className="text-muted-foreground" />
-                      </div>
-                      <span>{formatDate(item.date)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">{item.reference}</TableCell>
-                  <TableCell>{item.client_name}</TableCell>
-                  <TableCell>
-                    <TaxeTypeBadge type={item.type} />
-                  </TableCell>
-                  <TableCell>{formatCurrency(item.montant_brut)}</TableCell>
-                  <TableCell className="font-medium">{formatCurrency(item.montant_taxe)}</TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      <DataTablePagination
-        totalItems={totalItems}
-        pageSize={pageSize}
-        currentPage={page}
-        onPageChange={navigatePage}
-        onPageSizeChange={navigatePageSize}
-      />
-    </div>
+    <DataGrid
+      colonnes={colonnes}
+      donnees={page}
+      totalItems={filtrees.length}
+      cleLigne={(t) => t.id}
+      onRowClick={(t) =>
+        router.push(
+          t.source_type === "rachat" ? `/lots/${t.source_id}` : `/ventes/${t.source_id}`
+        )
+      }
+      placeholderRecherche="Rechercher une taxe..."
+      messageVide="Aucune taxe trouvée."
+      filtres={[{ cle: "type", label: "Type", options: TYPE_OPTIONS }]}
+      groupements={[
+        { cle: "type", label: "Type de taxe" },
+        { cle: "client_name", label: "Client" },
+      ]}
+    />
   );
 }
