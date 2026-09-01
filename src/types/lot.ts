@@ -50,6 +50,8 @@ export interface Lot {
   cours_platine_snapshot: number | null;
   coefficient_rachat_snapshot: number | null;
   coefficient_vente_snapshot: number | null;
+  /** Photo du lot entier, distincte de celle de chaque reference. */
+  photo_url: string | null;
   notes: string | null;
   created_by: string;
   created_at: string;

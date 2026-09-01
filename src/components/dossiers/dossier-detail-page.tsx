@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { RichText } from "@/components/ui/rich-text";
 
@@ -51,6 +51,9 @@ import { DossierLotsSection } from "@/components/dossiers/dossier-lots-section";
 import { FinalisationDialog } from "@/components/dossiers/finalisation-dialog";
 import { ActionDashboard } from "@/components/actions/action-dashboard";
 import { finaliserDossierAction } from "@/lib/actions/finalize-actions";
+import { executeAction } from "@/lib/actions/action-executor";
+import { getSettingClient } from "@/lib/settings-client";
+import type { RefActionId } from "@/components/dossiers/dossier-lots-section";
 import type { DossierWithClient, DossierStatus } from "@/types/dossier";
 import type { Lot, LotReference, LotWithReferences } from "@/types/lot";
 import type { VenteLigne } from "@/types/vente";
@@ -131,6 +134,44 @@ export function DossierDetailPage({
   const brouillonLots = lots.filter((l) => l.status === "brouillon");
   const canFinalize = brouillonLots.length > 0;
   const [confirmFinalisation, setConfirmFinalisation] = useState(false);
+  const [retractationMs, setRetractationMs] = useState(48 * 3600_000);
+
+  useEffect(() => {
+    getSettingClient("business_rules").then((rules) => {
+      if (rules?.retractation_heures) {
+        setRetractationMs(rules.retractation_heures * 3600_000);
+      }
+    });
+  }, []);
+
+  /**
+   * Rejoue une action de reference sans quitter le dossier.
+   *
+   * Le moteur d'action attend le lot avec ses references : on le recompose a
+   * partir de ce que le dossier a deja charge, plutot que de relire la base.
+   */
+  async function handleRefAction(actionId: RefActionId, refId: string, lot: Lot) {
+    const supabase = createClient();
+    const lotComplet: LotWithReferences = {
+      ...lot,
+      references: lotReferences.filter((r) => r.lot_id === lot.id),
+    };
+    await executeAction({
+      actionId,
+      supabase,
+      ctx: {
+        lot: lotComplet,
+        dossier: {
+          id: dossier.id,
+          numero: dossier.numero,
+          client: dossier.client,
+        },
+        retractationMs,
+      },
+      referenceId: refId,
+    });
+    router.refresh();
+  }
 
   // Build LotWithReferences for ActionDashboard
   const lotsWithRefs: LotWithReferences[] = lots.map((lot) => ({
@@ -401,6 +442,8 @@ export function DossierDetailPage({
           <DossierLotsSection
             lots={lots}
             dossierStatus={dossier.status}
+            lotReferences={lotReferences}
+            onRefAction={handleRefAction}
             creatingLot={creatingLot}
             onCreateLot={handleCreateLot}
             onDeleteLot={handleDeleteLot}
