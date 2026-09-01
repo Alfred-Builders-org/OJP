@@ -158,6 +158,7 @@ export async function autoProcessExpiredRetractation(dossierId: string): Promise
           const contratRefs = expiredRefs.filter((r: Ref) => contratRefIds.includes(r.id));
           const refLignes: ReferenceLigne[] = contratRefs.map((r: Ref) => ({
             designation: r.designation,
+            reference: r.numero ?? null,
             metal: r.metal ?? "—",
             titrage: r.qualite ?? "—",
             poids: r.poids_net ?? r.poids ?? 0,
@@ -334,6 +335,7 @@ function buildDossierInfo(dossier: { numero: string }, lot: { numero: string }, 
 function buildRefLignes(refList: Ref[]): ReferenceLigne[] {
   return refList.map((r: Ref) => ({
     designation: r.designation,
+    reference: r.numero ?? null,
     metal: r.metal ?? "—",
     titrage: r.qualite ?? "—",
     poids: r.poids_net ?? r.poids ?? 0,
@@ -536,6 +538,7 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
   const dossierInfo = buildDossierInfo(dossier, lot, now);
   const dvRefs: DepotVenteReferenceLigne[] = allDvRefs.map((r: Ref) => ({
     designation: r.designation,
+    reference: r.numero ?? null,
     description: [r.metal, r.qualite].filter(Boolean).join(" ") || "—",
     // Le poids ne remontait pas jusqu'au template : le contrat engageait la
     // boutique sur de la marchandise dont il ne disait pas la masse.
@@ -565,6 +568,7 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
     const confieRef: ConfieReferenceLigne = {
       titre: ref.qualite ?? "—",
       designation: `${ref.designation} (${ref.metal ?? "—"})`,
+      reference: ref.numero ?? null,
       quantite: ref.quantite,
       poids: ref.poids_net ?? ref.poids ?? 0,
       prixAchat: ref.prix_achat,

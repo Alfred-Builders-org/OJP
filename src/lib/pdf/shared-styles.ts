@@ -94,6 +94,9 @@ export const styles = StyleSheet.create({
   fveSigLabel: { fontSize: 8, color: "#777777", textAlign: "center" as const, marginTop: 10, fontFamily: "Courier-Oblique" },
   // QDV-specific styles (quittance dépôt-vente)
   qdvRefText: { fontSize: 7, color: "#AAAAAA", marginTop: 3 },
+  // Reference de l'article, sous sa designation : assez lisible pour etre
+  // recopiee, assez discrete pour ne pas concurrencer le libelle.
+  refLigne: { fontSize: 5.5, color: "#999999", marginTop: 1 },
 });
 
 export const W = {

@@ -28,6 +28,7 @@ function buildDossierInfo(ctx: ActionContext, now: Date): DossierInfo {
 function buildRefLignes(refs: LotReference[]): ReferenceLigne[] {
   return refs.map((r) => ({
     designation: r.designation,
+    reference: r.numero ?? null,
     metal: r.metal ?? "—",
     titrage: r.qualite ?? "—",
     poids: r.poids_net ?? r.poids ?? 0,

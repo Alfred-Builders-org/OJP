@@ -109,7 +109,9 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
         // Table rows
         ...references.map((r, i) =>
           h(View, { key: i, style: s.tableRow },
-            h(Text, { style: [s.tdBold, { width: W_CDV.des }] }, r.designation),
+            h(View, { style: { width: W_CDV.des } },
+              h(Text, { style: s.tdBold }, r.designation),
+              r.reference ? h(Text, { style: s.refLigne }, r.reference) : null),
             h(Text, { style: [s.td, { width: W_CDV.desc }] }, r.description),
             h(Text, { style: [s.td, { width: W_CDV.poids, textAlign: "right" }] }, r.poids ? `${r.poids}g` : "—"),
             h(Text, { style: [s.td, { width: W_CDV.prixNet, textAlign: "right" }] }, fmt(r.prixNetDeposant)),

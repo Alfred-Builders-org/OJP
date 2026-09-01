@@ -52,7 +52,9 @@ function Doc({ data }: { data: DevisRachatData }) {
         h(Text, { style: [s.th, { width: W.pt, textAlign: "right" }] }, "P.T BRUT")),
       ...references.map((r, i) =>
         h(View, { key: i, style: s.tableRow },
-          h(Text, { style: [s.tdBold, { width: W.des }] }, r.designation),
+          h(View, { style: { width: W.des } },
+            h(Text, { style: s.tdBold }, r.designation),
+            r.reference ? h(Text, { style: s.refLigne }, r.reference) : null),
           h(Text, { style: [s.td, { width: W.met }] }, r.metal),
           h(Text, { style: [s.td, { width: W.tit }] }, r.titrage && r.titrage !== "—" ? r.titrage : ""),
           h(Text, { style: [s.td, { width: W.poi, textAlign: "right" }] }, `${r.poids}g`),

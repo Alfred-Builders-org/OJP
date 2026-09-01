@@ -67,6 +67,12 @@ export interface DossierInfo {
 
 export interface ReferenceLigne {
   designation: string;
+  /**
+   * Reference de l'article, « numero du lot / rang ». Affichee sous la
+   * designation : c'est elle qui relie une ligne de document a l'objet en rayon
+   * et a son inscription au registre.
+   */
+  reference?: string | null;
   metal: string;
   titrage: string;
   poids: number;
@@ -132,6 +138,7 @@ export function recapitulatifTitrage(
 // Depot-vente specific types
 export interface DepotVenteReferenceLigne {
   designation: string;
+  reference?: string | null;
   description: string;
   /** Poids net, affiché sur le contrat et agrégé dans le récapitulatif. */
   poids?: number;
@@ -145,6 +152,7 @@ export interface DepotVenteReferenceLigne {
 export interface ConfieReferenceLigne {
   titre: string;
   designation: string;
+  reference?: string | null;
   quantite: number;
   poids: number;
   prixAchat: number;
@@ -263,6 +271,7 @@ export const TEXTE_DEVIS_VALIDITE =
 
 // Quittance dépôt-vente types
 export interface QuittanceDepotVenteLigne {
+  reference?: string | null;
   designation: string;
   description: string;
   prixVentePublic: number;
@@ -272,6 +281,7 @@ export interface QuittanceDepotVenteLigne {
 
 // Facture de vente types
 export interface FactureVenteLigne {
+  reference?: string | null;
   titre: string;
   designation: string;
   poids: number;
