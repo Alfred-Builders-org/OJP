@@ -34,6 +34,10 @@ import type { DocumentRecord } from "@/types/document";
 interface EcartState {
   titrage_reel: string;
   poids_reel: string;
+  /** Cours au gramme annonce par la fonderie, s'il differe de celui du depart. */
+  cours_reel: string;
+  /** Montant repris du bordereau. Rempli, il l'emporte sur tout calcul. */
+  valeur_reelle: string;
   ecart_notes: string;
 }
 
@@ -61,6 +65,8 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
         {
           titrage_reel: l.titrage_reel ?? "",
           poids_reel: l.poids_reel != null ? String(l.poids_reel) : "",
+          cours_reel: l.cours_reel != null ? String(l.cours_reel) : "",
+          valeur_reelle: l.valeur_reelle != null ? String(l.valeur_reelle) : "",
           ecart_notes: l.ecart_notes ?? "",
         },
       ]),
@@ -74,14 +80,35 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
     }));
   }
 
+  /**
+   * Ce que la fonderie doit payer, dans l'ordre de ce qui fait foi.
+   *
+   * Un bordereau donne parfois le montant seul : il l'emporte sur tout calcul.
+   * Sinon on multiplie le poids par le cours retenu par la fonderie. A defaut,
+   * on retombe sur l'estimation de depart, corrigee du titrage constate.
+   */
   function computeValeurReelle(ligne: BonLivraisonLigne, ecart: EcartState): number | null {
-    const titrageReel = parseInt(ecart.titrage_reel) || 0;
+    const saisi = parseFloat(ecart.valeur_reelle);
+    if (ecart.valeur_reelle.trim() !== "" && !isNaN(saisi)) return saisi;
+
     const poidsReel = parseFloat(ecart.poids_reel) || 0;
+    const coursReel = parseFloat(ecart.cours_reel) || 0;
+    if (poidsReel && coursReel) {
+      return Math.round(poidsReel * coursReel * 100) / 100;
+    }
+
+    const titrageReel = parseInt(ecart.titrage_reel) || 0;
     if (!titrageReel || !poidsReel || !ligne.cours_utilise || !ligne.titrage_declare) return null;
     const titrDeclare = parseInt(ligne.titrage_declare) || 1;
     const coursBase = ligne.cours_utilise / (titrDeclare / 1000);
     return Math.round(poidsReel * coursBase * (titrageReel / 1000) * 100) / 100;
   }
+
+  /** Le montant est le seul resultat sans lequel un envoi ne se solde pas. */
+  const lignesSansMontant = lignes.filter((l) => {
+    const ecart = ecarts[l.id];
+    return !ecart || computeValeurReelle(l, ecart) == null;
+  });
 
   // Group lines by metal/titrage
   const groups = new Map<string, { metal: string; titrage: string; lignes: BonLivraisonLigne[] }>();
@@ -152,6 +179,7 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
 
       const titrageReel = ecart.titrage_reel || null;
       const poidsReel = ecart.poids_reel ? parseFloat(ecart.poids_reel) : null;
+      const coursReel = ecart.cours_reel ? parseFloat(ecart.cours_reel) : null;
       const valeurReelle = computeValeurReelle(ligne, ecart);
       const ecartTitrage = titrageReel != null && titrageReel !== ligne.titrage_declare;
       const ecartPoids = poidsReel != null && poidsReel !== ligne.poids_declare;
@@ -162,6 +190,7 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
           .update({
             titrage_reel: titrageReel,
             poids_reel: poidsReel,
+            cours_reel: coursReel,
             valeur_reelle: valeurReelle,
             ecart_titrage: ecartTitrage,
             ecart_poids: ecartPoids,
@@ -303,9 +332,17 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
           if (bdl.statut === "recu") {
             actionRows.push({
               icon: Check,
-              label: "Résultats fonderie | Saisir titrages et poids réels",
+              label:
+                lignesSansMontant.length > 0
+                  ? `Résultats fonderie | Montant manquant sur ${lignesSansMontant.length} ligne${lignesSansMontant.length > 1 ? "s" : ""}`
+                  : "Résultats fonderie | Saisir les montants réglés par la fonderie",
               btn: (
-                <Button size="sm" variant="outline" disabled={savingEcarts} onClick={handleSaveEcarts}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingEcarts || lignesSansMontant.length > 0}
+                  onClick={handleSaveEcarts}
+                >
                   <Check size={14} weight="bold" />
                   {savingEcarts ? "..." : "Valider"}
                 </Button>
@@ -402,6 +439,11 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
                 {group.lignes.map((ligne) => {
                   const ecart = ecarts[ligne.id];
                   const valReel = ecart ? computeValeurReelle(ligne, ecart) : null;
+                  // Ce que le calcul propose, saisie manuelle mise de cote : le
+                  // repere affiche sous le champ, pour que l'ecart se voie.
+                  const valeurCalculee = ecart
+                    ? computeValeurReelle(ligne, { ...ecart, valeur_reelle: "" })
+                    : null;
                   const ecartValeur = valReel != null && ligne.valeur_estimee != null
                     ? Math.round((valReel - ligne.valeur_estimee) * 100) / 100
                     : null;
@@ -435,13 +477,13 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
 
                       {/* Ecart section — editable when recu, read-only when traité */}
                       {(canEdit || isTraite) && (
-                        <div className="grid grid-cols-4 gap-3 pt-2 border-t">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2 border-t">
                           <div>
                             <label className="text-[11px] font-medium text-muted-foreground">Titrage réel</label>
                             {canEdit ? (
                               <Input
                                 className="h-8 mt-1"
-                                placeholder="750"
+                                placeholder={ligne.titrage_declare ?? "750"}
                                 value={ecart?.titrage_reel ?? ""}
                                 onChange={(e) => updateEcart(ligne.id, "titrage_reel", e.target.value)}
                               />
@@ -456,7 +498,7 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
                             {canEdit ? (
                               <Input
                                 className="h-8 mt-1"
-                                placeholder="0.00"
+                                placeholder={ligne.poids_declare != null ? String(ligne.poids_declare) : "0.00"}
                                 type="number"
                                 step="0.01"
                                 value={ecart?.poids_reel ?? ""}
@@ -469,13 +511,47 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
                             )}
                           </div>
                           <div>
-                            <label className="text-[11px] font-medium text-muted-foreground">Valeur réelle</label>
-                            <p className="text-sm mt-1">
-                              {canEdit
-                                ? (valReel != null ? formatCurrency(valReel) : "—")
-                                : (ligne.valeur_reelle != null ? formatCurrency(ligne.valeur_reelle) : "—")
-                              }
-                            </p>
+                            <label className="text-[11px] font-medium text-muted-foreground">Cours fonderie</label>
+                            {canEdit ? (
+                              <Input
+                                className="h-8 mt-1"
+                                placeholder={ligne.cours_utilise != null ? String(ligne.cours_utilise) : "€/g"}
+                                type="number"
+                                step="0.01"
+                                value={ecart?.cours_reel ?? ""}
+                                onChange={(e) => updateEcart(ligne.id, "cours_reel", e.target.value)}
+                              />
+                            ) : (
+                              <p className="text-sm mt-1">
+                                {ligne.cours_reel != null ? `${formatCurrency(ligne.cours_reel)}/g` : "—"}
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="text-[11px] font-medium text-muted-foreground">
+                              Montant {canEdit && <span className="text-destructive">*</span>}
+                            </label>
+                            {canEdit ? (
+                              <>
+                                <Input
+                                  className="h-8 mt-1"
+                                  placeholder={valeurCalculee != null ? String(valeurCalculee) : "0.00"}
+                                  type="number"
+                                  step="0.01"
+                                  value={ecart?.valeur_reelle ?? ""}
+                                  onChange={(e) => updateEcart(ligne.id, "valeur_reelle", e.target.value)}
+                                />
+                                {valeurCalculee != null && (
+                                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                                    Calculé : {formatCurrency(valeurCalculee)}
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm mt-1">
+                                {ligne.valeur_reelle != null ? formatCurrency(ligne.valeur_reelle) : "—"}
+                              </p>
+                            )}
                           </div>
                           <div>
                             <label className="text-[11px] font-medium text-muted-foreground">Notes</label>
