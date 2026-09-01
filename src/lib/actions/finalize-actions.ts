@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { generateAndStoreDocument } from "@/lib/pdf/generate-and-store";
 import { tauxLigne, libelleTotalTaxe } from "@/lib/pdf/taxes-labels";
+import { calculerTFOP } from "@/lib/calculations/taxes";
 import { getSettingServer } from "@/lib/settings-server";
 import { formatDate, formatDateTime, formatTime } from "@/lib/format";
 import type {
@@ -699,15 +700,35 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
     let totalCommission = 0;
     let totalNetDeposant = 0;
 
+    // La quittance de depot-vente est l'acte par lequel la boutique achete le
+    // bijou au deposant : elle porte la meme fiscalite qu'une quittance de
+    // rachat. La taxe forfaitaire s'apprecie par objet, sur le net verse au
+    // deposant, et se retient sur ce qu'on lui doit.
+    let totalTaxe = 0;
+    const taxesParRef: { refId: string; taxe: number }[] = [];
+
     for (const item of items) {
       const ref = refByStockId.get(item.stockId);
       const prixVente = item.prixVente;
       const netDeposant = ref?.prix_achat ?? prixVente * 0.6;
       const commission = prixVente - netDeposant;
+      const taxe = calculerTFOP(netDeposant);
+      if (ref?.id) taxesParRef.push({ refId: ref.id, taxe });
       qdvLignes.push({ designation: ref?.designation ?? item.designation, description: item.designation, prixVentePublic: prixVente, netDeposant, commission });
       totalVentes += prixVente;
       totalCommission += commission;
-      totalNetDeposant += netDeposant;
+      totalTaxe += taxe;
+      totalNetDeposant += netDeposant - taxe;
+    }
+
+    // La taxe retenue est portee sur la reference : c'est de la qu'elle remonte
+    // au registre des impots, comme celle d'un rachat.
+    for (const { refId, taxe } of taxesParRef) {
+      if (taxe <= 0) continue;
+      await supabase
+        .from("lot_references")
+        .update({ regime_fiscal: "TFOP", montant_taxe: taxe })
+        .eq("id", refId);
     }
 
     const dvClientInfo: ClientInfo = {
@@ -721,7 +742,13 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
       type: "quittance_depot_vente", lotId: dvLot.id, dossierId: dvDossier.id, clientId: deposant.id,
       client: dvClientInfo,
       dossier: { numeroDossier: dvDossier.numero, numeroLot: dvLot.numero, date: formatDate(now.toISOString()), heure: formatTime(now) },
-      references: [], totaux: { totalBrut: totalVentes, taxe: totalCommission, netAPayer: totalNetDeposant },
+      references: [],
+      totaux: {
+        totalBrut: totalVentes,
+        taxe: totalTaxe,
+        netAPayer: totalNetDeposant,
+        taxeLabel: "Taxe forfaitaire (6,5%)",
+      },
       quittanceDepotVenteLignes: qdvLignes, totalVentes, totalCommission, venteDossierNumero: dossier.numero,
       lotReferenceIds: (lotRefs ?? []).map((r: Ref) => r.id),
     }, "quittance_depot_vente");
