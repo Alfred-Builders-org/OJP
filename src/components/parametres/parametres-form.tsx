@@ -11,7 +11,6 @@ import {
   Gavel,
   FileText,
   Bell,
-  EnvelopeSimple,
   ArrowsClockwise,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
