@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -249,7 +251,7 @@ export function ReferenceFormBijoux({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>}
+          {error && <FieldError>{error}</FieldError>}
 
           {!isDepotVente && (
             <div className="flex gap-2">
@@ -282,7 +284,7 @@ export function ReferenceFormBijoux({
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="designation">Désignation *</Label>
+              <Label htmlFor="designation" required>Désignation</Label>
               <Input
                 id="designation"
                 value={designation}
@@ -292,7 +294,7 @@ export function ReferenceFormBijoux({
               />
             </div>
             <div className="space-y-2">
-              <Label>Métal *</Label>
+              <Label required>Métal</Label>
               <Select value={metal} onValueChange={(v) => { if (v) setMetal(v as "Or" | "Argent" | "Platine"); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner" />
@@ -307,7 +309,7 @@ export function ReferenceFormBijoux({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Qualité *</Label>
+              <Label required>Qualité</Label>
               <Select value={qualite} onValueChange={(v) => { if (v) setQualite(v); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner" />
@@ -325,7 +327,7 @@ export function ReferenceFormBijoux({
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
             <div className="space-y-2">
-              <Label htmlFor="poids_brut">Poids brut (g) *</Label>
+              <Label htmlFor="poids_brut" required>Poids brut (g)</Label>
               <Input
                 id="poids_brut"
                 type="number"
@@ -340,7 +342,7 @@ export function ReferenceFormBijoux({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="poids_net">Poids net (g) *</Label>
+              <Label htmlFor="poids_net" required>Poids net (g)</Label>
               <Input
                 id="poids_net"
                 type="number"
@@ -357,7 +359,7 @@ export function ReferenceFormBijoux({
               <p className="text-xs text-muted-foreground">Poids du métal seul</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="quantite">Quantité *</Label>
+              <Label htmlFor="quantite" required>Quantité</Label>
               <Input
                 id="quantite"
                 type="number"
@@ -369,7 +371,7 @@ export function ReferenceFormBijoux({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prix_achat">Prix de rachat *</Label>
+              <Label htmlFor="prix_achat" required>Prix de rachat</Label>
               <Input
                 id="prix_achat"
                 type="number"
@@ -405,7 +407,7 @@ export function ReferenceFormBijoux({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="prix_revente">Prix de revente *</Label>
+                <Label htmlFor="prix_revente" required>Prix de revente</Label>
                 <Input
                   id="prix_revente"
                   type="number"

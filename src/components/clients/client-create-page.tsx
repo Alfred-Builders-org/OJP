@@ -1,5 +1,7 @@
 "use client";
 
+import { Field, FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -14,13 +16,13 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Card,
@@ -29,26 +31,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Header } from "@/components/dashboard/header";
-import { clientSchema, LEAD_SOURCE_OPTIONS } from "@/lib/validations/client";
+import { clientSchema, LEAD_SOURCE_OPTIONS, CIVILITY_OPTIONS } from "@/lib/validations/client";
 import { CountrySelect } from "@/components/ui/country-select";
-
-function FormField({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      {children}
-      {error && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>}
-    </div>
-  );
-}
 
 export function ClientCreatePage() {
   const router = useRouter();
@@ -129,7 +113,7 @@ export function ClientCreatePage() {
     }
 
     toast.success("Client créé");
-    router.push(`/clients/${data.id}`);
+    router.replace(`/clients/${data.id}`);
   }
 
   return (
@@ -149,7 +133,7 @@ export function ClientCreatePage() {
       </Header>
       <div className="flex-1 p-6">
         {errors._form && (
-          <p className="text-sm text-destructive mb-4 animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors._form}</p>
+          <FieldError className="mb-4 ">{errors._form}</FieldError>
         )}
         <div className="grid gap-6 md:grid-cols-2">
           {/* Informations personnelles */}
@@ -161,32 +145,35 @@ export function ClientCreatePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField label="Civilité *" error={errors.civility}>
+              <Field label="Civilité" required error={errors.civility}>
                 <Select value={civility} onValueChange={(val) => setCivility(val ?? "")}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
+                    <SelectValue placeholder="Sélectionner" items={selectItems(CIVILITY_OPTIONS)} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="M">Monsieur</SelectItem>
-                    <SelectItem value="Mme">Madame</SelectItem>
+                    {CIVILITY_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </FormField>
-              <FormField label="Prénom *" error={errors.first_name}>
+              </Field>
+              <Field label="Prénom" required error={errors.first_name}>
                 <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jean" />
-              </FormField>
-              <FormField label="Nom *" error={errors.last_name}>
+              </Field>
+              <Field label="Nom" required error={errors.last_name}>
                 <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Dupont" />
-              </FormField>
-              <FormField label="Nom de jeune fille" error={errors.maiden_name}>
+              </Field>
+              <Field label="Nom de jeune fille" error={errors.maiden_name}>
                 <Input value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />
-              </FormField>
-              <FormField label="Email" error={errors.email}>
+              </Field>
+              <Field label="Email" required error={errors.email}>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jean@exemple.fr" />
-              </FormField>
-              <FormField label="Téléphone" error={errors.phone}>
+              </Field>
+              <Field label="Téléphone" error={errors.phone}>
                 <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" />
-              </FormField>
+              </Field>
             </CardContent>
           </Card>
 
@@ -199,18 +186,18 @@ export function ClientCreatePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField label="Adresse" error={errors.address}>
+              <Field label="Adresse" required error={errors.address}>
                 <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="12 rue de la Paix" />
-              </FormField>
-              <FormField label="Code postal" error={errors.postal_code}>
+              </Field>
+              <Field label="Code postal" required error={errors.postal_code}>
                 <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="75001" />
-              </FormField>
-              <FormField label="Ville" error={errors.city}>
+              </Field>
+              <Field label="Ville" required error={errors.city}>
                 <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Paris" />
-              </FormField>
-              <FormField label="Pays *" error={errors.country}>
+              </Field>
+              <Field label="Pays" required error={errors.country}>
                 <CountrySelect value={country} onValueChange={(v) => setCountry(v)} />
-              </FormField>
+              </Field>
             </CardContent>
           </Card>
 
@@ -223,7 +210,7 @@ export function ClientCreatePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <FormField label="Source" error={errors.lead_source}>
+              <Field label="Source" error={errors.lead_source}>
                 <Select value={leadSource} onValueChange={(val) => setLeadSource(val ?? "")}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner une source" />
@@ -236,15 +223,15 @@ export function ClientCreatePage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </FormField>
-              <FormField label="Notes" error={errors.notes}>
+              </Field>
+              <Field label="Notes" error={errors.notes}>
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Notes additionnelles..."
                   className="min-h-[100px] resize-none"
                 />
-              </FormField>
+              </Field>
             </CardContent>
           </Card>
         </div>

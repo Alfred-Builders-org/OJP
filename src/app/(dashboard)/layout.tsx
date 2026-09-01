@@ -1,8 +1,10 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Image from "next/image";
 import { Toaster } from "sonner";
 import { createClient } from "@/lib/supabase/server";
 import {
+  Sidebar,
   SidebarProvider,
   SidebarContent,
   SidebarFooter,
@@ -11,7 +13,6 @@ import {
 } from "@/components/ui/sidebar";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { SidebarProfile } from "@/components/dashboard/sidebar-profile";
-import { HoverSidebar } from "@/components/dashboard/hover-sidebar";
 import { NotificationProvider } from "@/providers/notification-provider";
 import { PreviewDrawerProvider } from "@/providers/preview-drawer-provider";
 import { CommandPalette } from "@/components/dashboard/command-palette";
@@ -24,6 +25,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // La barre laterale est deployee par defaut. Le repli manuel reste possible et
+  // survit d'une session a l'autre : `SidebarProvider` ecrivait deja le cookie,
+  // personne ne le relisait.
+  const cookieStore = await cookies();
+  const sidebarOpen = cookieStore.get("sidebar_state")?.value !== "false";
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -57,8 +64,8 @@ export default async function DashboardLayout({
         Aller au contenu principal
       </a>
       <PreviewDrawerProvider>
-        <SidebarProvider defaultOpen={false}>
-          <HoverSidebar collapsible="icon">
+        <SidebarProvider defaultOpen={sidebarOpen}>
+          <Sidebar collapsible="icon">
             <SidebarHeader className="overflow-hidden px-4 py-3 transition-all duration-200 ease-linear">
               <Image src="/logo-light.png" alt="L'Or au Juste Prix" width={32} height={32} className="h-8 w-8 shrink-0 object-contain transition-all duration-200 ease-linear dark:hidden" />
               <Image src="/logo-dark.png" alt="L'Or au Juste Prix" width={32} height={32} className="hidden h-8 w-8 shrink-0 object-contain transition-all duration-200 ease-linear dark:block" />
@@ -69,7 +76,7 @@ export default async function DashboardLayout({
             <SidebarFooter>
               <SidebarProfile profile={profileData} email={user.email ?? ""} role={role} />
             </SidebarFooter>
-          </HoverSidebar>
+          </Sidebar>
           <SidebarInset id="main-content" className="max-h-svh overflow-hidden">{children}</SidebarInset>
           <CommandPalette />
         </SidebarProvider>

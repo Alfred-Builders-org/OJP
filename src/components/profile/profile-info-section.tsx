@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, FloppyDisk, UserCircle, Crown, Storefront } from "@phosphor-icons/react";
@@ -183,7 +185,7 @@ export function ProfileInfoSection({ profile, email }: ProfileInfoSectionProps) 
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4 pb-6">
             {error && (
-              <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>
+              <FieldError>{error}</FieldError>
             )}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

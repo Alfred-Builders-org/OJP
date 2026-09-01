@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -220,7 +222,7 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
           )}
 
           {error && (
-            <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>
+            <FieldError>{error}</FieldError>
           )}
 
           <DialogFooter>

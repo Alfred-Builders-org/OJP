@@ -1,5 +1,7 @@
 "use client";
 
+import { Field, FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -33,24 +35,6 @@ import { Header } from "@/components/dashboard/header";
 import { dossierSchema } from "@/lib/validations/dossier";
 import { ClientCreateDialog } from "@/components/clients/client-create-dialog";
 import type { Client } from "@/types/client";
-
-function FormField({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      {children}
-      {error && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>}
-    </div>
-  );
-}
 
 export function DossierCreatePage({ validClients }: { validClients: Client[] }) {
   const router = useRouter();
@@ -114,7 +98,7 @@ export function DossierCreatePage({ validClients }: { validClients: Client[] }) 
     }
 
     toast.success("Dossier créé");
-    router.push(`/dossiers/${data.id}`);
+    router.replace(`/dossiers/${data.id}`);
   }
 
   return (
@@ -134,7 +118,7 @@ export function DossierCreatePage({ validClients }: { validClients: Client[] }) 
       </Header>
       <div className="flex-1 p-6">
         {errors._form && (
-          <p className="text-sm text-destructive mb-4 animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors._form}</p>
+          <FieldError className="mb-4 ">{errors._form}</FieldError>
         )}
         <div className="grid gap-6 md:grid-cols-2">
           {/* Informations du dossier */}
@@ -167,7 +151,7 @@ export function DossierCreatePage({ validClients }: { validClients: Client[] }) 
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Client *</Label>
+                <Label required>Client</Label>
                 <p className="text-xs text-muted-foreground">
                   Seuls les clients avec une pièce d&apos;identité valide sont affichés.
                 </p>
@@ -207,7 +191,7 @@ export function DossierCreatePage({ validClients }: { validClients: Client[] }) 
                     )}
                   </SelectContent>
                 </Select>
-                {errors.client_id && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.client_id}</p>}
+                {errors.client_id && <FieldError>{errors.client_id}</FieldError>}
               </div>
               {selectedClient && (
                 <div className="pt-2 border-t">
@@ -237,14 +221,14 @@ export function DossierCreatePage({ validClients }: { validClients: Client[] }) 
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <FormField label="Notes" error={errors.notes}>
+              <Field label="Notes" error={errors.notes}>
                 <Textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Notes sur le dossier..."
                   className="min-h-[150px] resize-none"
                 />
-              </FormField>
+              </Field>
             </CardContent>
           </Card>
         </div>

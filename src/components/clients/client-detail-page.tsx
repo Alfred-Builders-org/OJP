@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { FieldError } from "@/components/ui/field";
 import { CopyableText } from "@/components/ui/copyable-text";
 import { PreviewLink } from "@/components/preview/preview-link";
 import { usePreviewDrawer } from "@/hooks/use-preview-drawer";
@@ -31,6 +32,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Card,
@@ -47,7 +49,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Header } from "@/components/dashboard/header";
-import { clientSchema, LEAD_SOURCE_OPTIONS } from "@/lib/validations/client";
+import { clientSchema, LEAD_SOURCE_OPTIONS, CIVILITY_OPTIONS } from "@/lib/validations/client";
 import { CountrySelect } from "@/components/ui/country-select";
 import { IdentityDocumentSection } from "@/components/clients/identity-document-form";
 import type { Client, ClientIdentityDocument } from "@/types/client";
@@ -270,19 +272,22 @@ export function ClientDetailPage({
                 editContent={
                   <Select value={civility} onValueChange={(val) => { if (val) setCivility(val as "M" | "Mme"); }}>
                     <SelectTrigger className="w-48">
-                      <SelectValue />
+                      <SelectValue items={selectItems(CIVILITY_OPTIONS)} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="M">Monsieur</SelectItem>
-                      <SelectItem value="Mme">Madame</SelectItem>
+                      {CIVILITY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 }
               />
               <DetailRow label="Prénom" value={client.first_name} editing={editing} editValue={firstName} onEditChange={setFirstName} />
-              {errors.first_name && editing && <p className="text-sm text-destructive text-right -mt-1 mb-1 animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.first_name}</p>}
+              {errors.first_name && editing && <FieldError className="text-right -mt-1 mb-1 ">{errors.first_name}</FieldError>}
               <DetailRow label="Nom" value={client.last_name} editing={editing} editValue={lastName} onEditChange={setLastName} />
-              {errors.last_name && editing && <p className="text-sm text-destructive text-right -mt-1 mb-1 animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.last_name}</p>}
+              {errors.last_name && editing && <FieldError className="text-right -mt-1 mb-1 ">{errors.last_name}</FieldError>}
               <DetailRow label="Nom de jeune fille" value={client.maiden_name ?? "—"} editing={editing} editValue={maidenName} onEditChange={setMaidenName} />
               <DetailRow
                 label="Email"
@@ -292,7 +297,7 @@ export function ClientDetailPage({
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 }
               />
-              {errors.email && editing && <p className="text-sm text-destructive text-right -mt-1 mb-1 animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.email}</p>}
+              {errors.email && editing && <FieldError className="text-right -mt-1 mb-1 ">{errors.email}</FieldError>}
               <DetailRow
                 label="Téléphone"
                 value={client.phone ? <CopyableText value={client.phone} /> : "—"}

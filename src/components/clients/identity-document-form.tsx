@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash, IdentificationCard, Camera, X, DotsThree, Eye, PencilSimple, Star } from "@phosphor-icons/react";
@@ -295,7 +297,7 @@ export function IdentityDocumentSection({
             /* --- Edit form --- */
             <div className="space-y-3 rounded-lg border p-3">
               <div className="space-y-1.5">
-                <Label>Type de document *</Label>
+                <Label required>Type de document</Label>
                 <Select value={documentType} onValueChange={(val) => setDocumentType(val ?? "")}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Sélectionner">
@@ -310,13 +312,13 @@ export function IdentityDocumentSection({
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.document_type && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.document_type}</p>}
+                {errors.document_type && <FieldError>{errors.document_type}</FieldError>}
               </div>
 
               <div className="space-y-1.5">
-                <Label>Numéro *</Label>
+                <Label required>Numéro</Label>
                 <Input value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} placeholder="123456789" />
-                {errors.document_number && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.document_number}</p>}
+                {errors.document_number && <FieldError>{errors.document_number}</FieldError>}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -470,7 +472,7 @@ export function IdentityDocumentSection({
       {showForm ? (
         <div className="space-y-3 rounded-lg border p-3">
           <div className="space-y-1.5">
-            <Label>Type de document *</Label>
+            <Label required>Type de document</Label>
             <Select value={documentType} onValueChange={(val) => setDocumentType(val ?? "")}>
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Sélectionner">
@@ -485,13 +487,13 @@ export function IdentityDocumentSection({
                 ))}
               </SelectContent>
             </Select>
-            {errors.document_type && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.document_type}</p>}
+            {errors.document_type && <FieldError>{errors.document_type}</FieldError>}
           </div>
 
           <div className="space-y-1.5">
-            <Label>Numéro *</Label>
+            <Label required>Numéro</Label>
             <Input value={documentNumber} onChange={(e) => setDocumentNumber(e.target.value)} placeholder="123456789" />
-            {errors.document_number && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.document_number}</p>}
+            {errors.document_number && <FieldError>{errors.document_number}</FieldError>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

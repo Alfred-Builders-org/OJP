@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import {
   CurrencyEur,
   FloppyDisk,
@@ -84,8 +85,14 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
   },
 };
 
+const SECTION_KEYS = NAV_ITEMS.map((item) => item.key) as readonly Section[];
+
 export function ParametresForm({ parametres, emailTemplates, settings }: ParametresFormProps) {
-  const [activeSection, setActiveSection] = useState<Section>("societe");
+  const [activeSection, setActiveSection] = useUrlTab<Section>(
+    "section",
+    "societe",
+    SECTION_KEYS
+  );
   const [globalSaving, setGlobalSaving] = useState(false);
 
   // Save function registered by the active tab

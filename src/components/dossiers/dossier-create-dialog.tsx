@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -104,7 +106,7 @@ export function DossierCreateDialog({ open, onOpenChange, validClients: initialC
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
-              <Label>Client *</Label>
+              <Label required>Client</Label>
               <p className="text-xs text-muted-foreground">
                 Seuls les clients avec une pièce d&apos;identité valide sont affichés.
               </p>
@@ -141,7 +143,7 @@ export function DossierCreateDialog({ open, onOpenChange, validClients: initialC
                   )}
                 </SelectContent>
               </Select>
-              {error && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>}
+              {error && <FieldError>{error}</FieldError>}
             </div>
             {selectedClient && (
               <div className="rounded-lg border p-3 space-y-1">

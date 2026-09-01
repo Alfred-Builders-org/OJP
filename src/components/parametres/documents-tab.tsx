@@ -23,6 +23,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import dynamic from "next/dynamic";
 
@@ -273,7 +274,7 @@ export function DocumentsTab({ prefixes: initialPrefixes, legalTexts: initialTex
                 }
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue items={selectItems(FONT_OPTIONS)} />
                 </SelectTrigger>
                 <SelectContent>
                   {FONT_OPTIONS.map((opt) => (

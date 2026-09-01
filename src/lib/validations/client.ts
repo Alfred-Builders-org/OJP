@@ -292,6 +292,11 @@ export const DOCUMENT_TYPE_OPTIONS = [
   { value: "permis_conduire", label: "Permis de conduire" },
 ] as const;
 
+export const CIVILITY_OPTIONS = [
+  { value: "M", label: "Monsieur" },
+  { value: "Mme", label: "Madame" },
+] as const;
+
 export const clientSchema = z.object({
   civility: z.enum(["M", "Mme"], { message: "La civilité est requise" }),
   first_name: z.string().min(1, "Le prénom est requis").max(100, "100 caractères maximum"),

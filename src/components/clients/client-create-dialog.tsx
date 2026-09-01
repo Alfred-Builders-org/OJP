@@ -1,5 +1,7 @@
 "use client";
 
+import { Field, FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import {
   User as PhUser,
@@ -13,13 +15,13 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Dialog,
@@ -35,7 +37,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { clientSchema, LEAD_SOURCE_OPTIONS, DOCUMENT_TYPE_OPTIONS } from "@/lib/validations/client";
+import { clientSchema, LEAD_SOURCE_OPTIONS, DOCUMENT_TYPE_OPTIONS, CIVILITY_OPTIONS } from "@/lib/validations/client";
 import { CountrySelect } from "@/components/ui/country-select";
 import { NationalitySelect } from "@/components/ui/nationality-select";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -46,16 +48,6 @@ interface ClientCreateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onClientCreated: (client: Client) => void;
-}
-
-function FormField({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      {children}
-      {error && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>}
-    </div>
-  );
 }
 
 export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: ClientCreateDialogProps) {
@@ -215,7 +207,7 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-2 py-2">
           {clientErrors._form && (
-            <p className="text-sm text-destructive md:col-span-2 animate-in fade-in-0 slide-in-from-top-1 duration-150">{clientErrors._form}</p>
+            <FieldError className="md:col-span-2 ">{clientErrors._form}</FieldError>
           )}
           <Card>
             <CardHeader className="pb-3">
@@ -225,32 +217,35 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <FormField label="Civilité *" error={clientErrors.civility}>
+              <Field label="Civilité" required error={clientErrors.civility}>
                 <Select value={civility} onValueChange={(v) => setCivility(v ?? "")}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner" />
+                    <SelectValue placeholder="Sélectionner" items={selectItems(CIVILITY_OPTIONS)} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="M">Monsieur</SelectItem>
-                    <SelectItem value="Mme">Madame</SelectItem>
+                    {CIVILITY_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </FormField>
-              <FormField label="Prénom *" error={clientErrors.first_name}>
+              </Field>
+              <Field label="Prénom" required error={clientErrors.first_name}>
                 <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Jean" />
-              </FormField>
-              <FormField label="Nom *" error={clientErrors.last_name}>
+              </Field>
+              <Field label="Nom" required error={clientErrors.last_name}>
                 <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Dupont" />
-              </FormField>
-              <FormField label="Nom de jeune fille" error={clientErrors.maiden_name}>
+              </Field>
+              <Field label="Nom de jeune fille" error={clientErrors.maiden_name}>
                 <Input value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />
-              </FormField>
-              <FormField label="Email *" error={clientErrors.email}>
+              </Field>
+              <Field label="Email" required error={clientErrors.email}>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jean@exemple.fr" required />
-              </FormField>
-              <FormField label="Téléphone" error={clientErrors.phone}>
+              </Field>
+              <Field label="Téléphone" error={clientErrors.phone}>
                 <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" />
-              </FormField>
+              </Field>
             </CardContent>
           </Card>
 
@@ -263,7 +258,7 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <FormField label="Type de document *" error={clientErrors.doc_type}>
+                <Field label="Type de document" required error={clientErrors.doc_type}>
                   <Select value={docType} onValueChange={(v) => setDocType(v ?? "")}>
                     <SelectTrigger>
                       {docType
@@ -276,28 +271,28 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
                       ))}
                     </SelectContent>
                   </Select>
-                </FormField>
-                <FormField label="Numéro *" error={clientErrors.doc_number}>
+                </Field>
+                <Field label="Numéro" required error={clientErrors.doc_number}>
                   <Input value={docNumber} onChange={(e) => setDocNumber(e.target.value)} placeholder="N° du document" />
-                </FormField>
-                <FormField label="Nationalité" error={clientErrors.doc_nationality}>
+                </Field>
+                <Field label="Nationalité" error={clientErrors.doc_nationality}>
                   <NationalitySelect value={docNationality} onValueChange={setDocNationality} />
-                </FormField>
+                </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <FormField label="Date d'émission" error={clientErrors.doc_issue_date}>
+                  <Field label="Date d'émission" error={clientErrors.doc_issue_date}>
                     <DatePicker
                       value={docIssueDate ? new Date(docIssueDate) : undefined}
                       onChange={(d) => setDocIssueDate(d ? d.toISOString().split("T")[0] : "")}
                       placeholder="Sélectionner"
                     />
-                  </FormField>
-                  <FormField label="Date d'expiration" error={clientErrors.doc_expiry_date}>
+                  </Field>
+                  <Field label="Date d'expiration" error={clientErrors.doc_expiry_date}>
                     <DatePicker
                       value={docExpiryDate ? new Date(docExpiryDate) : undefined}
                       onChange={(d) => setDocExpiryDate(d ? d.toISOString().split("T")[0] : "")}
                       placeholder="Sélectionner"
                     />
-                  </FormField>
+                  </Field>
                 </div>
               </CardContent>
             </Card>
@@ -310,18 +305,18 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <FormField label="Adresse *" error={clientErrors.address}>
+                <Field label="Adresse" required error={clientErrors.address}>
                   <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="12 rue de la Paix" required />
-                </FormField>
-                <FormField label="Code postal *" error={clientErrors.postal_code}>
+                </Field>
+                <Field label="Code postal" required error={clientErrors.postal_code}>
                   <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="75001" required />
-                </FormField>
-                <FormField label="Ville *" error={clientErrors.city}>
+                </Field>
+                <Field label="Ville" required error={clientErrors.city}>
                   <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Paris" required />
-                </FormField>
-                <FormField label="Pays *" error={clientErrors.country}>
+                </Field>
+                <Field label="Pays" required error={clientErrors.country}>
                   <CountrySelect value={country} onValueChange={(v) => { setCountry(v); setDocNationality(getNationalityForCountry(v)); }} />
-                </FormField>
+                </Field>
               </CardContent>
             </Card>
 
@@ -333,7 +328,7 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <FormField label="Source" error={clientErrors.lead_source}>
+                <Field label="Source" error={clientErrors.lead_source}>
                   <Select value={leadSource} onValueChange={(v) => setLeadSource(v ?? "")}>
                     <SelectTrigger>
                       <SelectValue placeholder="Sélectionner une source" />
@@ -344,15 +339,15 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
                       ))}
                     </SelectContent>
                   </Select>
-                </FormField>
-                <FormField label="Notes" error={clientErrors.notes}>
+                </Field>
+                <Field label="Notes" error={clientErrors.notes}>
                   <Textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Notes additionnelles..."
                     className="min-h-[80px] resize-none"
                   />
-                </FormField>
+                </Field>
               </CardContent>
             </Card>
           </div>

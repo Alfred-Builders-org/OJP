@@ -53,7 +53,7 @@ interface QuickAction {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: "new-client", label: "Nouveau client", url: "/clients/new", icon: Plus, iconWeight: "regular", group: "actions" },
-  { id: "new-dossier", label: "Nouveau dossier", url: "/dossiers/new", icon: Plus, iconWeight: "regular", shortcut: "⌘⇧N", group: "actions" },
+  { id: "new-dossier", label: "Nouveau dossier", url: "/dossiers/new", icon: Plus, iconWeight: "regular", shortcut: "Alt+N", group: "actions" },
   { id: "nav-dashboard", label: "Aller au tableau de bord", url: "/dashboard", icon: SquaresFour, shortcut: "Alt+D", group: "navigation" },
   { id: "nav-lots", label: "Aller aux lots", url: "/lots", icon: ShoppingCart, shortcut: "Alt+L", group: "navigation" },
   { id: "nav-stock", label: "Aller au stock", url: "/stock", icon: Diamond, shortcut: "Alt+S", group: "navigation" },

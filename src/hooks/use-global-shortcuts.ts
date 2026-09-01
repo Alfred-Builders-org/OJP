@@ -3,6 +3,27 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+/**
+ * Raccourcis de navigation globaux.
+ *
+ * On lit `e.code` et non `e.key` : sur macOS, Option est un modificateur de
+ * composition, si bien qu'Alt+D remplit `e.key` avec « ∂ », Alt+S avec « ß »,
+ * Alt+C avec « ç ». Aucun raccourci ne se declenchait sur Mac. `e.code` designe
+ * la touche physique et reste stable quels que soient la disposition clavier et
+ * les modificateurs enfonces.
+ *
+ * Le raccourci « nouveau dossier » est en Alt+N : Cmd/Ctrl+Maj+N est intercepte
+ * par le navigateur (fenetre de navigation privee) et n'atteint jamais la page.
+ */
+const NAVIGATION: Record<string, string> = {
+  KeyD: "/dashboard",
+  KeyL: "/lots",
+  KeyS: "/stock",
+  KeyV: "/ventes",
+  KeyC: "/clients",
+  KeyN: "/dossiers/new",
+};
+
 export function useGlobalShortcuts() {
   const router = useRouter();
 
@@ -13,38 +34,13 @@ export function useGlobalShortcuts() {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if ((e.target as HTMLElement)?.isContentEditable) return;
 
-      // Alt + key: Navigation shortcuts
-      if (e.altKey && !e.metaKey && !e.ctrlKey) {
-        switch (e.key.toLowerCase()) {
-          case "d":
-            e.preventDefault();
-            router.push("/dashboard");
-            return;
-          case "l":
-            e.preventDefault();
-            router.push("/lots");
-            return;
-          case "s":
-            e.preventDefault();
-            router.push("/stock");
-            return;
-          case "v":
-            e.preventDefault();
-            router.push("/ventes");
-            return;
-          case "c":
-            e.preventDefault();
-            router.push("/clients");
-            return;
-        }
-      }
+      if (!e.altKey || e.metaKey || e.ctrlKey) return;
 
-      // Ctrl/Cmd + Shift + N: Nouveau dossier
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n" && !e.altKey) {
-        e.preventDefault();
-        router.push("/dossiers/new");
-        return;
-      }
+      const destination = NAVIGATION[e.code];
+      if (!destination) return;
+
+      e.preventDefault();
+      router.push(destination);
     }
 
     document.addEventListener("keydown", handleKeyDown);

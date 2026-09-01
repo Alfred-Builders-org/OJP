@@ -27,6 +27,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Card,
@@ -289,7 +290,7 @@ export function DossierDetailPage({
           {editing && status !== "finalise" && (
             <Select value={status} onValueChange={(val) => { if (val) setStatus(val as DossierStatus); }}>
               <SelectTrigger className="w-40">
-                <SelectValue />
+                <SelectValue items={selectItems(DOSSIER_STATUS_OPTIONS)} />
               </SelectTrigger>
               <SelectContent>
                 {DOSSIER_STATUS_OPTIONS
