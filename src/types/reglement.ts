@@ -4,8 +4,11 @@ export type ModeReglement = "especes" | "carte" | "virement" | "cheque";
 
 export interface Reglement {
   id: string;
-  lot_id: string;
+  /** Absent pour un reglement de fonte : un envoi n'appartient a aucun lot. */
+  lot_id: string | null;
   bon_commande_id: string | null;
+  /** Envoi en fonte que ce reglement solde, quand la fonderie nous paie. */
+  bon_livraison_id: string | null;
   document_id: string | null;
   sens: ReglementSens;
   type: ReglementType;

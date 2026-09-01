@@ -12,6 +12,7 @@ import {
   WarningCircle,
   Check,
   Lightning,
+  Coins,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui/card";
 import { Header } from "@/components/dashboard/header";
 import { DocumentsTable } from "@/components/documents/documents-table";
+import { ReglementFonderieDialog } from "./reglement-fonderie-dialog";
 import { formatDate, formatCurrency } from "@/lib/format";
 import { BDL_STATUS_CONFIG } from "@/lib/fonderie/status-config";
 import type { BonLivraison, BonLivraisonLigne } from "@/types/bon-livraison";
@@ -50,6 +52,7 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [savingEcarts, setSavingEcarts] = useState(false);
+  const [reglementOuvert, setReglementOuvert] = useState(false);
   const supabase = createClient();
 
   const statutConfig = BDL_STATUS_CONFIG[bdl.statut] ?? BDL_STATUS_CONFIG.brouillon;
@@ -350,6 +353,19 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
             });
           }
 
+          if (bdl.statut === "traite") {
+            actionRows.push({
+              icon: Coins,
+              label: "Règlement fonderie | Encaisser ce que la fonderie a versé",
+              btn: (
+                <Button size="sm" variant="outline" onClick={() => setReglementOuvert(true)}>
+                  <Coins size={14} weight="duotone" />
+                  Enregistrer
+                </Button>
+              ),
+            });
+          }
+
           if (bdl.statut === "envoye") {
             actionRows.push({
               icon: CheckCircle,
@@ -583,6 +599,12 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
           <DocumentsTable documents={documents} />
         )}
       </div>
+
+      <ReglementFonderieDialog
+        bdl={bdl}
+        open={reglementOuvert}
+        onOpenChange={setReglementOuvert}
+      />
     </>
   );
 }
