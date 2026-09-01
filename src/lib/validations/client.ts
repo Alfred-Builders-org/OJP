@@ -314,15 +314,51 @@ export const clientSchema = z.object({
 
 export type ClientFormData = z.infer<typeof clientSchema>;
 
-export const identityDocumentSchema = z.object({
-  document_type: z.enum(["cni", "passeport", "titre_sejour", "permis_conduire"], {
-    message: "Le type de document est requis",
-  }),
-  document_number: z.string().min(1, "Le numéro est requis").max(50, "50 caractères maximum"),
-  issue_date: z.string().optional().or(z.literal("")),
-  expiry_date: z.string().optional().or(z.literal("")),
-  nationality: z.string().optional().or(z.literal("")),
-  is_primary: z.boolean().default(true),
-});
+/**
+ * Une pièce d'identité est le fondement du dossier client : elle conditionne la
+ * possibilité même d'ouvrir un dossier. Tous ses champs sont donc requis — les
+ * dates et la nationalité étaient optionnelles, et n'avaient d'ailleurs aucun
+ * message d'erreur à afficher.
+ *
+ * Une pièce déjà expirée est refusée à la saisie. L'expiration était jusqu'ici
+ * détectée après coup, signalée par un badge et bloquante pour la création d'un
+ * dossier — mais rien n'empêchait de l'enregistrer.
+ */
+export const identityDocumentSchema = z
+  .object({
+    document_type: z.enum(["cni", "passeport", "titre_sejour", "permis_conduire"], {
+      message: "Le type de document est requis",
+    }),
+    document_number: z.string().min(1, "Le numéro est requis").max(50, "50 caractères maximum"),
+    issue_date: z.string().min(1, "La date d'émission est requise"),
+    expiry_date: z.string().min(1, "La date d'expiration est requise"),
+    nationality: z.string().min(1, "La nationalité est requise"),
+    is_primary: z.boolean().default(true),
+  })
+  .refine(
+    (data) => {
+      const expiration = new Date(data.expiry_date);
+      if (Number.isNaN(expiration.getTime())) return false;
+      // Comparaison au jour près : une pièce qui expire aujourd'hui est encore
+      // valable aujourd'hui.
+      const aujourdhui = new Date();
+      aujourdhui.setHours(0, 0, 0, 0);
+      return expiration >= aujourdhui;
+    },
+    {
+      message: "Cette pièce est expirée : elle ne peut pas être enregistrée",
+      path: ["expiry_date"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (!data.issue_date) return true;
+      return new Date(data.issue_date) <= new Date(data.expiry_date);
+    },
+    {
+      message: "La date d'émission doit précéder la date d'expiration",
+      path: ["issue_date"],
+    }
+  );
 
 export type IdentityDocumentFormData = z.infer<typeof identityDocumentSchema>;

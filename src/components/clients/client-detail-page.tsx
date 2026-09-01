@@ -2,6 +2,15 @@
 
 import { useState } from "react";
 import { FieldError } from "@/components/ui/field";
+import dynamic from "next/dynamic";
+import { RichText } from "@/components/ui/rich-text";
+
+// Tiptap ne sert que sur ouverture de l'editeur : on evite de l'embarquer dans
+// le bundle initial de la fiche client.
+const RichTextEditor = dynamic(
+  () => import("@/components/ui/rich-text-editor").then((m) => m.RichTextEditor),
+  { ssr: false }
+);
 import { CopyableText } from "@/components/ui/copyable-text";
 import { PreviewLink } from "@/components/preview/preview-link";
 import { usePreviewDrawer } from "@/hooks/use-preview-drawer";
@@ -51,6 +60,7 @@ import {
 import { Header } from "@/components/dashboard/header";
 import { clientSchema, LEAD_SOURCE_OPTIONS, CIVILITY_OPTIONS } from "@/lib/validations/client";
 import { CountrySelect } from "@/components/ui/country-select";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { IdentityDocumentSection } from "@/components/clients/identity-document-form";
 import type { Client, ClientIdentityDocument } from "@/types/client";
 import type { Dossier } from "@/types/dossier";
@@ -303,7 +313,7 @@ export function ClientDetailPage({
                 value={client.phone ? <CopyableText value={client.phone} /> : "—"}
                 editing={editing}
                 editContent={
-                  <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <PhoneInput value={phone} onValueChange={setPhone} />
                 }
               />
             </CardContent>
@@ -461,16 +471,16 @@ export function ClientDetailPage({
             </CardHeader>
             <CardContent>
               {editingNotes ? (
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                <RichTextEditor
+                  // Le composant ne resynchronise pas son contenu après montage :
+                  // la clé le remonte à chaque entrée en édition.
+                  key={`notes-${client.id}`}
+                  content={notes}
+                  onChange={setNotes}
                   placeholder="Notes sur le client..."
-                  className="min-h-[150px] resize-none"
                 />
               ) : (
-                <p className="text-sm whitespace-pre-wrap">
-                  {client.notes ?? "Aucune note."}
-                </p>
+                <RichText html={client.notes} fallback="Aucune note." />
               )}
             </CardContent>
           </Card>

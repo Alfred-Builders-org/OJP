@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/card";
 import { clientSchema, LEAD_SOURCE_OPTIONS, DOCUMENT_TYPE_OPTIONS, CIVILITY_OPTIONS } from "@/lib/validations/client";
 import { CountrySelect } from "@/components/ui/country-select";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { NationalitySelect } from "@/components/ui/nationality-select";
 import { DatePicker } from "@/components/ui/date-picker";
 import { getNationalityForCountry } from "@/lib/validations/client";
@@ -244,7 +245,7 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jean@exemple.fr" required />
               </Field>
               <Field label="Téléphone" error={clientErrors.phone}>
-                <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" />
+                <PhoneInput value={phone} onValueChange={setPhone} />
               </Field>
             </CardContent>
           </Card>

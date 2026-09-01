@@ -33,6 +33,8 @@ import {
 import { Header } from "@/components/dashboard/header";
 import { clientSchema, LEAD_SOURCE_OPTIONS, CIVILITY_OPTIONS } from "@/lib/validations/client";
 import { CountrySelect } from "@/components/ui/country-select";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { AddressAutocomplete, type AdresseDetaillee } from "@/components/ui/address-autocomplete";
 
 export function ClientCreatePage() {
   const router = useRouter();
@@ -45,10 +47,12 @@ export function ClientCreatePage() {
   const [maidenName, setMaidenName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [city, setCity] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [country, setCountry] = useState("France");
+  const [adresse, setAdresse] = useState<AdresseDetaillee>({
+    address: "",
+    postal_code: "",
+    city: "",
+    country: "France",
+  });
   const [leadSource, setLeadSource] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -60,10 +64,10 @@ export function ClientCreatePage() {
       maiden_name: maidenName,
       email,
       phone,
-      address,
-      city,
-      postal_code: postalCode,
-      country,
+      address: adresse.address,
+      city: adresse.city,
+      postal_code: adresse.postal_code,
+      country: adresse.country,
       lead_source: leadSource,
       notes,
     };
@@ -94,10 +98,18 @@ export function ClientCreatePage() {
         maiden_name: maidenName || null,
         email: email || null,
         phone: phone || null,
-        address: address || null,
-        city: city || null,
-        postal_code: postalCode || null,
-        country: country || null,
+        address: adresse.address || null,
+        city: adresse.city || null,
+        postal_code: adresse.postal_code || null,
+        country: adresse.country || null,
+        // Champs d'origine du service d'autocompletion : conserves pour
+        // retrouver la fiche sans redemander l'adresse au client.
+        street_number: adresse.street_number ?? null,
+        route: adresse.route ?? null,
+        formatted_address: adresse.formatted_address ?? null,
+        place_id: adresse.place_id ?? null,
+        latitude: adresse.latitude ?? null,
+        longitude: adresse.longitude ?? null,
         lead_source: leadSource || null,
         notes: notes || null,
         created_by: user?.id ?? null,
@@ -172,7 +184,7 @@ export function ClientCreatePage() {
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jean@exemple.fr" />
               </Field>
               <Field label="Téléphone" error={errors.phone}>
-                <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="06 12 34 56 78" />
+                <PhoneInput value={phone} onValueChange={setPhone} />
               </Field>
             </CardContent>
           </Card>
@@ -186,18 +198,16 @@ export function ClientCreatePage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Field label="Adresse" required error={errors.address}>
-                <Input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="12 rue de la Paix" />
-              </Field>
-              <Field label="Code postal" required error={errors.postal_code}>
-                <Input value={postalCode} onChange={(e) => setPostalCode(e.target.value)} placeholder="75001" />
-              </Field>
-              <Field label="Ville" required error={errors.city}>
-                <Input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Paris" />
-              </Field>
-              <Field label="Pays" required error={errors.country}>
-                <CountrySelect value={country} onValueChange={(v) => setCountry(v)} />
-              </Field>
+              <AddressAutocomplete
+                value={adresse}
+                onChange={setAdresse}
+                errors={{
+                  address: errors.address,
+                  postal_code: errors.postal_code,
+                  city: errors.city,
+                  country: errors.country,
+                }}
+              />
             </CardContent>
           </Card>
 

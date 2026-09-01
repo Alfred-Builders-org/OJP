@@ -123,9 +123,14 @@ describe("clientSchema", () => {
 // identityDocumentSchema
 // ============================================================
 describe("identityDocumentSchema", () => {
+  // Tous les champs sont requis : une piece d'identite conditionne l'ouverture
+  // d'un dossier, on ne peut pas en enregistrer une a moitie renseignee.
   const validDoc = {
     document_type: "cni" as const,
     document_number: "1234567890",
+    issue_date: "2020-01-15",
+    expiry_date: "2035-01-15",
+    nationality: "Française",
   };
 
   it("valide un document minimal", () => {
@@ -134,6 +139,27 @@ describe("identityDocumentSchema", () => {
     if (result.success) {
       expect(result.data.is_primary).toBe(true); // default
     }
+  });
+
+  it("rejette une nationalite absente", () => {
+    const { nationality: _n, ...sansNationalite } = validDoc;
+    expect(identityDocumentSchema.safeParse(sansNationalite).success).toBe(false);
+  });
+
+  it("rejette une piece deja expiree", () => {
+    const result = identityDocumentSchema.safeParse({
+      ...validDoc,
+      expiry_date: "2020-06-30",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejette une emission posterieure a l'expiration", () => {
+    const result = identityDocumentSchema.safeParse({
+      ...validDoc,
+      issue_date: "2036-01-15",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("valide un document complet", () => {

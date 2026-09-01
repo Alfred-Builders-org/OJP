@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
+import { RichText } from "@/components/ui/rich-text";
+
+// Tiptap n'est charge qu'a l'ouverture de l'editeur.
+const RichTextEditor = dynamic(
+  () => import("@/components/ui/rich-text-editor").then((m) => m.RichTextEditor),
+  { ssr: false }
+);
 import { CopyableText } from "@/components/ui/copyable-text";
 import Link from "next/link";
 import { PreviewLink } from "@/components/preview/preview-link";
@@ -443,16 +451,16 @@ export function DossierDetailPage({
             </CardHeader>
             <CardContent>
               {editing || editingNotes ? (
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                <RichTextEditor
+                  // Le composant ne resynchronise pas son contenu apres montage :
+                  // la cle le remonte a chaque entree en edition.
+                  key={`notes-${dossier.id}`}
+                  content={notes}
+                  onChange={setNotes}
                   placeholder="Notes sur le dossier..."
-                  className="min-h-[150px] resize-none"
                 />
               ) : (
-                <p className="text-sm whitespace-pre-wrap">
-                  {dossier.notes ?? "Aucune note."}
-                </p>
+                <RichText html={dossier.notes} fallback="Aucune note." />
               )}
             </CardContent>
           </Card>
