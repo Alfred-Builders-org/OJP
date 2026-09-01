@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Gear, SignOut, UserCircle, Book } from "@phosphor-icons/react";
+import { Gear, SignOut, UserCircle, Book, Lifebuoy } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -92,6 +92,14 @@ export function SidebarProfile({ profile, email, role }: SidebarProfileProps) {
             >
               <Book size={16} weight="duotone" />
               <span>Documentation</span>
+            </DropdownMenuItem>
+            {/*
+              Support Alfrhelp. L'attribut suffit : l'ecoute est posee sur le
+              document par le script du layout, donc aucun gestionnaire ici.
+            */}
+            <DropdownMenuItem data-alfrhelp-open="">
+              <Lifebuoy size={16} weight="duotone" />
+              <span>Support client</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem

@@ -25,7 +25,11 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Content-Security-Policy",
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://alfrhelp-web-staging.up.railway.app; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://alfrhelp-web-staging.up.railway.app; frame-src blob:; object-src 'none'; base-uri 'self'; form-action 'self';",
+            // Le widget de support Alfrhelp est servi par api-ui.up.railway.app :
+            // il lui faut le script, ses appels (dont le temps reel), et de quoi
+            // monter son panneau — sans quoi le script se charge et rien ne
+            // s'affiche, seul symptome d'un CSP trop ferme.
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api-ui.up.railway.app; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://api-ui.up.railway.app; font-src 'self' https://api-ui.up.railway.app; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api-ui.up.railway.app wss://api-ui.up.railway.app; frame-src blob: https://api-ui.up.railway.app; object-src 'none'; base-uri 'self'; form-action 'self';",
           },
         ],
       },
