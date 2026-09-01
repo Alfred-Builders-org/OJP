@@ -2,6 +2,7 @@ import { render } from "@react-email/components";
 import React from "react";
 import { getResend } from "./resend";
 import { EmailWrapper } from "./wrapper";
+import { LOGO_CID, pieceLogo } from "./logo";
 import type { Gabarit } from "./gabarits";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { CourrielType } from "@/types/email";
@@ -84,13 +85,13 @@ export async function envoyerCourriel(envoi: Envoi): Promise<ResultatEnvoi> {
   }
 
   try {
-    const origine = process.env.NEXT_PUBLIC_APP_URL;
     const html = await render(
       React.createElement(EmailWrapper, {
-        body: gabarit.lignes.join("\n"),
-        // Le logo est servi par l'application. Un lien vers le bucket d'un
-        // projet precis affiche un carre casse partout ailleurs.
-        logoUrl: origine ? `${origine}/logo-light.png` : undefined,
+        blocs: gabarit.blocs,
+        // Le logo voyage avec le message plutot que d'etre appele a distance :
+        // les messageries bloquent les images externes, et l'en-tete
+        // apparaissait un coup sur deux.
+        logoUrl: `cid:${LOGO_CID}`,
       })
     );
 
@@ -99,7 +100,7 @@ export async function envoyerCourriel(envoi: Envoi): Promise<ResultatEnvoi> {
       to: destinataire,
       subject: gabarit.sujet,
       html,
-      attachments: pieces.length > 0 ? pieces : undefined,
+      attachments: [pieceLogo(), ...pieces],
     });
 
     await journaliser({

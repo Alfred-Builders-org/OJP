@@ -89,7 +89,6 @@ export async function POST(request: NextRequest) {
       const { envoye, motif } = await envoyerInvitation({
         destinataire: email,
         lien: inviteLink,
-        origine: siteUrl,
       }).catch((erreurInattendue: Error) => ({
         envoye: false,
         motif: erreurInattendue.message,

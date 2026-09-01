@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { composerRecap, nommerPiece, type LotClos, type DocumentClos } from "./recap-cloture";
-import { gabaritDossierCloture } from "./gabarits";
+import { gabaritDossierCloture, texteDe } from "./gabarits";
 
 const CLIENT = { civilite: "M", prenom: "Camille", nom: "Perret" };
 
@@ -12,6 +12,10 @@ function lot(patch: Partial<LotClos> = {}): LotClos {
     outcome: "complete",
     montant: 1250,
     nbArticles: 3,
+    articles: [
+      { designation: "Bague or 18 carats", quantite: 1, montant: 620, sort: null },
+      { designation: "Chaîne maille forçat", quantite: 2, montant: 630, sort: null },
+    ],
     ...patch,
   };
 }
@@ -102,7 +106,7 @@ describe("gabaritDossierCloture", () => {
 
   it("ne totalise pas un dossier à lot unique", () => {
     const { recap } = composerRecap(CLIENT, "DOS-2026-0012", [lot()], []);
-    const corps = gabaritDossierCloture(recap).lignes.join("\n");
+    const corps = texteDe(gabaritDossierCloture(recap));
 
     expect(corps).not.toContain("Total");
   });
@@ -116,31 +120,76 @@ describe("gabaritDossierCloture", () => {
     );
     // Intl sépare les milliers par une espace insécable étroite : on compare
     // sur un texte normalisé plutôt que sur l'apparence du caractère.
-    const corps = gabaritDossierCloture(recap).lignes.join("\n").replace(/\s/g, " ");
+    const corps = texteDe(gabaritDossierCloture(recap)).replace(/\s/g, " ");
 
     expect(corps).toContain("Total");
     expect(corps).toContain("2 000,00 €");
   });
 
-  it("annonce les pièces jointes et les nomme", () => {
-    const { recap } = composerRecap(CLIENT, "DOS-2026-0012", [lot()], [doc()]);
-    const corps = gabaritDossierCloture(recap).lignes.join("\n");
+  // Le corps annonce les pièces, il ne les redessine pas : les nommer une
+  // seconde fois dans le message doublait ce que la messagerie affiche déjà.
+  it("annonce les pièces sans recopier leurs noms", () => {
+    const { recap } = composerRecap(CLIENT, "DOS-2026-0012", [lot()], [
+      doc(),
+      doc({ type: "facture_vente", numero: "FAC-2026-0009" }),
+    ]);
+    const corps = texteDe(gabaritDossierCloture(recap));
 
-    expect(corps).toContain("Contrat de rachat CRA-2026-0007.pdf");
+    expect(corps).toContain("Les 2 documents de votre dossier sont joints");
+    expect(corps).not.toContain("CRA-2026-0007.pdf");
   });
 
-  it("n'annonce pas de pièce jointe quand il n'y en a aucune", () => {
-    const { recap } = composerRecap(CLIENT, "DOS-2026-0012", [lot()], []);
-    const corps = gabaritDossierCloture(recap).lignes.join("\n");
+  it("accorde la mention au singulier sur une pièce unique", () => {
+    const { recap } = composerRecap(CLIENT, "DOS-2026-0012", [lot()], [doc()]);
 
-    expect(corps).not.toContain("ci-joint");
+    expect(texteDe(gabaritDossierCloture(recap))).toContain(
+      "Le document de votre dossier est joint"
+    );
+  });
+
+  it("ne parle pas de pièce jointe quand il n'y en a aucune", () => {
+    const { recap } = composerRecap(CLIENT, "DOS-2026-0012", [lot()], []);
+    const corps = texteDe(gabaritDossierCloture(recap));
+
+    expect(corps).not.toContain("joint");
+  });
+
+  it("détaille les articles, puis referme sur la ligne du lot", () => {
+    const { recap } = composerRecap(CLIENT, "DOS-2026-0012", [lot()], []);
+    const corps = texteDe(gabaritDossierCloture(recap));
+
+    const positionArticle = corps.indexOf("Bague or 18 carats");
+    const positionLot = corps.indexOf("RAC-2026-0033 — rachat");
+
+    expect(positionArticle).toBeGreaterThan(-1);
+    expect(positionLot).toBeGreaterThan(positionArticle);
+  });
+
+  it("nomme le sort d'un article qui n'a pas suivi le cours normal", () => {
+    const { recap } = composerRecap(
+      CLIENT,
+      "DOS-2026-0012",
+      [
+        lot({
+          articles: [
+            { designation: "Bracelet jonc", quantite: 1, montant: 940, sort: null },
+            { designation: "Montre plaquée", quantite: 1, montant: 0, sort: "devis refusé" },
+          ],
+        }),
+      ],
+      []
+    );
+    const corps = texteDe(gabaritDossierCloture(recap));
+
+    expect(corps).toContain("Montre plaquée");
+    expect(corps).toContain("devis refusé");
   });
 
   it("accorde le singulier et le pluriel des articles", () => {
     const un = composerRecap(CLIENT, "DOS-1", [lot({ nbArticles: 1 })], []).recap;
     const trois = composerRecap(CLIENT, "DOS-1", [lot({ nbArticles: 3 })], []).recap;
 
-    expect(gabaritDossierCloture(un).lignes.join("\n")).toContain("1 article —");
-    expect(gabaritDossierCloture(trois).lignes.join("\n")).toContain("3 articles —");
+    expect(texteDe(gabaritDossierCloture(un))).toContain("1 article —");
+    expect(texteDe(gabaritDossierCloture(trois))).toContain("3 articles —");
   });
 });

@@ -14,13 +14,44 @@ import type { CourrielType } from "@/types/email";
  * donnee citee existe vraiment, et ou un changement de formulation passe par
  * une relecture.
  *
- * Un gabarit rend un sujet et des lignes. La mise en forme, l'enseigne et le
- * logo appartiennent au `EmailWrapper` — ici on n'ecrit que des phrases.
+ * Un gabarit ne rend pas des phrases mises bout a bout mais des **blocs** :
+ * un montant est un montant, une liste d'articles est une liste d'articles.
+ * La premiere version alignait des lignes de texte, et le rendu ne pouvait
+ * alors que les empiler — impossible d'aligner une colonne de prix ou de poser
+ * un sous-total sous son detail. Le style appartient au `EmailWrapper`, la
+ * structure se decide ici.
  */
+
+/** Un article, tel qu'il figure au detail d'un lot. */
+export interface ArticleRecap {
+  designation: string;
+  quantite: number;
+  montant: number;
+  /** Ce qui lui est arrive, quand ce n'est pas l'achat ordinaire. */
+  sort: string | null;
+}
+
+export type Bloc =
+  | { type: "paragraphe"; texte: string }
+  | { type: "note"; texte: string }
+  | {
+      type: "lot";
+      numero: string;
+      nature: string;
+      issue: string | null;
+      nbArticles: number;
+      montant: number;
+      articles: ArticleRecap[];
+    }
+  | { type: "total"; montant: number }
+  | { type: "liste"; items: string[] }
+  | { type: "encadre"; lignes: { libelle: string; valeur: string; fort?: boolean }[] }
+  | { type: "pieces"; noms: string[] }
+  | { type: "signature" };
 
 export interface Gabarit {
   sujet: string;
-  lignes: string[];
+  blocs: Bloc[];
 }
 
 /** Nom d'usage du client, pour l'entree en matiere. */
@@ -30,13 +61,71 @@ export interface Destinataire {
   nom: string;
 }
 
-function bonjour(client: Destinataire): string {
-  return `Bonjour ${client.prenom} ${client.nom},`;
+function bonjour(client: Destinataire): Bloc {
+  return { type: "paragraphe", texte: `Bonjour ${client.prenom} ${client.nom},` };
 }
 
-const SIGNATURE = ["Cordialement,", "L'Or au Juste Prix"];
+/**
+ * La phrase qui annonce les pieces, et rien de plus.
+ *
+ * Le corps du message listait auparavant chaque fichier dans un cadre gris,
+ * avec son nom et son extension. Ces cadres ressemblaient a des pieces jointes
+ * sans en etre : rien ne s'ouvrait au clic, alors que les vraies pieces
+ * attendaient plus bas, affichees par la messagerie. Deux listes pour les memes
+ * documents, dont une inerte.
+ *
+ * Une phrase suffit. Les noms, les icones et les boutons de telechargement sont
+ * l'affaire du client de messagerie, qui le fait mieux et au bon endroit.
+ */
+export function mentionPieces(nombre: number): string {
+  return nombre > 1
+    ? `Les ${nombre} documents de votre dossier sont joints à ce message.`
+    : "Le document de votre dossier est joint à ce message.";
+}
 
-/** Ligne de recapitulatif d'un lot clos. */
+/** Aplatit un gabarit en texte brut — utile aux tests et aux journaux. */
+export function texteDe(gabarit: Gabarit): string {
+  const lignes: string[] = [];
+
+  for (const bloc of gabarit.blocs) {
+    switch (bloc.type) {
+      case "paragraphe":
+      case "note":
+        lignes.push(bloc.texte);
+        break;
+      case "lot":
+        for (const article of bloc.articles) {
+          lignes.push(
+            `${article.designation} — ${article.quantite} — ${formatCurrency(article.montant)}${article.sort ? ` — ${article.sort}` : ""}`
+          );
+        }
+        lignes.push(
+          `${bloc.numero} — ${bloc.nature} — ${bloc.nbArticles} article${bloc.nbArticles > 1 ? "s" : ""} — ${formatCurrency(bloc.montant)}${bloc.issue ? ` — ${bloc.issue}` : ""}`
+        );
+        break;
+      case "total":
+        lignes.push(`Total : ${formatCurrency(bloc.montant)}`);
+        break;
+      case "liste":
+        lignes.push(...bloc.items);
+        break;
+      case "encadre":
+        for (const l of bloc.lignes) lignes.push(`${l.libelle} : ${l.valeur}`);
+        break;
+      case "pieces":
+        lignes.push(mentionPieces(bloc.noms.length));
+        break;
+      case "signature":
+        lignes.push("Cordialement,", "L'Or au Juste Prix");
+        break;
+    }
+  }
+
+  return lignes.join("\n");
+}
+
+/* ──────────────────────── CLOTURE D'UN DOSSIER ──────────────────────── */
+
 export interface LigneRecap {
   numero: string;
   /** « rachat », « vente » ou « dépôt-vente », deja en clair. */
@@ -45,6 +134,7 @@ export interface LigneRecap {
   issue: string | null;
   nbArticles: number;
   montant: number;
+  articles: ArticleRecap[];
 }
 
 export interface RecapCloture {
@@ -62,50 +152,61 @@ export interface RecapCloture {
  * un depot-vente le meme jour — et certains n'aboutissent pas. Le recapitulatif
  * les nomme tous, y compris ceux sans suite : le client doit retrouver le
  * compte de ce qu'il a apporte, pas seulement de ce qui lui a ete paye.
+ *
+ * Chaque lot montre d'abord ses articles, puis sa propre ligne en dessous, en
+ * sous-total. Le recapitulatif ne donnait au depart que la ligne du lot : sur
+ * un rachat ou un objet avait ete achete et l'autre refuse, le client lisait
+ * « 2 articles » et un montant, sans pouvoir dire lequel des deux lui avait ete
+ * paye.
  */
 export function gabaritDossierCloture(recap: RecapCloture): Gabarit {
-  const lignes: string[] = [
+  const blocs: Bloc[] = [
     bonjour(recap.client),
-    "",
-    `Votre dossier n°${recap.dossierNumero} est clôturé. Voici le récapitulatif de ce qui s'y est passé.`,
-    "",
+    {
+      type: "paragraphe",
+      texte: `Votre dossier n°${recap.dossierNumero} est clôturé. Voici le récapitulatif de ce qui s'y est passé.`,
+    },
   ];
 
   for (const lot of recap.lots) {
-    const articles = `${lot.nbArticles} article${lot.nbArticles > 1 ? "s" : ""}`;
-    const issue = lot.issue ? ` — ${lot.issue}` : "";
-    lignes.push(
-      `• ${lot.numero} — ${lot.nature} — ${articles} — ${formatCurrency(lot.montant)}${issue}`
-    );
+    blocs.push({
+      type: "lot",
+      numero: lot.numero,
+      nature: lot.nature,
+      issue: lot.issue,
+      nbArticles: lot.nbArticles,
+      montant: lot.montant,
+      articles: lot.articles,
+    });
   }
 
   // Le total n'a de sens qu'a plusieurs lots : repeter un montant unique deja
   // ecrit juste au-dessus donne l'impression d'une somme a payer en plus.
   if (recap.lots.length > 1) {
-    const total = recap.lots.reduce((somme, lot) => somme + lot.montant, 0);
-    lignes.push("", `Total : ${formatCurrency(total)}`);
+    blocs.push({
+      type: "total",
+      montant: recap.lots.reduce((somme, lot) => somme + lot.montant, 0),
+    });
   }
 
   if (recap.documents.length > 0) {
-    lignes.push(
-      "",
-      `Vous trouverez ci-joint ${recap.documents.length > 1 ? "les documents suivants" : "le document suivant"} :`
-    );
-    for (const nom of recap.documents) lignes.push(`• ${nom}`);
+    blocs.push({ type: "pieces", noms: recap.documents });
+    blocs.push({
+      type: "note",
+      texte:
+        "Conservez ces documents : ils vous seront demandés en cas de question sur cette opération.",
+    });
   }
 
-  lignes.push(
-    "",
-    "Conservez ces documents : ils vous seront demandés en cas de question sur cette opération.",
-    "",
-    ...SIGNATURE
-  );
+  blocs.push({ type: "signature" });
 
   return {
     sujet: `Votre dossier ${recap.dossierNumero} est clôturé — L'Or au Juste Prix`,
-    lignes,
+    blocs,
   };
 }
+
+/* ──────────────────────── DEVIS QUI EXPIRE ──────────────────────── */
 
 export interface RappelDevis {
   client: Destinataire;
@@ -130,19 +231,34 @@ export function gabaritDevisExpireBientot(rappel: RappelDevis): Gabarit {
 
   return {
     sujet: `Votre devis${reference} expire demain — L'Or au Juste Prix`,
-    lignes: [
+    blocs: [
       bonjour(rappel.client),
-      "",
-      `Votre devis${reference} portant sur ${articles}, d'un montant de ${formatCurrency(rappel.montant)}, arrive à échéance le ${formatDateTime(rappel.dateFin)}.`,
-      "",
-      "Passé ce délai, le prix proposé ne pourra plus être garanti : il est calculé sur le cours des métaux au jour de l'estimation.",
-      "",
-      "Si vous souhaitez donner suite, il vous suffit de nous le faire savoir avant cette date.",
-      "",
-      ...SIGNATURE,
+      {
+        type: "paragraphe",
+        texte: `Votre devis${reference} porte sur ${articles}. Il arrive à échéance demain.`,
+      },
+      {
+        type: "encadre",
+        lignes: [
+          { libelle: "Montant proposé", valeur: formatCurrency(rappel.montant), fort: true },
+          { libelle: "Valable jusqu'au", valeur: formatDateTime(rappel.dateFin) },
+        ],
+      },
+      {
+        type: "paragraphe",
+        texte:
+          "Passé ce délai, le prix proposé ne pourra plus être garanti : il est calculé sur le cours des métaux au jour de l'estimation.",
+      },
+      {
+        type: "paragraphe",
+        texte: "Si vous souhaitez donner suite, il vous suffit de nous le faire savoir avant cette date.",
+      },
+      { type: "signature" },
     ],
   };
 }
+
+/* ──────────────────────── COMMANDE ARRIVEE ──────────────────────── */
 
 export interface CommandePrete {
   client: Destinataire;
@@ -158,27 +274,26 @@ export interface CommandePrete {
  * client pour rien.
  */
 export function gabaritCommandePrete(commande: CommandePrete): Gabarit {
-  const lignes: string[] = [
-    bonjour(commande.client),
-    "",
-    "Bonne nouvelle : votre commande est arrivée et vous attend en boutique.",
-    "",
-  ];
-
-  for (const article of commande.articles) lignes.push(`• ${article}`);
-
-  lignes.push(
-    "",
-    "Vous pouvez venir la retirer aux horaires d'ouverture, muni d'une pièce d'identité.",
-    "",
-    ...SIGNATURE
-  );
-
   return {
     sujet: `Votre commande ${commande.lotNumero} est disponible — L'Or au Juste Prix`,
-    lignes,
+    blocs: [
+      bonjour(commande.client),
+      {
+        type: "paragraphe",
+        texte: "Bonne nouvelle : votre commande est arrivée et vous attend en boutique.",
+      },
+      { type: "liste", items: commande.articles },
+      {
+        type: "paragraphe",
+        texte:
+          "Vous pouvez venir la retirer aux horaires d'ouverture, muni d'une pièce d'identité.",
+      },
+      { type: "signature" },
+    ],
   };
 }
+
+/* ──────────────────────── RAPPEL DE SOLDE ──────────────────────── */
 
 export interface RappelSolde {
   client: Destinataire;
@@ -199,16 +314,25 @@ export function gabaritRappelSolde(rappel: RappelSolde): Gabarit {
 
   return {
     sujet: `Rappel : solde de votre facture${reference} — L'Or au Juste Prix`,
-    lignes: [
+    blocs: [
       bonjour(rappel.client),
-      "",
-      `Nous vous rappelons que le solde de votre facture${reference}, soit ${formatCurrency(rappel.montantRestant)}, est à régler avant le ${formatDate(rappel.dateLimite)}.`,
-      "",
-      "Votre commande reste réservée jusqu'à cette date.",
-      "",
-      "Si le règlement a déjà été effectué, merci de ne pas tenir compte de ce message.",
-      "",
-      ...SIGNATURE,
+      {
+        type: "paragraphe",
+        texte: `Nous vous rappelons que le solde de votre facture${reference} reste à régler.`,
+      },
+      {
+        type: "encadre",
+        lignes: [
+          { libelle: "Reste à régler", valeur: formatCurrency(rappel.montantRestant), fort: true },
+          { libelle: "Avant le", valeur: formatDate(rappel.dateLimite) },
+        ],
+      },
+      { type: "paragraphe", texte: "Votre commande reste réservée jusqu'à cette date." },
+      {
+        type: "note",
+        texte: "Si le règlement a déjà été effectué, merci de ne pas tenir compte de ce message.",
+      },
+      { type: "signature" },
     ],
   };
 }

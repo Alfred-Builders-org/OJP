@@ -1,6 +1,7 @@
 import { render } from "@react-email/components";
 import React from "react";
 import { getResend } from "./resend";
+import { LOGO_CID, pieceLogo } from "./logo";
 import { AuthEmail } from "./auth-email";
 import { GABARITS_AUTH } from "./auth-templates";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -24,8 +25,6 @@ interface Invitation {
   destinataire: string;
   /** Le lien deja construit, qui passe par `/auth/callback`. */
   lien: string;
-  /** Adresse publique de l'environnement qui envoie, pour le logo. */
-  origine: string;
 }
 
 interface ResultatEnvoi {
@@ -37,7 +36,6 @@ interface ResultatEnvoi {
 export async function envoyerInvitation({
   destinataire,
   lien,
-  origine,
 }: Invitation): Promise<ResultatEnvoi> {
   const gabarit = GABARITS_AUTH.invite;
 
@@ -48,10 +46,10 @@ export async function envoyerInvitation({
       lien,
       libelleBouton: gabarit.libelleBouton,
       validite: gabarit.validite,
-      // Le logo est servi par l'application : un courriel qui affiche un carre
-      // casse a la place de l'enseigne ressemble a du hameçonnage, et celui-ci
-      // demande justement de choisir un mot de passe.
-      logoUrl: `${origine}/logo-light.png`,
+      // Le logo voyage avec le message : une image appelee a distance est
+      // bloquee par la plupart des messageries, et un courriel qui demande de
+      // choisir un mot de passe sans son enseigne ressemble a du hameçonnage.
+      logoUrl: `cid:${LOGO_CID}`,
     })
   );
 
@@ -72,6 +70,7 @@ export async function envoyerInvitation({
     to: destinataire,
     subject: gabarit.sujet,
     html,
+    attachments: [pieceLogo()],
   });
 
   // Journalise au meme endroit que les courriels metier : quand quelqu'un dit

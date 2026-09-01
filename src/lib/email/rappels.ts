@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { envoyerCourriel, lotsDejaNotifies, dossiersDejaNotifies } from "./envoyer";
+import { envoyerCourriel, lotsDejaNotifies } from "./envoyer";
 import {
   devisQuiExpirent,
   commandesPretes,
@@ -14,7 +14,6 @@ import {
   gabaritRappelSolde,
   type Destinataire,
 } from "./gabarits";
-import { envoyerRecapCloture } from "./recap-cloture";
 import type { BusinessRulesSettings } from "@/types/settings";
 
 /**
@@ -38,7 +37,6 @@ export interface RapportBalayage {
   devis: number;
   commandes: number;
   soldes: number;
-  clotures: number;
   echecs: number;
 }
 
@@ -54,7 +52,7 @@ interface ClientLot {
 
 export async function executerBalayage(maintenant: Date = new Date()): Promise<RapportBalayage> {
   const db = getSupabaseAdmin();
-  const rapport: RapportBalayage = { devis: 0, commandes: 0, soldes: 0, clotures: 0, echecs: 0 };
+  const rapport: RapportBalayage = { devis: 0, commandes: 0, soldes: 0, echecs: 0 };
 
   const { data: reglages } = await db
     .from("settings")
@@ -226,24 +224,19 @@ export async function executerBalayage(maintenant: Date = new Date()): Promise<R
     }
   }
 
-  /* ── Filet : clotures dont le recapitulatif n'est jamais parti ── */
-
-  // La cloture envoie son recapitulatif sur-le-champ. Si Resend etait
-  // indisponible a cette seconde-la, personne ne repasserait : ce rattrapage
-  // s'en charge, dans la semaine qui suit.
-  const depuis = new Date(maintenant.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: closDernierement } = await db
-    .from("dossiers")
-    .select("id")
-    .eq("status", "finalise")
-    .gte("updated_at", depuis);
-
-  const dejaEcrit = await dossiersDejaNotifies("dossier_cloture");
-  for (const dossier of (closDernierement ?? []) as { id: string }[]) {
-    if (dejaEcrit.has(dossier.id)) continue;
-    await envoyerRecapCloture(dossier.id);
-    rapport.clotures++;
-  }
+  // Aucun rattrapage des clotures, volontairement.
+  //
+  // Le balayage avait d'abord repris les dossiers clos recemment dont le
+  // recapitulatif n'etait pas parti. A la premiere execution, trente dossiers
+  // deja clos depuis des jours auraient ecrit d'un coup a des clients qui
+  // avaient tourne la page. Reduire la fenetre ne reglait rien : le principe
+  // meme est mauvais. Un courriel qui n'est pas parti au bon moment ne doit
+  // plus partir du tout — il se rattrape a la voix, pas par un automate qui
+  // remonte le temps.
+  //
+  // Le recapitulatif de cloture part donc d'un seul endroit : le moment ou le
+  // dossier se clot. S'il echoue, l'echec est trace dans `email_logs`, et
+  // c'est tout.
 
   return rapport;
 }
