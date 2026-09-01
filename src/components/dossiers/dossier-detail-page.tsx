@@ -418,6 +418,7 @@ export function DossierDetailPage({
             processing={processing}
             lots={brouillonLots}
             lotReferences={lotReferences}
+            venteLignes={venteLignes}
           />
 
           {/* Récapitulatif financier — masqué temporairement */}
