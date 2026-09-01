@@ -307,7 +307,7 @@ export async function finaliserDossierAction(dossierId: string): Promise<Finalis
 
 /* ──────────────────────── HELPERS ──────────────────────── */
 
-function buildClientInfo(dossier: { client: { civility: string; first_name: string; last_name: string; address: string | null; postal_code: string | null; city: string | null } }): ClientInfo {
+function buildClientInfo(dossier: { client: { civility: string; first_name: string; last_name: string; address: string | null; postal_code: string | null; city: string | null; phone?: string | null; email?: string | null } }): ClientInfo {
   return {
     civilite: dossier.client.civility === "M" ? "M." : "Mme",
     nom: dossier.client.last_name,
@@ -315,6 +315,9 @@ function buildClientInfo(dossier: { client: { civility: string; first_name: stri
     adresse: dossier.client.address ?? undefined,
     codePostal: dossier.client.postal_code ?? undefined,
     ville: dossier.client.city ?? undefined,
+    // Rappelees en tete de l'annexe du contrat de depot-vente.
+    telephone: dossier.client.phone ?? undefined,
+    email: dossier.client.email ?? undefined,
   };
 }
 
@@ -525,6 +528,10 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
     clientInfo.documentNumber = idDoc.document_number;
   }
 
+  // Le contrat annonce le taux reellement applique, et non un 40 % ecrit en dur.
+  const reglesDv = await getSettingServer("business_rules");
+  const commissionPct = reglesDv?.commission_dv_pct ?? 40;
+
   const dossierInfo = buildDossierInfo(dossier, lot, now);
   const dvRefs: DepotVenteReferenceLigne[] = allDvRefs.map((r: Ref) => ({
     designation: r.designation,
@@ -544,6 +551,7 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
   const contratRes = await genDoc({
     type: "contrat_depot_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id,
     client: clientInfo, dossier: dossierInfo, depotVenteReferences: dvRefs, numeroLot: lot.numero,
+    commissionPct,
     references: [], totaux: { totalBrut: 0, taxe: 0, netAPayer: 0 },
     lotReferenceIds: allDvRefs.map((r: Ref) => r.id),
   }, "contrat_depot_vente");

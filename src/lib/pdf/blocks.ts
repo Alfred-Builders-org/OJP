@@ -14,6 +14,7 @@ export const SOCIETE = {
   nom: "L'Or au Juste Prix",
   adresse: "4 Grande Rue 74160 St Julien en Genevois",
   telephone: "06 78 87 75 78",
+  email: "oraujusteprix@gmail.com",
   details: "SAS au capital de 5 000,00 \u20AC",
   siret_rcs: "928 126 390 R.C.S. Thonon-les-Bains",
 };
@@ -31,6 +32,7 @@ export async function refreshSociete(): Promise<void> {
   SOCIETE.nom = company.nom || SOCIETE.nom;
   SOCIETE.adresse = [company.adresse, company.code_postal, company.ville].filter(Boolean).join(" ") || SOCIETE.adresse;
   SOCIETE.telephone = company.telephone || SOCIETE.telephone;
+  SOCIETE.email = company.email || SOCIETE.email;
   SOCIETE.details = company.forme_juridique || SOCIETE.details;
   SOCIETE.siret_rcs = company.siret_rcs || SOCIETE.siret_rcs;
 }
@@ -48,6 +50,9 @@ export interface ClientInfo {
   adresse?: string;
   codePostal?: string;
   ville?: string;
+  /** Coordonnées rappelées en tête de l'annexe du contrat de dépôt-vente. */
+  telephone?: string;
+  email?: string;
   documentType?: string;
   documentNumber?: string;
 }
@@ -159,7 +164,18 @@ export interface ConfieReferenceLigne {
  * ici : le gabarit les compose à partir du dossier. L'annexe 1 (fiche de dépôt)
  * est la page 2, générée depuis les références du lot.
  */
-export const CDV_CLAUSES: Array<{ title: string; body: string }> = [
+export function cdvClauses(
+  commissionPct: number
+): Array<{ title: string; body: string }> {
+  // Le taux affiche doit etre celui reellement applique au lot : il etait ecrit
+  // en dur a 40 %, si bien qu'un depot negocie a un autre taux produisait un
+  // contrat qui annoncait le mauvais chiffre.
+  const commission = Number.isFinite(commissionPct) ? commissionPct : 40;
+  const commissionTexte = new Intl.NumberFormat("fr-FR", {
+    maximumFractionDigits: 2,
+  }).format(commission);
+
+  return [
   {
     title: "OBJET DU CONTRAT",
     body: "Le présent contrat est établi à l'occasion du dépôt de marchandises appartenant au déposant-vendeur dans le local commercial du dépositaire. À charge pour ce dernier de les vendre en son nom et pour son compte contre une rémunération de ses services d'intermédiaire.\n\nSi le déposant-vendeur devait déposer de nouveaux objets, ces derniers feraient alors l'objet d'un nouveau contrat.",
@@ -190,7 +206,7 @@ export const CDV_CLAUSES: Array<{ title: string; body: string }> = [
   },
   {
     title: "RÉMUNÉRATION DU DÉPOSITAIRE",
-    body: "Le dépositaire sera rémunéré pour le service qu'il propose par une commission sur le prix de vente. La commission s'élève à 40 % du prix de vente public.\n\nLe prix souhaité par le propriétaire-déposant, la rémunération du dépositaire ainsi que les modalités des soldes et promotions sont consignées sur la feuille de dépôt.",
+    body: `Le dépositaire sera rémunéré pour le service qu'il propose par une commission sur le prix de vente. La commission s'élève à ${commissionTexte} % du prix de vente public.\n\nLe prix souhaité par le propriétaire-déposant, la rémunération du dépositaire ainsi que les modalités des soldes et promotions sont consignées sur la feuille de dépôt.`,
   },
   {
     title: "SOLDES ET PROMOTIONS",
@@ -219,8 +235,9 @@ export const CDV_CLAUSES: Array<{ title: string; body: string }> = [
   {
     title: "ACCEPTATION",
     body: "En signant le présent document et les 2 annexes, le déposant-vendeur déclare avoir pris connaissance et accepter les termes et conditions du présent contrat. Il reconnaît notamment être le seul propriétaire des objets désignés et donner mandat au dépôt-vente de les vendre. Il déclare également avoir pris connaissance de toutes les conditions de ce dépôt-vente, en particulier celles relatives à la baisse des prix.\n\nPièces jointes : carte d'identité ou passeport, RIB, certificats d'authenticité et factures.",
-  },
-];
+    },
+  ];
+}
 
 // Legal texts
 export const TEXTE_CONDITIONS_CONFIE =

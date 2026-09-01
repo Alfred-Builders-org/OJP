@@ -3,7 +3,7 @@ import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W_CDV, fmt } from "./shared-styles";
 import {
-  CDV_CLAUSES, SOCIETE,
+  cdvClauses, SOCIETE,
   type ClientInfo, type DossierInfo, type DepotVenteReferenceLigne,
   recapitulatifTitrage,
 } from "./blocks";
@@ -14,6 +14,8 @@ export interface ContratDepotVenteData {
   dossier: DossierInfo;
   references: DepotVenteReferenceLigne[];
   numeroLot: string;
+  /** Taux de commission réellement appliqué au lot, en pourcentage. */
+  commissionPct?: number;
 }
 
 function Doc({ data }: { data: ContratDepotVenteData }) {
@@ -51,7 +53,7 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
           h(Text, { style: s.cdvColLine }, SOCIETE.adresse))),
 
       // Legal clauses
-      ...CDV_CLAUSES.map((clause, i) =>
+      ...cdvClauses(data.commissionPct ?? 40).map((clause, i) =>
         h(View, { key: i, wrap: false },
           h(Text, { style: s.cdvClauseTitle }, clause.title),
           h(Text, { style: s.cdvClauseBody }, clause.body))),
@@ -71,10 +73,33 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
         h(Text, { style: s.footerText }, `${SOCIETE.nom} - ${SOCIETE.adresse}`),
         h(Text, { style: s.footerText }, `${SOCIETE.details} - ${SOCIETE.siret_rcs}`))),
 
-    // Page 2: Tableau des marchandises
+    // Page 2: Annexe 1 — fiche de depot
     h(Page, { size: "A4", style: s.page },
+      // En-tete de l'annexe : sortie du contrat, elle doit se rattacher seule a
+      // son contrat et nommer les deux parties.
+      h(View, { style: { marginBottom: 14 } },
+        h(Text, { style: s.cdvTitle }, `ANNEXE 1 \u2014 FICHE DE D\u00C9P\u00D4T`),
+        h(Text, { style: s.cdvColLine },
+          `Au contrat de d\u00E9p\u00F4t-vente ${data.numero} du ${dossier.date}`)),
+      h(View, { style: s.cdvTwoCol },
+        h(View, { style: s.cdvColLeft },
+          h(Text, { style: s.cdvColLabel }, "D\u00C9POSANT"),
+          h(Text, { style: s.cdvColName }, fullName),
+          client.adresse ? h(Text, { style: s.cdvColLine }, client.adresse) : null,
+          (client.codePostal || client.ville)
+            ? h(Text, { style: s.cdvColLine }, [client.codePostal, client.ville].filter(Boolean).join(" "))
+            : null,
+          client.telephone ? h(Text, { style: s.cdvColLine }, client.telephone) : null,
+          client.email ? h(Text, { style: s.cdvColLine }, client.email) : null),
+        h(View, { style: s.cdvColRight },
+          h(Text, { style: s.cdvColLabel }, "D\u00C9POSITAIRE"),
+          h(Text, { style: s.cdvColName }, SOCIETE.nom),
+          h(Text, { style: s.cdvColLine }, SOCIETE.adresse),
+          h(Text, { style: s.cdvColLine }, SOCIETE.telephone),
+          h(Text, { style: s.cdvColLine }, SOCIETE.email))),
+
       // Table header
-      h(View, { style: s.tableWrap },
+      h(View, { style: [s.tableWrap, { marginTop: 14 }] },
         h(View, { style: s.tableHead },
           h(Text, { style: [s.th, { width: W_CDV.des }] }, "DÉSIGNATION"),
           h(Text, { style: [s.th, { width: W_CDV.desc }] }, "DESCRIPTION"),

@@ -44,6 +44,8 @@ export interface GenerateDocumentParams {
   depotVenteReferences?: DepotVenteReferenceLigne[];
   confieReference?: ConfieReferenceLigne;
   numeroLot?: string;
+  /** Taux de commission du depot-vente, tel que parametre au moment du contrat. */
+  commissionPct?: number;
   // Quittance depot-vente specific
   quittanceDepotVenteLignes?: QuittanceDepotVenteLigne[];
   totalVentes?: number;
@@ -128,6 +130,7 @@ export async function generateAndStoreDocument(params: GenerateDocumentParams, d
       numero, client, dossier,
       references: params.depotVenteReferences!,
       numeroLot: params.numeroLot!,
+      commissionPct: params.commissionPct,
     });
   } else if (type === "confie_achat") {
     blob = await generateConfieAchat({
