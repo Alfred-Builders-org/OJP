@@ -2,6 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W_CONF, fmt } from "./shared-styles";
+import { piedDePage, enTeteDocument } from "./entete";
 import {
   TEXTE_CONDITIONS_CONFIE, SOCIETE,
   type ClientInfo, type DossierInfo, type ConfieReferenceLigne, type TotauxInfo,
@@ -18,7 +19,6 @@ export interface ConfieAchatData {
 function Doc({ data }: { data: ConfieAchatData }) {
   const { client, dossier, reference, totaux } = data;
   const h = React.createElement;
-  const fullName = `${client.civilite} ${client.prenom} ${client.nom}`;
 
   // Recap poids
   const recap = `${reference.titre}: ${(reference.poids * reference.quantite).toFixed(1)}g`;
@@ -32,24 +32,10 @@ function Doc({ data }: { data: ConfieAchatData }) {
         h(Text, { style: s.companyLine }, SOCIETE.adresse),
         h(Text, { style: s.companyLine }, SOCIETE.telephone))),
     // Info section
-    h(View, { style: s.infoSection },
-      h(View, { style: s.clientBlock },
-        h(Text, { style: s.label }, "CLIENT"),
-        h(Text, { style: s.clientName }, fullName),
-        client.adresse ? h(Text, { style: s.clientLine }, client.adresse) : null,
-        (client.codePostal || client.ville)
-          ? h(Text, { style: s.clientLine }, [client.codePostal, client.ville].filter(Boolean).join(" "))
-          : null,
-        client.documentType && client.documentNumber
-          ? h(Text, { style: s.clientMuted }, `${client.documentType}: ${client.documentNumber}`)
-          : null,
-        h(Text, { style: s.clientMuted }, `Dossier: ${dossier.numeroDossier}`)),
-      h(View, { style: s.docRight },
-        h(Text, { style: s.docTitle }, "CONFIÉ D'ACHAT"),
-        h(Text, { style: s.infoLabel }, "NUMÉRO"),
-        h(Text, { style: s.infoValue }, data.numero),
-        h(Text, { style: s.infoLabel }, "DATE"),
-        h(Text, { style: s.infoValue }, `${dossier.date}   ${dossier.heure}`))),
+    enTeteDocument("CONFIÉ D'ACHAT", [
+      { label: "NUMÉRO", value: data.numero },
+      { label: "DATE", value: `${dossier.date}  ${dossier.heure}` },
+    ], client, dossier, "DÉPOSANT"),
     // Table
     h(View, { style: s.tableWrap },
       h(View, { style: s.tableHead },
@@ -81,9 +67,7 @@ function Doc({ data }: { data: ConfieAchatData }) {
         h(View, { style: s.netRow }, h(Text, { style: s.netLabel }, "NET À PAYER"), h(Text, { style: s.netValue }, fmt(totaux.netAPayer))),
         h(View, { style: s.sigBlock }, h(Text, { style: s.sigLabel }, "Signature du vendeur"), h(View, { style: s.sigLine })))),
     // Footer
-    h(View, { style: s.footer, fixed: true },
-      h(Text, { style: s.footerText }, `${SOCIETE.nom}  ·  ${SOCIETE.details}`),
-      h(Text, { style: s.footerText }, `${SOCIETE.adresse}  ·  ${SOCIETE.telephone}`))));
+    piedDePage()));
 }
 
 export async function generateConfieAchat(data: ConfieAchatData): Promise<Blob> {

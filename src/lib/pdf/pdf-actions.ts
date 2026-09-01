@@ -8,7 +8,7 @@ import type { GenerateDocumentParams } from "./generate-and-store";
 import type { BonLivraisonData } from "./bon-livraison";
 import { createClient } from "@/lib/supabase/server";
 import { getSettingServer } from "@/lib/settings-server";
-import { formatDate, formatTime } from "@/lib/format";
+import { formatDate, formatTime, libelleModeReglement } from "@/lib/format";
 import type { FactureVenteLigne } from "./blocks";
 import { ligneSousMarge, totauxFactureVente } from "./facture-vente-regime";
 
@@ -126,7 +126,7 @@ export async function generateVenteFactures(lotId: string): Promise<{ success: b
         totalTTC,
         regimeMarge,
         mentionMarge,
-        modeReglement: "—",
+        modeReglement: libelleModeReglement(lot.mode_reglement),
       });
       if (!facturePath) errors.push("facture_vente");
       console.log("[VENTE-FACTURES] facture_vente:", facturePath ? "OK" : "FAILED");
@@ -201,7 +201,7 @@ export async function generateVenteFactures(lotId: string): Promise<{ success: b
         montantAcompte,
         montantSolde,
         numeroAcompte,
-        modeReglement: "—",
+        modeReglement: libelleModeReglement(lot.mode_reglement),
         referenceNumero: numeroAcompte,
       });
       if (!soldePath) errors.push("facture_solde");

@@ -45,3 +45,20 @@ export function formatCurrency(amount: number | null): string {
     currency: "EUR",
   }).format(amount ?? 0);
 }
+
+/**
+ * Libellé imprimable d'un mode de règlement.
+ *
+ * Les factures affichaient un tiret en dur : la ligne « Règlement » d'une
+ * facture de solde ne disait jamais comment le client avait payé, alors que
+ * `lots.mode_reglement` le sait.
+ */
+export function libelleModeReglement(mode: string | null | undefined): string {
+  const libelles: Record<string, string> = {
+    especes: "Espèces",
+    carte: "Carte bancaire",
+    virement: "Virement",
+    cheque: "Chèque",
+  };
+  return mode ? libelles[mode] ?? mode : "—";
+}

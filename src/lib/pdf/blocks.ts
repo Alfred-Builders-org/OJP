@@ -12,11 +12,16 @@ export const WHITE = "#FFFFFF";
 // Company info — mutable, refreshed from settings before PDF generation
 export const SOCIETE = {
   nom: "L'Or au Juste Prix",
+  /** Denomination sociale, distincte du nom commercial. */
+  denominationSociale: "SAS ORJP",
   adresse: "4 Grande Rue 74160 St Julien en Genevois",
   telephone: "06 78 87 75 78",
+  /** Ligne fixe de la boutique. */
+  telephoneFixe: "04 50 35 62 06",
   email: "oraujusteprix@gmail.com",
   details: "SAS au capital de 5 000,00 \u20AC",
   siret_rcs: "928 126 390 R.C.S. Thonon-les-Bains",
+  tva: "FR02 928 126 390",
 };
 
 import { getSettingServer } from "@/lib/settings-server";
@@ -30,11 +35,14 @@ export async function refreshSociete(): Promise<void> {
   const company = await getSettingServer("company");
   if (!company) return;
   SOCIETE.nom = company.nom || SOCIETE.nom;
+  SOCIETE.denominationSociale = company.denomination_sociale || SOCIETE.denominationSociale;
   SOCIETE.adresse = [company.adresse, company.code_postal, company.ville].filter(Boolean).join(" ") || SOCIETE.adresse;
   SOCIETE.telephone = company.telephone || SOCIETE.telephone;
+  SOCIETE.telephoneFixe = company.telephone_fixe || SOCIETE.telephoneFixe;
   SOCIETE.email = company.email || SOCIETE.email;
   SOCIETE.details = company.forme_juridique || SOCIETE.details;
   SOCIETE.siret_rcs = company.siret_rcs || SOCIETE.siret_rcs;
+  SOCIETE.tva = company.tva_intracom || SOCIETE.tva;
 }
 
 // Types
@@ -321,7 +329,7 @@ export interface FonderieInfo {
 }
 
 export const TEXTE_CONDITIONS_BON_COMMANDE =
-  "Ce bon de commande est émis par L'Or au Juste Prix pour l'achat d'or d'investissement. Merci de confirmer la réception de cette commande par retour, accompagnée de votre devis chiffré aux cours en vigueur.";
+  "Ce bon de commande est émis par L'Or au Juste Prix pour l'achat d'or d'investissement. Merci de confirmer la réception de cette commande par retour et par mail, accompagnée de votre devis chiffré aux cours en vigueur.";
 
 // Bon de livraison fonderie types
 export interface BonLivraisonLigneData {

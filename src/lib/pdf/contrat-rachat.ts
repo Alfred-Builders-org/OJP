@@ -2,6 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W, fmt } from "./shared-styles";
+import { piedDePage, enTeteDocument } from "./entete";
 import { TEXTE_CONDITIONS_CONTRAT, SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne, type TotauxInfo, recapitulatifTitrage } from "./blocks";
 
 export interface ContratRachatData {
@@ -26,20 +27,10 @@ function Doc({ data }: { data: ContratRachatData }) {
           h(Text, { style: s.companyName }, SOCIETE.nom.toUpperCase()),
           h(Text, { style: s.companyLine }, SOCIETE.adresse),
           h(Text, { style: s.companyLine }, SOCIETE.telephone))),
-      h(View, { style: s.infoSection },
-        h(View, { style: s.clientBlock },
-          h(Text, { style: s.label }, "CLIENT"),
-          h(Text, { style: s.clientName }, fullName),
-          client.adresse ? h(Text, { style: s.clientLine }, client.adresse) : null,
-          (client.codePostal || client.ville) ? h(Text, { style: s.clientLine }, [client.codePostal, client.ville].filter(Boolean).join(" ")) : null,
-          client.documentType && client.documentNumber ? h(Text, { style: s.clientMuted }, `${client.documentType} : ${client.documentNumber}`) : null,
-          h(Text, { style: s.clientMuted }, `Dossier : ${dossier.numeroDossier}`)),
-        h(View, { style: s.docRight },
-          h(Text, { style: s.docTitle }, "CONTRAT"),
-          h(Text, { style: s.infoLabel }, "NUM\u00C9RO"),
-          h(Text, { style: s.infoValue }, data.numero),
-          h(Text, { style: s.infoLabel }, "DATE"),
-          h(Text, { style: s.infoValue }, `${dossier.date}   ${dossier.heure}`))),
+      enTeteDocument("CONTRAT", [
+        { label: "NUM\u00C9RO", value: data.numero },
+        { label: "DATE", value: `${dossier.date}  ${dossier.heure}` },
+      ], client, dossier),
       // Table
       h(View, { style: s.tableWrap },
         h(View, { style: s.tableHead },
@@ -79,36 +70,38 @@ function Doc({ data }: { data: ContratRachatData }) {
       h(View, { style: s.condBlock },
         h(Text, { style: s.condTitle }, "CONDITIONS G\u00C9N\u00C9RALES DU CONTRAT"),
         h(Text, { style: s.condBody }, TEXTE_CONDITIONS_CONTRAT)),
-      h(View, { style: s.footer, fixed: true },
-        h(Text, { style: s.footerText }, `${SOCIETE.nom}  \u00B7  ${SOCIETE.details}`),
-        h(Text, { style: s.footerText }, `${SOCIETE.adresse}  \u00B7  ${SOCIETE.telephone}`))),
 
-    // Page 2: Bordereau de rétractation
-    h(Page, { size: "A4", style: s.page },
+      // Bordereau de retractation, ramene sur la page du contrat : c'est le
+      // meme feuillet que le client emporte, il se detache au trait pointille.
+      // Ses quatre reperes tiennent sur deux lignes de deux.
       h(View, { style: s.bordereauCut }),
       h(Text, { style: s.bordereauTitle }, "BORDEREAU DE R\u00C9TRACTATION\n(Article L. 224-99 du Code de la consommation)"),
       h(Text, { style: s.bordereauIntro },
         "Conform\u00E9ment \u00E0 mon droit de r\u00E9tractation de 48H apr\u00E8s signature du contrat, je vous notifie par ce bordereau que j'exerce mon droit de r\u00E9tractation et que j'annule le contrat :"),
-      h(View, { style: { marginBottom: 16 } },
+      h(View, { style: { marginBottom: 10 } },
         ...[
-          { label: "N\u00B0 de Contrat :", value: data.numero },
-          { label: "Date du contrat :", value: dossier.date },
-          { label: "Nom du client :", value: fullName },
-          { label: "Vendeur :", value: SOCIETE.nom },
-        ].map((f, i) =>
+          [
+            { label: "N\u00B0 de Contrat :", value: data.numero },
+            { label: "Date du contrat :", value: dossier.date },
+          ],
+          [
+            { label: "Nom du client :", value: fullName },
+            { label: "Vendeur :", value: SOCIETE.nom },
+          ],
+        ].map((paire, i) =>
           h(View, { key: i, style: s.bordereauFieldRow },
-            h(Text, { style: s.bordereauFieldLabel }, f.label),
-            h(Text, { style: s.bordereauFieldValue }, f.value)))),
+            ...paire.map((f, j) =>
+              h(View, { key: j, style: { flexDirection: "row" as const, width: "50%" } },
+                h(Text, { style: s.bordereauFieldLabel }, f.label),
+                h(Text, { style: s.bordereauFieldValue }, f.value)))))),
       h(View, { style: [s.spaceBetween, s.mt8] },
         h(View, null,
           h(Text, { style: [s.td, s.mb4] }, "Fait le : ..... / ..... / .........."),
           h(Text, { style: s.td }, "\u00E0 : ..... h .....")),
         h(View, { style: { alignItems: "flex-end" } },
           h(Text, { style: s.sigLabel }, "Signature du client :"),
-          h(View, { style: { borderBottomWidth: 0.5, borderBottomColor: "#1A1A1A", width: 150, marginTop: 25 } }))),
-      h(View, { style: s.footer, fixed: true },
-        h(Text, { style: s.footerText }, `${SOCIETE.nom}  \u00B7  ${SOCIETE.details}`),
-        h(Text, { style: s.footerText }, `${SOCIETE.adresse}  \u00B7  ${SOCIETE.telephone}`))));
+          h(View, { style: { borderBottomWidth: 0.5, borderBottomColor: "#1A1A1A", width: 150, marginTop: 20 } }))),
+      piedDePage()));
 }
 
 export async function generateContratRachat(data: ContratRachatData): Promise<Blob> {

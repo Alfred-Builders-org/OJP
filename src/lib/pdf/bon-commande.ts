@@ -2,8 +2,8 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s } from "./shared-styles";
+import { piedDePage } from "./entete";
 import {
-  SOCIETE,
   TEXTE_CONDITIONS_BON_COMMANDE,
   type BonCommandeLigne,
   type FonderieInfo,
@@ -34,21 +34,24 @@ function Doc({ data }: { data: BonCommandeData }) {
       ),
     ),
 
-    // Info section
+    // Reperes du dossier a gauche, fournisseur a droite.
     h(View, { style: s.infoSection },
+      h(View, { style: s.docLeft },
+        h(View, { style: s.reperes },
+          h(View, null,
+            h(Text, { style: s.repereLabel }, "DOSSIER"),
+            h(Text, { style: s.repereValue }, dossier.numeroDossier)),
+          h(View, null,
+            h(Text, { style: s.repereLabel }, "LOT"),
+            h(Text, { style: s.repereValue }, dossier.numeroLot))),
+      ),
       h(View, { style: s.clientBlock },
         h(Text, { style: s.label }, "FOURNISSEUR"),
         h(Text, { style: s.clientName }, fonderie.nom),
         fonderie.adresse ? h(Text, { style: s.clientLine }, fonderie.adresse) : null,
         fonderie.codePostal && fonderie.ville ? h(Text, { style: s.clientLine }, `${fonderie.codePostal} ${fonderie.ville}`) : null,
-        fonderie.telephone ? h(Text, { style: s.clientMuted }, `Tél : ${fonderie.telephone}`) : null,
+        fonderie.telephone ? h(Text, { style: s.clientMuted }, `T\u00E9l : ${fonderie.telephone}`) : null,
         fonderie.email ? h(Text, { style: s.clientMuted }, fonderie.email) : null,
-      ),
-      h(View, { style: s.docRight },
-        h(Text, { style: s.infoLabel }, "DOSSIER"),
-        h(Text, { style: s.infoValue }, dossier.numeroDossier),
-        h(Text, { style: s.infoLabel }, "LOT"),
-        h(Text, { style: s.infoValue }, dossier.numeroLot),
       ),
     ),
 
@@ -85,10 +88,7 @@ function Doc({ data }: { data: BonCommandeData }) {
     ),
 
     // Footer
-    h(View, { style: { ...s.footer, position: "absolute", bottom: 18, left: 45, right: 45 } },
-      h(Text, { style: s.footerText }, `${SOCIETE.nom} — ${SOCIETE.details}`),
-      h(Text, { style: s.footerText }, data.numero),
-    ),
+    piedDePage(data.numero),
   ));
 }
 

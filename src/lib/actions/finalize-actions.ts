@@ -6,7 +6,7 @@ import { tauxLigne, libelleTotalTaxe } from "@/lib/pdf/taxes-labels";
 import { ligneSousMarge, totauxFactureVente } from "@/lib/pdf/facture-vente-regime";
 import { calculerTFOP } from "@/lib/calculations/taxes";
 import { getSettingServer } from "@/lib/settings-server";
-import { formatDate, formatDateTime, formatTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatTime, libelleModeReglement } from "@/lib/format";
 import type {
   ClientInfo,
   DossierInfo,
@@ -803,7 +803,7 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
       client: clientInfo, dossier: dossierInfo, references: [],
       totaux: { totalBrut: totalHT, taxe: tva, netAPayer: totalTTC },
       factureVenteLignes: buildFactureLignes(lignesFacturees),
-      totalHT, tva, totalTTC, modeReglement: "—",
+      totalHT, tva, totalTTC, modeReglement: libelleModeReglement(lot.mode_reglement),
       regimeMarge, mentionMarge,
     }, "facture_vente");
     if (res.error) docErrors.push(res.error);
@@ -873,7 +873,7 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
       totaux: { totalBrut: totalHT, taxe: tva, netAPayer: montantSolde },
       factureVenteLignes: buildFactureLignes(orInvestLignes),
       totalHT, tva, totalTTC, montantAcompte, montantSolde, numeroAcompte,
-      modeReglement: "—", referenceNumero: numeroAcompte,
+      modeReglement: libelleModeReglement(lot.mode_reglement), referenceNumero: numeroAcompte,
     }, "facture_solde");
     if (soldeRes.error) docErrors.push(soldeRes.error);
     else if (soldeRes.path) {

@@ -110,6 +110,19 @@ export function SocieteTab({ settings, onRegisterSave }: SocieteTabProps) {
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="company_denomination">Dénomination sociale</Label>
+              <Input
+                id="company_denomination"
+                value={form.denomination_sociale ?? ""}
+                onChange={(e) => update("denomination_sociale", e.target.value)}
+                placeholder="SAS ORJP"
+              />
+              <p className="text-muted-foreground text-xs">
+                Imprimée au pied de chaque document, avec le capital, le RCS et la TVA.
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="company_adresse">Adresse</Label>
               <Input
                 id="company_adresse"
@@ -139,22 +152,32 @@ export function SocieteTab({ settings, onRegisterSave }: SocieteTabProps) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="company_telephone">Téléphone</Label>
+                <Label htmlFor="company_telephone_fixe">Téléphone fixe</Label>
+                <Input
+                  id="company_telephone_fixe"
+                  value={form.telephone_fixe ?? ""}
+                  onChange={(e) => update("telephone_fixe", e.target.value)}
+                  placeholder="04 50 35 62 06"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="company_telephone">Portable</Label>
                 <Input
                   id="company_telephone"
                   value={form.telephone}
                   onChange={(e) => update("telephone", e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="company_email">Email de contact</Label>
-                <Input
-                  id="company_email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => update("email", e.target.value)}
-                />
-              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company_email">Email de contact</Label>
+              <Input
+                id="company_email"
+                type="email"
+                value={form.email}
+                onChange={(e) => update("email", e.target.value)}
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -174,6 +197,16 @@ export function SocieteTab({ settings, onRegisterSave }: SocieteTabProps) {
                   onChange={(e) => update("siret_rcs", e.target.value)}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="company_tva">N° TVA intracommunautaire</Label>
+              <Input
+                id="company_tva"
+                value={form.tva_intracom ?? ""}
+                onChange={(e) => update("tva_intracom", e.target.value)}
+                placeholder="FR02 928 126 390"
+              />
             </div>
 
             <div className="space-y-2">

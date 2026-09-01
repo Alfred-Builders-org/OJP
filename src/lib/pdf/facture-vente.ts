@@ -1,9 +1,9 @@
 import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
-import { styles as s, W_FVE, C, fmt } from "./shared-styles";
+import { styles as s, W_FVE, fmt } from "./shared-styles";
+import { piedDePage, blocIdentiteFacture } from "./entete";
 import {
-  SOCIETE,
   type ClientInfo, type DossierInfo, type FactureVenteLigne, } from "./blocks";
 import { MENTION_TVA_MARGE } from "@/lib/calculations/taxes";
 
@@ -32,7 +32,6 @@ export interface FactureVenteData {
 function Doc({ data }: { data: FactureVenteData }) {
   const { client, dossier, lignes, totalHT, tva, totalTTC } = data;
   const h = React.createElement;
-  const fullName = `${client.civilite} ${client.prenom} ${client.nom}`;
 
   // Une facture peut melanger un bijou d'occasion et un bijou neuf. On ne
   // ventile alors que la TVA des seconds, et les premiers portent un renvoi
@@ -51,23 +50,12 @@ function Doc({ data }: { data: FactureVenteData }) {
         h(Text, { style: s.fveTitle }, "FACTURE DE VENTE"),
         h(Text, { style: s.fveNumero }, `N\u00B0 ${data.numero}`))),
 
-    // Client box with gold left border
-    h(View, { style: s.fveClientBox },
-      h(Text, { style: { fontSize: 6.5, fontFamily: "Courier-Bold", color: C.gray, marginBottom: 3, letterSpacing: 0.5 } }, "CLIENT"),
-      h(Text, { style: { fontSize: 10, fontFamily: "Courier-Bold", color: C.black, marginBottom: 1 } }, fullName),
-      client.adresse ? h(Text, { style: { fontSize: 8, color: C.gray, marginBottom: 1 } }, client.adresse) : null,
-      (client.codePostal || client.ville)
-        ? h(Text, { style: { fontSize: 8, color: C.gray, marginBottom: 1 } }, [client.codePostal, client.ville].filter(Boolean).join(" "))
-        : null,
-      client.documentType && client.documentNumber
-        ? h(Text, { style: { fontSize: 7, color: C.grayLight, marginTop: 2 } }, `${client.documentType} : ${client.documentNumber}`)
-        : null,
-      h(Text, { style: { fontSize: 7, color: C.grayLight, marginTop: 1 } }, `Dossier : ${dossier.numeroDossier}`)),
-
-    // Date / Heure / Paiement (right-aligned)
-    h(View, { style: { alignItems: "flex-end", marginBottom: 20 } },
-      h(Text, { style: s.fveDateRow }, `Date : ${dossier.date} | Heure : ${dossier.heure}`),
-      h(Text, { style: s.fveDateRow }, `Paiement : ${data.modeReglement || ""}`)),
+    // Reperes a gauche, identite du client a droite.
+    h(View, { style: { flexDirection: "row" as const, justifyContent: "space-between" as const, alignItems: "flex-start" as const, marginBottom: 20 } },
+      h(View, null,
+        h(Text, { style: s.fveDateLeft }, `Date : ${dossier.date}  |  Heure : ${dossier.heure}`),
+        h(Text, { style: s.fveDateLeft }, `Paiement : ${data.modeReglement || "\u2014"}`)),
+      blocIdentiteFacture(client, dossier)),
 
     // Table
     h(View, { style: s.tableWrap },
@@ -129,10 +117,7 @@ function Doc({ data }: { data: FactureVenteData }) {
     h(View, { style: s.fveCutLine }),
 
     // Footer
-    h(View, { style: s.footer, fixed: true },
-      h(Text, { style: s.footerText }, `${SOCIETE.nom}`),
-      h(Text, { style: s.footerText }, `${SOCIETE.adresse}  \u00B7  ${SOCIETE.telephone}`),
-      h(Text, { style: s.footerText }, `${SOCIETE.details}`))));
+    piedDePage()));
 }
 
 export async function generateFactureVente(data: FactureVenteData): Promise<Blob> {

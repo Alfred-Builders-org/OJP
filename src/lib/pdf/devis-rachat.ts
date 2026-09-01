@@ -2,6 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W, fmt } from "./shared-styles";
+import { piedDePage, enTeteDocument } from "./entete";
 import { TEXTE_DEVIS_VALIDITE, SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne, type TotauxInfo, recapitulatifTitrage } from "./blocks";
 
 export interface DevisRachatData {
@@ -15,7 +16,6 @@ export interface DevisRachatData {
 function Doc({ data }: { data: DevisRachatData }) {
   const { client, dossier, references, totaux } = data;
   const h = React.createElement;
-  const fullName = `${client.civilite} ${client.prenom} ${client.nom}`;
 
   const recap = recapitulatifTitrage(references);
 
@@ -26,20 +26,10 @@ function Doc({ data }: { data: DevisRachatData }) {
         h(Text, { style: s.companyName }, SOCIETE.nom.toUpperCase()),
         h(Text, { style: s.companyLine }, SOCIETE.adresse),
         h(Text, { style: s.companyLine }, SOCIETE.telephone))),
-    h(View, { style: s.infoSection },
-      h(View, { style: s.clientBlock },
-        h(Text, { style: s.label }, "CLIENT"),
-        h(Text, { style: s.clientName }, fullName),
-        client.adresse ? h(Text, { style: s.clientLine }, client.adresse) : null,
-        (client.codePostal || client.ville) ? h(Text, { style: s.clientLine }, [client.codePostal, client.ville].filter(Boolean).join(" ")) : null,
-        client.documentType && client.documentNumber ? h(Text, { style: s.clientMuted }, `${client.documentType} : ${client.documentNumber}`) : null,
-        h(Text, { style: s.clientMuted }, `Dossier : ${dossier.numeroDossier}`)),
-      h(View, { style: s.docRight },
-        h(Text, { style: s.docTitle }, "DEVIS"),
-        h(Text, { style: s.infoLabel }, "NUM\u00C9RO"),
-        h(Text, { style: s.infoValue }, data.numero),
-        h(Text, { style: s.infoLabel }, "DATE"),
-        h(Text, { style: s.infoValue }, `${dossier.date}   ${dossier.heure}`))),
+    enTeteDocument("DEVIS", [
+      { label: "NUM\u00C9RO", value: data.numero },
+      { label: "DATE", value: `${dossier.date}  ${dossier.heure}` },
+    ], client, dossier),
     h(View, { style: s.tableWrap },
       h(View, { style: s.tableHead },
         h(Text, { style: [s.th, { width: W.des }] }, "D\u00C9SIGNATION"),
@@ -76,9 +66,7 @@ function Doc({ data }: { data: DevisRachatData }) {
         h(View, { style: s.totSep }),
         h(View, { style: s.netRow }, h(Text, { style: s.netLabel }, "TOTAL DEVIS"), h(Text, { style: s.netValue }, fmt(totaux.netAPayer))),
         h(View, { style: s.sigBlock }, h(Text, { style: s.sigLabel }, "Signature du vendeur"), h(View, { style: s.sigLine })))),
-    h(View, { style: s.footer, fixed: true },
-      h(Text, { style: s.footerText }, `${SOCIETE.nom}  \u00B7  ${SOCIETE.details}`),
-      h(Text, { style: s.footerText }, `${SOCIETE.adresse}  \u00B7  ${SOCIETE.telephone}`))));
+    piedDePage()));
 }
 
 export async function generateDevisRachat(data: DevisRachatData): Promise<Blob> {

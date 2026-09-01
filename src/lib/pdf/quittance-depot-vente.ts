@@ -2,6 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W_QDV, fmt } from "./shared-styles";
+import { piedDePage, enTeteDocument } from "./entete";
 import {
   TEXTE_CONDITIONS_QUITTANCE_DV, SOCIETE,
   type ClientInfo, type DossierInfo, type QuittanceDepotVenteLigne,
@@ -21,7 +22,6 @@ export interface QuittanceDepotVenteData {
 function Doc({ data }: { data: QuittanceDepotVenteData }) {
   const { client, dossier, lignes, totalVentes, totalCommission, netAPayer } = data;
   const h = React.createElement;
-  const fullName = `${client.civilite} ${client.prenom} ${client.nom}`;
 
   return h(Document, null, h(Page, { size: "A4", style: s.page },
     // Header
@@ -32,22 +32,11 @@ function Doc({ data }: { data: QuittanceDepotVenteData }) {
         h(Text, { style: s.companyLine }, SOCIETE.adresse),
         h(Text, { style: s.companyLine }, SOCIETE.telephone))),
     // Info
-    h(View, { style: s.infoSection },
-      h(View, { style: s.clientBlock },
-        h(Text, { style: s.label }, "D\u00C9POSANT"),
-        h(Text, { style: s.clientName }, fullName),
-        client.adresse ? h(Text, { style: s.clientLine }, client.adresse) : null,
-        (client.codePostal || client.ville) ? h(Text, { style: s.clientLine }, [client.codePostal, client.ville].filter(Boolean).join(" ")) : null,
-        client.documentType && client.documentNumber ? h(Text, { style: s.clientMuted }, `${client.documentType} : ${client.documentNumber}`) : null,
-        h(Text, { style: s.clientMuted }, `Dossier : ${dossier.numeroDossier}`),
-        h(Text, { style: s.qdvRefText }, `Vente : ${data.venteDossierNumero}`)),
-      h(View, { style: s.docRight },
-        h(Text, { style: s.docTitle }, "QUITTANCE"),
-        h(Text, { style: { fontSize: 8, color: "#777777", textAlign: "right", marginBottom: 8 } }, "D\u00C9P\u00D4T-VENTE"),
-        h(Text, { style: s.infoLabel }, "NUM\u00C9RO"),
-        h(Text, { style: s.infoValue }, data.numero),
-        h(Text, { style: s.infoLabel }, "DATE"),
-        h(Text, { style: s.infoValue }, `${dossier.date}   ${dossier.heure}`))),
+    enTeteDocument("QUITTANCE D\u00C9P\u00D4T-VENTE", [
+      { label: "NUM\u00C9RO", value: data.numero },
+      { label: "DATE", value: `${dossier.date}  ${dossier.heure}` },
+      { label: "VENTE", value: data.venteDossierNumero },
+    ], client, dossier, "D\u00C9POSANT"),
     // Table
     h(View, { style: s.tableWrap },
       h(View, { style: s.tableHead },
@@ -76,9 +65,7 @@ function Doc({ data }: { data: QuittanceDepotVenteData }) {
         h(View, { style: s.netRow }, h(Text, { style: s.netLabel }, "NET \u00C0 PAYER"), h(Text, { style: s.netValue }, fmt(netAPayer))),
         h(View, { style: s.sigBlock }, h(Text, { style: s.sigLabel }, "Signature du d\u00E9posant"), h(View, { style: s.sigLine })))),
     // Footer
-    h(View, { style: s.footer, fixed: true },
-      h(Text, { style: s.footerText }, `${SOCIETE.nom}  \u00B7  ${SOCIETE.details}`),
-      h(Text, { style: s.footerText }, `${SOCIETE.adresse}  \u00B7  ${SOCIETE.telephone}`))));
+    piedDePage()));
 }
 
 export async function generateQuittanceDepotVente(data: QuittanceDepotVenteData): Promise<Blob> {

@@ -317,13 +317,16 @@ export function ParametresForm({ parametres, settings }: ParametresFormProps) {
               settings={
                 settings.company ?? {
                   nom: "",
+                  denomination_sociale: "",
                   adresse: "",
                   code_postal: "",
                   ville: "",
                   telephone: "",
+                  telephone_fixe: "",
                   email: "",
                   forme_juridique: "",
                   siret_rcs: "",
+                  tva_intracom: "",
                   tribunal: "",
                   logo_url: "",
                   email_expediteur: "",

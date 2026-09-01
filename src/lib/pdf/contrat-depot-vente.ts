@@ -2,6 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W_CDV, fmt } from "./shared-styles";
+import { piedDePage } from "./entete";
 import {
   cdvClauses, SOCIETE,
   type ClientInfo, type DossierInfo, type DepotVenteReferenceLigne,
@@ -32,11 +33,20 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
           h(Text, { style: s.cdvTitle }, "CONTRAT DE DÉPÔT-VENTE"),
           h(Text, { style: s.cdvNumero }, `N°${data.numero}`))),
 
-      // Two-column info: DÉPOSANT | DÉPOSITAIRES
+      // Deux colonnes : le depositaire a gauche, le deposant a droite — comme
+      // partout ailleurs, l'adresse de celui a qui le document s'adresse se lit
+      // a droite.
       h(View, { style: s.cdvTwoCol },
-        // Left: Déposant
+        // Gauche : depositaire
         h(View, { style: s.cdvColLeft },
-          h(Text, { style: s.cdvColLabel }, "DÉPOSANT"),
+          h(Text, { style: s.cdvColLabel }, "D\u00C9POSITAIRES"),
+          h(Text, { style: s.cdvColName }, SOCIETE.nom),
+          h(Text, { style: s.cdvColLine }, SOCIETE.adresse),
+          h(Text, { style: s.cdvColLine }, SOCIETE.telephoneFixe),
+          h(Text, { style: s.cdvColLine }, SOCIETE.email)),
+        // Droite : deposant
+        h(View, { style: s.cdvColRight },
+          h(Text, { style: s.cdvColLabel }, "D\u00C9POSANT"),
           h(Text, { style: s.cdvColName }, fullName),
           client.adresse ? h(Text, { style: s.cdvColLine }, client.adresse) : null,
           (client.codePostal || client.ville)
@@ -45,12 +55,7 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
           client.documentType && client.documentNumber
             ? h(Text, { style: s.cdvColLine }, `${client.documentType} : ${client.documentNumber}`)
             : null,
-          h(Text, { style: s.cdvColLine }, `N° Lot : ${data.numeroLot}`)),
-        // Right: Dépositaires
-        h(View, { style: s.cdvColRight },
-          h(Text, { style: s.cdvColLabel }, "DÉPOSITAIRES"),
-          h(Text, { style: s.cdvColName }, SOCIETE.nom),
-          h(Text, { style: s.cdvColLine }, SOCIETE.adresse))),
+          h(Text, { style: s.cdvColLine }, `N\u00B0 Lot : ${data.numeroLot}`))),
 
       // Legal clauses
       ...cdvClauses(data.commissionPct ?? 40).map((clause, i) =>
@@ -69,9 +74,7 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
             h(Text, { style: s.cdvSignatureLabel }, "Le Dépositaire")))),
 
       // Footer
-      h(View, { style: s.footer, fixed: true },
-        h(Text, { style: s.footerText }, `${SOCIETE.nom} - ${SOCIETE.adresse}`),
-        h(Text, { style: s.footerText }, `${SOCIETE.details} - ${SOCIETE.siret_rcs}`))),
+      piedDePage()),
 
     // Page 2: Annexe 1 — fiche de depot
     h(Page, { size: "A4", style: s.page },
@@ -83,6 +86,13 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
           `Au contrat de d\u00E9p\u00F4t-vente ${data.numero} du ${dossier.date}`)),
       h(View, { style: s.cdvTwoCol },
         h(View, { style: s.cdvColLeft },
+          h(Text, { style: s.cdvColLabel }, "D\u00C9POSITAIRE"),
+          h(Text, { style: s.cdvColName }, SOCIETE.nom),
+          h(Text, { style: s.cdvColLine }, SOCIETE.adresse),
+          h(Text, { style: s.cdvColLine }, SOCIETE.telephoneFixe),
+          h(Text, { style: s.cdvColLine }, SOCIETE.telephone),
+          h(Text, { style: s.cdvColLine }, SOCIETE.email)),
+        h(View, { style: s.cdvColRight },
           h(Text, { style: s.cdvColLabel }, "D\u00C9POSANT"),
           h(Text, { style: s.cdvColName }, fullName),
           client.adresse ? h(Text, { style: s.cdvColLine }, client.adresse) : null,
@@ -90,13 +100,7 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
             ? h(Text, { style: s.cdvColLine }, [client.codePostal, client.ville].filter(Boolean).join(" "))
             : null,
           client.telephone ? h(Text, { style: s.cdvColLine }, client.telephone) : null,
-          client.email ? h(Text, { style: s.cdvColLine }, client.email) : null),
-        h(View, { style: s.cdvColRight },
-          h(Text, { style: s.cdvColLabel }, "D\u00C9POSITAIRE"),
-          h(Text, { style: s.cdvColName }, SOCIETE.nom),
-          h(Text, { style: s.cdvColLine }, SOCIETE.adresse),
-          h(Text, { style: s.cdvColLine }, SOCIETE.telephone),
-          h(Text, { style: s.cdvColLine }, SOCIETE.email))),
+          client.email ? h(Text, { style: s.cdvColLine }, client.email) : null)),
 
       // Table header
       h(View, { style: [s.tableWrap, { marginTop: 14 }] },
@@ -123,9 +127,7 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
         h(Text, { style: s.recapText }, recapitulatifTitrage(references))),
 
       // Footer
-      h(View, { style: s.footer, fixed: true },
-        h(Text, { style: s.footerText }, `${SOCIETE.nom} - ${SOCIETE.adresse}`),
-        h(Text, { style: s.footerText }, `${SOCIETE.details} - ${SOCIETE.siret_rcs}`))));
+      piedDePage()));
 }
 
 export async function generateContratDepotVente(data: ContratDepotVenteData): Promise<Blob> {
