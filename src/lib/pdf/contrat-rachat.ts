@@ -2,7 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W, fmt } from "./shared-styles";
-import { TEXTE_CONDITIONS_CONTRAT, SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne, type TotauxInfo } from "./blocks";
+import { TEXTE_CONDITIONS_CONTRAT, SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne, type TotauxInfo, recapitulatifTitrage } from "./blocks";
 
 export interface ContratRachatData {
   numero: string;
@@ -61,8 +61,11 @@ function Doc({ data }: { data: ContratRachatData }) {
             h(Text, { style: [s.td, { width: W.tax, textAlign: "center" }] }, r.taxe),
             h(Text, { style: [s.tdBold, { width: W.pu, textAlign: "right" }] }, fmt(r.prixUnitaire)),
             h(Text, { style: [s.tdBold, { width: W.pt, textAlign: "right" }] }, fmt(r.prixTotal))))),
-      // Totaux + signature
-      h(View, { style: { alignItems: "flex-end", marginTop: 8 } },
+      // Recapitulatif des poids par metal et titrage, puis totaux
+      h(View, { style: { flexDirection: "row", justifyContent: "space-between", marginTop: 8 } },
+        h(View, { style: { width: 260 } },
+          h(Text, { style: s.sectionLabel }, "R\u00C9CAPITULATIF"),
+          h(Text, { style: s.recapText }, recapitulatifTitrage(references))),
         h(View, { style: { width: 200 } },
           h(View, { style: s.totGoldLine }),
           h(View, { style: s.totRow }, h(Text, { style: s.totLabel }, "Subtotal"), h(Text, { style: s.totValue }, fmt(totaux.totalBrut))),

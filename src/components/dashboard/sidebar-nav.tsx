@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SquaresFour, Diamond, Coins, UsersThree, FolderOpen, ShoppingCart, Storefront, HandCoins, ClipboardText, Factory, UserGear, Receipt, Fire } from "@phosphor-icons/react";
+import { SquaresFour, Diamond, Coins, UsersThree, FolderOpen, ShoppingCart, Storefront, HandCoins, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings } from "@phosphor-icons/react";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -18,6 +18,7 @@ const stockItems = [
   { title: "Bijoux", href: "/stock", icon: Diamond, disabled: false },
   { title: "Confié d'achat", href: "/confie-achat", icon: HandCoins, disabled: false },
   { title: "Or Investissement", href: "/or-investissement", icon: Coins, disabled: false },
+  { title: "Grossistes", href: "/grossistes", icon: Buildings, disabled: false },
 ];
 
 const fonderieItems = [

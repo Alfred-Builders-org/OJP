@@ -1,0 +1,84 @@
+<!--
+  Gabarit du courriel de reinitialisation de mot de passe (Supabase Auth).
+
+  Le message par defaut de Supabase est un lien nu sur fond blanc, sans en-tete
+  ni signature : recu par une cliente, il ressemble a du hameconnage. Ce gabarit
+  reprend l'identite des autres courriels de l'application (logo, or, pied de
+  page), en HTML de table — seule mise en page que les clients de messagerie
+  rendent de facon previsible.
+
+  A coller dans Supabase > Authentication > Email Templates > Reset Password.
+  Les variables entre doubles accolades sont resolues par Supabase.
+-->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f5f4;margin:0;padding:32px 0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <tr>
+    <td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" border="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e7e5e4;">
+
+        <!-- En-tete -->
+        <tr>
+          <td align="center" style="padding:32px 32px 24px 32px;border-bottom:1px solid #e7e5e4;">
+            <img
+              src="https://wprsfakodbuvszporcoe.supabase.co/storage/v1/object/public/assets/logo-light.png"
+              width="150"
+              alt="Or au Juste Prix"
+              style="display:block;border:0;"
+            />
+          </td>
+        </tr>
+
+        <!-- Corps -->
+        <tr>
+          <td style="padding:32px;">
+            <p style="margin:0 0 16px 0;font-size:18px;font-weight:600;color:#1c1917;">
+              Réinitialisation de votre mot de passe
+            </p>
+            <p style="margin:0 0 16px 0;font-size:15px;line-height:24px;color:#44403c;">
+              Vous avez demandé à définir un nouveau mot de passe pour votre accès
+              à l’espace de gestion Or au Juste Prix. Le bouton ci-dessous vous y
+              conduit.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;">
+              <tr>
+                <td align="center" style="background-color:#1c1917;border-radius:8px;">
+                  <a
+                    href="{{ .ConfirmationURL }}"
+                    style="display:inline-block;padding:12px 28px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;"
+                  >
+                    Définir un nouveau mot de passe
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 16px 0;font-size:14px;line-height:22px;color:#78716c;">
+              Ce lien est valable une heure et ne peut servir qu’une fois.
+              Si vous n’êtes pas à l’origine de cette demande, ignorez ce message :
+              votre mot de passe actuel reste inchangé.
+            </p>
+
+            <p style="margin:0;font-size:13px;line-height:20px;color:#a8a29e;">
+              Si le bouton ne fonctionne pas, copiez cette adresse dans votre
+              navigateur :<br />
+              <span style="color:#78716c;word-break:break-all;">{{ .ConfirmationURL }}</span>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Pied de page -->
+        <tr>
+          <td style="padding:20px 32px;background-color:#fafaf9;border-top:1px solid #e7e5e4;">
+            <p style="margin:0 0 4px 0;font-size:12px;color:#78716c;">
+              Or au Juste Prix — Achat, vente et dépôt-vente d’or et bijoux
+            </p>
+            <p style="margin:0;font-size:12px;color:#a8a29e;">
+              Message automatique, merci de ne pas y répondre.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>

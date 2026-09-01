@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { DataGrid, type ColonneGrid } from "@/components/ui/data-grid";
-import { METAL_OPTIONS } from "@/lib/validations/lot";
+import { METAL_STOCK_OPTIONS } from "@/lib/validations/lot";
 import { formatCurrency } from "@/lib/format";
 
 const statutConfig: Record<
@@ -166,7 +166,7 @@ export function StockTable({
       messageVide="Aucun produit trouvé."
       filtres={[
         { cle: "statut", label: "Statut", options: STOCK_STATUT_OPTIONS },
-        { cle: "metal", label: "Métal", options: METAL_OPTIONS },
+        { cle: "metal", label: "Métal", options: METAL_STOCK_OPTIONS },
       ]}
       groupements={[
         { cle: "statut", label: "Statut" },

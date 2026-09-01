@@ -5,6 +5,7 @@ import { styles as s, W_CDV, fmt } from "./shared-styles";
 import {
   CDV_CLAUSES, SOCIETE,
   type ClientInfo, type DossierInfo, type DepotVenteReferenceLigne,
+  recapitulatifTitrage,
 } from "./blocks";
 
 export interface ContratDepotVenteData {
@@ -77,6 +78,7 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
         h(View, { style: s.tableHead },
           h(Text, { style: [s.th, { width: W_CDV.des }] }, "DÉSIGNATION"),
           h(Text, { style: [s.th, { width: W_CDV.desc }] }, "DESCRIPTION"),
+          h(Text, { style: [s.th, { width: W_CDV.poids, textAlign: "right" }] }, "POIDS"),
           h(Text, { style: [s.th, { width: W_CDV.prixNet, textAlign: "right" }] }, "PRIX NET (DÉPOSANT)"),
           h(Text, { style: [s.th, { width: W_CDV.prixPublic, textAlign: "right" }] }, "PRIX AFFICHÉ (PUBLIC)")),
         // Table rows
@@ -84,8 +86,14 @@ function Doc({ data }: { data: ContratDepotVenteData }) {
           h(View, { key: i, style: s.tableRow },
             h(Text, { style: [s.tdBold, { width: W_CDV.des }] }, r.designation),
             h(Text, { style: [s.td, { width: W_CDV.desc }] }, r.description),
+            h(Text, { style: [s.td, { width: W_CDV.poids, textAlign: "right" }] }, r.poids ? `${r.poids}g` : "—"),
             h(Text, { style: [s.td, { width: W_CDV.prixNet, textAlign: "right" }] }, fmt(r.prixNetDeposant)),
             h(Text, { style: [s.tdBold, { width: W_CDV.prixPublic, textAlign: "right" }] }, fmt(r.prixAffichePublic))))),
+
+      // Recapitulatif des poids par metal et titrage
+      h(View, { style: { marginTop: 10 } },
+        h(Text, { style: s.sectionLabel }, "R\u00C9CAPITULATIF"),
+        h(Text, { style: s.recapText }, recapitulatifTitrage(references))),
 
       // Footer
       h(View, { style: s.footer, fixed: true },

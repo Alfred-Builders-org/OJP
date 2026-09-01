@@ -20,10 +20,25 @@ export const REFERENCE_CATEGORIE_OPTIONS = [
   { value: "or_investissement", label: "Or Investissement" },
 ] as const;
 
+/**
+ * Les metaux qu'on rachete au poids, et dont le cours pilote le prix.
+ * Un rachat ne peut porter que sur l'un d'eux.
+ */
 export const METAL_OPTIONS = [
   { value: "Or", label: "Or" },
   { value: "Argent", label: "Argent" },
   { value: "Platine", label: "Platine" },
+] as const;
+
+/**
+ * Ce que le stock peut contenir, rachat ou achat chez un grossiste. « Autre »
+ * couvre ce qui n'est fait d'aucun metal precieux — bijou fantaisie, cuir,
+ * acier — et qu'on ne valorise donc pas au cours. Sans cette valeur, un metal
+ * vide voulait dire deux choses a la fois : non precieux, ou pas renseigne.
+ */
+export const METAL_STOCK_OPTIONS = [
+  ...METAL_OPTIONS,
+  { value: "Autre", label: "Autre (non précieux)" },
 ] as const;
 
 export const QUALITE_OPTIONS = [

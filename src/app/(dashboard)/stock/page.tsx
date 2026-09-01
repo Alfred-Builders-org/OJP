@@ -45,7 +45,7 @@ export default async function StockPage({
 
   const { data: { user } } = await supabase.auth.getUser();
 
-  const [{ data: profile }, { count }, { data }, { data: originRefs }] = await Promise.all([
+  const [{ data: profile }, { count }, { data }, { data: originRefs }, { data: grossistes }] = await Promise.all([
     supabase
       .from("profiles")
       .select("role")
@@ -78,6 +78,7 @@ export default async function StockPage({
         )`
       )
       .not("destination_stock_id", "is", null),
+    supabase.from("grossistes").select("id, nom"),
   ]);
 
   const role = (profile?.role ?? "vendeur") as UserRole;
@@ -97,14 +98,26 @@ export default async function StockPage({
     }
   }
 
+  // Un bijou neuf n'a pas de vendeur : sa provenance est le grossiste chez qui
+  // il a ete achete.
+  const grossisteMap = new Map(
+    (grossistes ?? []).map((g) => [g.id, g.nom as string])
+  );
+
   const bijoux: BijouxStockWithOrigin[] = ((data ?? []) as BijouxStock[]).map((item) => {
     const origin = originMap.get(item.id);
+    if (origin) {
+      return {
+        ...item,
+        origin_client_name: origin.client_name,
+        origin_type: origin.type === "depot_vente" ? "depot_vente" : "rachat",
+      };
+    }
+    const grossiste = item.grossiste_id ? grossisteMap.get(item.grossiste_id) : null;
     return {
       ...item,
-      origin_client_name: origin?.client_name ?? null,
-      origin_type: origin
-        ? origin.type === "depot_vente" ? "depot_vente" : "rachat"
-        : null,
+      origin_client_name: grossiste ?? null,
+      origin_type: grossiste ? "grossiste" : null,
     };
   });
 

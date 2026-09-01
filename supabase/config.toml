@@ -193,6 +193,13 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
+# Gabarit du courriel de reinitialisation de mot de passe.
+# Le message par defaut de Supabase est un lien nu, sans en-tete ni signature :
+# recu par une cliente, il ressemble a du hameconnage.
+[auth.email.template.recovery]
+subject = "Réinitialisation de votre mot de passe — Or au Juste Prix"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

@@ -91,10 +91,48 @@ export function formatCurrency(amount: number): string {
     .replace(/[\u202F\u00A0]/g, " ");
 }
 
+/**
+ * Récapitulatif des poids par couple métal + titrage.
+ *
+ * Demandé en recette (parcours 7, étape 11) : « à côté du total, pour tous les
+ * documents où on lit des références, l'agrégation des poids pour chaque
+ * combinaison métal-titrage ». C'est ce que la fonderie et le comptable lisent
+ * en premier — un contrat de dix lignes ne dit rien de la matière qu'il engage
+ * tant que ces totaux ne sont pas faits à la main.
+ *
+ * La fonction était écrite trois fois, à l'identique, dans trois templates.
+ */
+export function recapitulatifTitrage(
+  lignes: readonly {
+    metal?: string;
+    titrage?: string;
+    poids?: number;
+    quantite?: number;
+  }[]
+): string {
+  const groupes: Record<string, number> = {};
+  for (const ligne of lignes) {
+    if (!ligne.poids || !ligne.metal) continue;
+    const titrage = ligne.titrage && ligne.titrage !== "—" ? ligne.titrage : "";
+    const cle = titrage ? `${ligne.metal} ${titrage}` : ligne.metal;
+    groupes[cle] = (groupes[cle] ?? 0) + ligne.poids * (ligne.quantite ?? 1);
+  }
+
+  return Object.entries(groupes)
+    .sort(([a], [b]) => a.localeCompare(b, "fr"))
+    .map(([cle, poids]) => `${cle}: ${poids.toFixed(1)}g`)
+    .join("   ·   ");
+}
+
 // Depot-vente specific types
 export interface DepotVenteReferenceLigne {
   designation: string;
   description: string;
+  /** Poids net, affiché sur le contrat et agrégé dans le récapitulatif. */
+  poids?: number;
+  quantite?: number;
+  metal?: string;
+  titrage?: string;
   prixNetDeposant: number;
   prixAffichePublic: number;
 }

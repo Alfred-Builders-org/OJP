@@ -2,7 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W, fmt } from "./shared-styles";
-import { TEXTE_CONDITIONS_ACHAT, SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne, type TotauxInfo } from "./blocks";
+import { TEXTE_CONDITIONS_ACHAT, SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne, type TotauxInfo, recapitulatifTitrage } from "./blocks";
 
 export interface QuittanceRachatData {
   numero: string;
@@ -17,12 +17,7 @@ function Doc({ data }: { data: QuittanceRachatData }) {
   const h = React.createElement;
   const fullName = `${client.civilite} ${client.prenom} ${client.nom}`;
 
-  const groups: Record<string, number> = {};
-  for (const r of references) {
-    const k = r.titrage && r.titrage !== "—" ? `${r.metal} ${r.titrage}` : r.metal;
-    groups[k] = (groups[k] ?? 0) + r.poids * r.quantite;
-  }
-  const recap = Object.entries(groups).map(([k, v]) => `${k}: ${v.toFixed(1)}g`).join("   \u00B7   ");
+  const recap = recapitulatifTitrage(references);
 
   return h(Document, null, h(Page, { size: "A4", style: s.page },
     // Header
