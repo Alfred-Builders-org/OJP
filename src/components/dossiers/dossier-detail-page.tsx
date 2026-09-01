@@ -40,6 +40,7 @@ import { DOSSIER_STATUS_OPTIONS } from "@/lib/validations/dossier";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { DossierRecapFinancier } from "@/components/dossiers/dossier-recap-financier";
 import { DossierLotsSection } from "@/components/dossiers/dossier-lots-section";
+import { FinalisationDialog } from "@/components/dossiers/finalisation-dialog";
 import { ActionDashboard } from "@/components/actions/action-dashboard";
 import { finaliserDossierAction } from "@/lib/actions/finalize-actions";
 import type { DossierWithClient, DossierStatus } from "@/types/dossier";
@@ -121,6 +122,7 @@ export function DossierDetailPage({
   // Lots that can be finalized (brouillon)
   const brouillonLots = lots.filter((l) => l.status === "brouillon");
   const canFinalize = brouillonLots.length > 0;
+  const [confirmFinalisation, setConfirmFinalisation] = useState(false);
 
   // Build LotWithReferences for ActionDashboard
   const lotsWithRefs: LotWithReferences[] = lots.map((lot) => ({
@@ -243,6 +245,7 @@ export function DossierDetailPage({
     try {
       const result = await finaliserDossierAction(dossier.id);
       setProcessing(false);
+      setConfirmFinalisation(false);
       if (result.success) {
         toast.success("Dossier finalisé");
         router.refresh();
@@ -320,7 +323,7 @@ export function DossierDetailPage({
             </Button>
           )}
           {canFinalize && (
-            <Button size="sm" disabled={processing} onClick={handleFinaliserDossier}>
+            <Button size="sm" disabled={processing} onClick={() => setConfirmFinalisation(true)}>
               <CheckCircle size={16} weight="duotone" />
               {processing ? "Traitement..." : "Finaliser le dossier"}
             </Button>
@@ -399,6 +402,15 @@ export function DossierDetailPage({
           <div className="md:col-span-2">
             <DocumentsTable documents={documents ?? []} />
           </div>
+
+          <FinalisationDialog
+            open={confirmFinalisation}
+            onOpenChange={setConfirmFinalisation}
+            onConfirm={handleFinaliserDossier}
+            processing={processing}
+            lots={brouillonLots}
+            lotReferences={lotReferences}
+          />
 
           {/* Récapitulatif financier — masqué temporairement */}
           {/* <DossierRecapFinancier

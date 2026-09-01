@@ -132,9 +132,12 @@ export async function generateContratRachat(
 }
 
 /**
- * Génère le reçu de remboursement émis quand un client se rétracte après avoir
- * déjà été payé. Atteste que les sommes versées sont revenues à la société et
- * solde l'opération.
+ * Génère le reçu émis quand un client se rétracte : il atteste la rétractation
+ * et, le cas échéant, la somme qu'il doit restituer.
+ *
+ * Le montant peut valoir zéro — c'est même le cas le plus fréquent, le client
+ * n'ayant rien reçu. Le document était auparavant conditionné à un versement
+ * préalable, si bien qu'une rétractation ordinaire ne laissait aucune trace.
  */
 export async function generateRemboursementRetractation(
   ctx: ActionContext,
@@ -142,7 +145,7 @@ export async function generateRemboursementRetractation(
   montantRembourse: number,
   numeroContrat: string
 ): Promise<string | null> {
-  if (refs.length === 0 || montantRembourse <= 0) return null;
+  if (refs.length === 0) return null;
   const now = new Date();
   try {
     return await generateDocument({

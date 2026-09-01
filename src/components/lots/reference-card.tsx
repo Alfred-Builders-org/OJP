@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Diamond, Coins, Lightning, FileText, DotsThree, PencilSimple, Trash, WarningCircle, ArrowUUpLeft, CheckCircle, XCircle, Timer, Stamp, ArrowCounterClockwise } from "@phosphor-icons/react";
+import { formatRemaining } from "@/components/actions/retractation-timer";
 import { usePreviewDrawer } from "@/hooks/use-preview-drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -270,25 +271,31 @@ export function ReferenceCard({ reference, onDelete, onEdit, onRestituer, onVali
 }
 
 function RefCountdown({ endDate }: { endDate: Date }) {
-  const [, setTick] = useState(0);
+  const [now, setNow] = useState<Date | null>(null);
 
+  const diff = now ? endDate.getTime() - now.getTime() : Infinity;
+
+  // Premier rendu sans horloge pour ne pas diverger de l'hydratation serveur.
+  // Cadence adaptative ensuite : la seconde ne devient utile que dans la
+  // derniere minute, ou le compteur affichait « 0h 0m » faute de descendre plus bas.
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
+    const premier = setTimeout(() => setNow(new Date()), 0);
+    const interval = setInterval(
+      () => setNow(new Date()),
+      diff <= 60_000 ? 1_000 : 30_000
+    );
+    return () => {
+      clearTimeout(premier);
+      clearInterval(interval);
+    };
+  }, [diff]);
 
-  const now = new Date();
-  const diff = endDate.getTime() - now.getTime();
-
-  if (diff <= 0) return null;
-
-  const hours = Math.floor(diff / (1000 * 60 * 60));
-  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (now === null || diff <= 0) return null;
 
   return (
     <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
       <Timer size={12} weight="duotone" />
-      <span>{hours}h {minutes}m</span>
+      <span>{formatRemaining(diff)}</span>
     </div>
   );
 }

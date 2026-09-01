@@ -15,6 +15,14 @@ export default async function StockPage({
   const from = page * size;
   const to = from + size - 1;
 
+  // Le Stock bijoux montre tout ce qui est physiquement en boutique : articles
+  // en stock, en depot-vente, en reparation, et ceux qui attendent un envoi en
+  // fonderie. Seul « fondu » est exclu — cette marchandise n'existe plus.
+  //
+  // Les deux filtres precedents (`depot_vente_lot_id IS NULL` et l'exclusion de
+  // « a_fondre ») rendaient invisibles les articles justement crees par un
+  // rachat ou un depot-vente : deux filtres de la barre d'outils ne pouvaient
+  // structurellement rien renvoyer.
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -28,13 +36,11 @@ export default async function StockPage({
     supabase
       .from("bijoux_stock")
       .select("*", { count: "exact", head: true })
-      .is("depot_vente_lot_id", null)
-      .not("statut", "in", "(a_fondre,fondu)"),
+      .neq("statut", "fondu"),
     supabase
       .from("bijoux_stock")
       .select("*")
-      .is("depot_vente_lot_id", null)
-      .not("statut", "in", "(a_fondre,fondu)")
+      .neq("statut", "fondu")
       .order("date_creation", { ascending: false })
       .range(from, to),
     supabase

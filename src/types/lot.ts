@@ -24,7 +24,7 @@ export type ReferenceStatus =
   | "en_attente_paiement"
   | "finalise";
 
-export type ReferenceDestination = "stock_boutique" | "fonderie" | "depot_vente";
+export type ReferenceDestination = "stock_boutique" | "fonderie";
 
 export type TypeRachat = "direct" | "devis";
 

@@ -90,7 +90,6 @@ export default function ReferencePreview({ id }: { id: string }) {
   const destinationLabels: Record<string, string> = {
     stock_boutique: "Stock boutique",
     fonderie: "Fonderie",
-    depot_vente: "Dépôt-vente",
   };
 
   return (

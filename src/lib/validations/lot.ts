@@ -34,10 +34,20 @@ export const QUALITE_OPTIONS = [
   { value: "999", label: "999 (24k)" },
 ] as const;
 
+/**
+ * Le depot-vente n'est pas une destination de reference : il suppose un lot de
+ * depot-vente a part entiere, avec son contrat et son deposant. Une reference de
+ * rachat part donc en stock ou en fonderie, rien d'autre.
+ *
+ * « Non defini » est une valeur a part entiere : sans elle, le premier choix
+ * etait definitif, le selecteur ignorant la valeur vide.
+ */
+export const DESTINATION_NON_DEFINIE = "non_definie";
+
 export const DESTINATION_OPTIONS = [
+  { value: DESTINATION_NON_DEFINIE, label: "Non définie" },
   { value: "stock_boutique", label: "Stock boutique" },
   { value: "fonderie", label: "Fonderie" },
-  { value: "depot_vente", label: "Dépôt-vente" },
 ] as const;
 
 // ============================================================

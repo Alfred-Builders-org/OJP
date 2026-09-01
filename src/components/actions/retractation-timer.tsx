@@ -17,39 +17,77 @@ interface RetractationTimerProps {
   compact?: boolean;
 }
 
-export function RetractationTimer({ startDate, endDate, compact }: RetractationTimerProps) {
-  const [, setTick] = useState(0);
+/**
+ * Met en forme le temps restant.
+ *
+ * Sous l'heure, on descend a la minute ; sous la minute, aux secondes. Le
+ * compte a rebours affichait « 0h 0m » pendant toute la derniere minute, ce qui
+ * se lit comme un compteur en panne au moment precis ou il compte le plus.
+ */
+export function formatRemaining(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const seconds = total % 60;
 
+  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  if (minutes > 0) return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+  return `${seconds}s`;
+}
+
+/**
+ * Cadence de rafraichissement : inutile de battre la seconde pendant 48 heures,
+ * indispensable dans la derniere minute.
+ */
+function tickInterval(remainingMs: number): number {
+  return remainingMs <= 60_000 ? 1_000 : 30_000;
+}
+
+export function RetractationTimer({ startDate, endDate, compact }: RetractationTimerProps) {
+  const [now, setNow] = useState<Date | null>(null);
+
+  const remainingForTick = endDate && now ? new Date(endDate).getTime() - now.getTime() : 0;
+
+  // Le premier rendu est aligne sur le serveur (pas d'horloge), puis le
+  // composant prend la main cote client : sans cela, l'hydratation diverge.
+  // La premiere lecture passe par un timeout plutot qu'un appel synchrone, qui
+  // declencherait une cascade de rendus.
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(interval);
-  }, []);
+    if (!endDate) return;
+    const premier = setTimeout(() => setNow(new Date()), 0);
+    const interval = setInterval(
+      () => setNow(new Date()),
+      tickInterval(remainingForTick)
+    );
+    return () => {
+      clearTimeout(premier);
+      clearInterval(interval);
+    };
+  }, [endDate, remainingForTick]);
 
   if (!endDate) return null;
 
-  const now = new Date();
+  const reference = now ?? new Date(0);
   const end = new Date(endDate);
   const start = startDate ? new Date(startDate) : null;
-  const canFinalize = now >= end;
+  const canFinalize = now !== null && now >= end;
 
   // Progress calculation
   const totalDuration = start ? end.getTime() - start.getTime() : 48 * 3600_000;
-  const elapsed = start ? now.getTime() - start.getTime() : 0;
+  const elapsed = start && now ? now.getTime() - start.getTime() : 0;
   const progress = Math.min(Math.max(elapsed / totalDuration, 0), 1);
 
-  // Remaining time
-  const diff = end.getTime() - now.getTime();
-  const hoursLeft = Math.max(0, Math.floor(diff / (1000 * 60 * 60)));
-  const minutesLeft = Math.max(0, Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)));
+  const diff = end.getTime() - reference.getTime();
+  const remaining = now === null ? "—" : formatRemaining(diff);
 
   if (compact) {
     return (
       <div className="flex items-center gap-1.5 text-sm">
         <Timer size={14} weight="duotone" className={canFinalize ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400"} />
         {canFinalize ? (
-          <span className="text-emerald-600 dark:text-emerald-400">Delai expire</span>
+          <span className="text-emerald-600 dark:text-emerald-400">Délai expiré</span>
         ) : (
-          <span className="text-amber-600 dark:text-amber-400">{hoursLeft}h {minutesLeft}m</span>
+          <span className="text-amber-600 dark:text-amber-400">{remaining}</span>
         )}
       </div>
     );
@@ -60,7 +98,7 @@ export function RetractationTimer({ startDate, endDate, compact }: RetractationT
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-amber-700 dark:text-amber-400">
           <Timer size={20} weight="duotone" />
-          Delai de retractation
+          Délai de rétractation
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -73,7 +111,7 @@ export function RetractationTimer({ startDate, endDate, compact }: RetractationT
             />
           </div>
           <div className="flex items-center justify-between text-sm text-muted-foreground">
-            {start && <span>Debut : {formatDateTime(start.toISOString())}</span>}
+            {start && <span>Début : {formatDateTime(start.toISOString())}</span>}
             <span>Fin : {formatDateTime(end.toISOString())}</span>
           </div>
         </div>
@@ -82,11 +120,11 @@ export function RetractationTimer({ startDate, endDate, compact }: RetractationT
         <div className="text-sm font-medium">
           {canFinalize ? (
             <span className="text-emerald-600 dark:text-emerald-400">
-              Delai expire — le lot peut etre finalise
+              Délai expiré — le lot peut être finalisé
             </span>
           ) : (
             <span className="text-amber-700 dark:text-amber-400">
-              {hoursLeft}h {minutesLeft}m restantes
+              {remaining} restantes
             </span>
           )}
         </div>

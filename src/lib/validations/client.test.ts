@@ -5,15 +5,33 @@ import { clientSchema, identityDocumentSchema } from "./client";
 // clientSchema
 // ============================================================
 describe("clientSchema", () => {
+  // Le schema exige aussi l'email et l'adresse complete : une fiche client sert
+  // a etablir des contrats et a envoyer des documents, les deux sont
+  // indispensables. Le jeu minimal les inclut donc.
   const validClient = {
     civility: "M" as const,
     first_name: "Jean",
     last_name: "Dupont",
+    email: "jean@example.com",
+    address: "1 rue de la Paix",
+    city: "Paris",
+    postal_code: "75001",
+    country: "France",
   };
 
   it("valide un client minimal (champs obligatoires)", () => {
     const result = clientSchema.safeParse(validClient);
     expect(result.success).toBe(true);
+  });
+
+  it("rejette un email absent", () => {
+    const { email: _email, ...sansEmail } = validClient;
+    expect(clientSchema.safeParse(sansEmail).success).toBe(false);
+  });
+
+  it("rejette une adresse absente", () => {
+    const { address: _address, ...sansAdresse } = validClient;
+    expect(clientSchema.safeParse(sansAdresse).success).toBe(false);
   });
 
   it("valide un client complet", () => {
@@ -63,9 +81,9 @@ describe("clientSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepte un email vide (optionnel)", () => {
+  it("rejette un email vide", () => {
     const result = clientSchema.safeParse({ ...validClient, email: "" });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 
   it("accepte un lead_source valide", () => {

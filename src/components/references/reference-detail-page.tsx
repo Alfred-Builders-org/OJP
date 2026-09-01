@@ -123,7 +123,6 @@ const LOT_TYPE_LABELS: Record<string, string> = {
 const DESTINATION_CONFIG: Record<string, { label: string; icon: typeof Package }> = {
   stock_boutique: { label: "Stock boutique", icon: Package },
   fonderie: { label: "Fonderie", icon: Factory },
-  depot_vente: { label: "Dépôt-vente", icon: Storefront },
 };
 
 // ── Component ──────────────────────────────────────────────

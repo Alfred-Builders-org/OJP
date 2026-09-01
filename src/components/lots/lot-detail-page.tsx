@@ -19,6 +19,8 @@ import {
   Coins,
   Receipt,
   Warning,
+  CheckCircle,
+  XCircle,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
@@ -153,6 +155,17 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
     acompte_pct: acomptePct,
   });
 
+  // Délai de rétractation en cours : on retient l'échéance la plus tardive parmi
+  // les références concernées — c'est elle qui commande la finalisation du lot.
+  const refsEnRetractation = lot.references.filter(
+    (r) => r.status === "en_retractation" && r.date_fin_delai
+  );
+  const retractationDelai = refsEnRetractation.length
+    ? refsEnRetractation.reduce((tardive, r) =>
+        new Date(r.date_fin_delai!) > new Date(tardive.date_fin_delai!) ? r : tardive
+      )
+    : null;
+
   // ── Action context (used by ActionList) ─────────────────────
   const actionCtx: ActionContext = {
     lot,
@@ -170,6 +183,12 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
   async function handleRefAction(actionId: "ref.valider_rachat" | "ref.retracter" | "ref.accepter_devis" | "ref.refuser_devis" | "ref.restituer", refId: string) {
     const supabase = createClient();
     await executeAction({ actionId, supabase, ctx: actionCtx, referenceId: refId });
+    router.refresh();
+  }
+
+  async function handleLotAction(actionId: "lot.accepter_devis" | "lot.refuser_devis") {
+    const supabase = createClient();
+    await executeAction({ actionId, supabase, ctx: actionCtx });
     router.refresh();
   }
 
@@ -318,8 +337,21 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
           referenceStatuses={lot.references.map((r) => r.status)}
         />
 
-        {/* Destination des articles — modifiable tant que le lot n'est pas soldé */}
-        {!isTerminal && lot.references.length > 0 && (
+        {/* Délai de rétractation — barre de progression et compte à rebours.
+            Branché sur les références et non sur le lot : `date_fin_retractation`
+            n'est renseignée que dans le parcours devis, jamais en rachat direct,
+            où le délai court pourtant bel et bien. */}
+        {retractationDelai && (
+          <RetractationTimer
+            startDate={retractationDelai.date_envoi}
+            endDate={retractationDelai.date_fin_delai}
+          />
+        )}
+
+        {/* Destination des articles — modifiable tant que le lot n'est pas soldé.
+            Un lot de dépôt-vente n'est pas concerné : sa marchandise part chez
+            le déposant, pas en stock ni en fonderie. */}
+        {!isTerminal && lot.type !== "depot_vente" && lot.references.length > 0 && (
           <DestinationSelector lot={lot} />
         )}
 
@@ -549,8 +581,32 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
           </CardContent>
         </Card>
 
-        {/* Documents */}
-        <DocumentsTable documents={documents} />
+        {/* Documents — la ligne du devis porte ses deux décisions. Le tableau
+            prévoyait ce point d'extension depuis l'origine ; aucun appelant ne
+            s'en servait, si bien qu'Accepter et Refuser n'existaient que dans la
+            carte des actions en attente. */}
+        <DocumentsTable
+          documents={documents}
+          rowActions={(doc) =>
+            doc.type === "devis_rachat" &&
+            doc.status === "en_attente" &&
+            lot.references.some((r) => r.status === "devis_envoye") ? (
+              <>
+                <DropdownMenuItem onClick={() => handleLotAction("lot.accepter_devis")}>
+                  <CheckCircle size={16} weight="duotone" />
+                  Accepter le devis
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => handleLotAction("lot.refuser_devis")}
+                >
+                  <XCircle size={16} weight="duotone" />
+                  Refuser le devis
+                </DropdownMenuItem>
+              </>
+            ) : null
+          }
+        />
 
         {/* Reglements */}
         {(lot.type === "rachat" || lot.type === "depot_vente") && lot.status !== "brouillon" && (
