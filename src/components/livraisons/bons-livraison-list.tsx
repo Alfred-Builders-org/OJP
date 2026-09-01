@@ -7,6 +7,7 @@ import {
   Factory,
   Diamond,
   Package,
+  WarningCircle,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
@@ -20,7 +21,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@/components/ui/select";
 import {
   Table,
@@ -30,10 +30,27 @@ import {
   TableHead,
   TableCell,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { formatCurrency } from "@/lib/format";
 import type { Fonderie } from "@/types/fonderie";
 import type { BijouxStock } from "@/types/bijoux";
+
+/**
+ * Plafond de valeur d'un envoi en fonderie.
+ *
+ * Au-dela, un envoi n'est plus couvert : on constitue plusieurs paquets. C'est
+ * la raison d'etre de la selection — composer des lots qui tiennent sous la
+ * limite, plutot que de tout envoyer d'un bloc.
+ */
+const PLAFOND_ENVOI = 20_000;
 
 interface BonsLivraisonListProps {
   fonderies: Fonderie[];
@@ -49,14 +66,13 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
 
-  // Per-item fonderie assignment: stockId → fonderieId
-  const [fonderieAssignments, setFonderieAssignments] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
 
   // Les articles a fondre s'accumulent et partent par fournees : on les
   // selectionne en lot plutot que de choisir une fonderie ligne par ligne.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [fonderieLot, setFonderieLot] = useState("");
+  const [choixFonderie, setChoixFonderie] = useState(false);
 
   // Build fonderie name map for Select display
   const fonderieNameMap = useMemo(
@@ -98,11 +114,6 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
   const totalItems = filtered.length;
   const paginatedData = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
-  // Count unique fonderies assigned
-  const assignedEntries = Object.entries(fonderieAssignments).filter(([, v]) => v);
-  const uniqueFonderies = new Set(assignedEntries.map(([, v]) => v));
-  const canGenerate = assignedEntries.length > 0;
-
   const selection = useMemo(
     () => filtered.filter((i) => selectedIds.has(i.id)),
     [filtered, selectedIds],
@@ -111,6 +122,11 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
     (sum, i) => sum + (i.poids_net ?? i.poids ?? 0),
     0,
   );
+  const valeurSelection = selection.reduce(
+    (sum, i) => sum + (i.prix_achat ?? 0) * (i.quantite ?? 1),
+    0,
+  );
+  const plafondDepasse = valeurSelection > PLAFOND_ENVOI;
   const toutSelectionne = filtered.length > 0 && selection.length === filtered.length;
 
   function basculerLigne(id: string) {
@@ -128,8 +144,9 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
 
   /** Envoie d'un coup tous les articles coches vers la meme fonderie. */
   async function handleEnvoyerSelection() {
-    if (!fonderieLot || selection.length === 0) return;
+    if (!fonderieLot || selection.length === 0 || plafondDepasse) return;
     setGenerating(true);
+    setChoixFonderie(false);
 
     const groups = new Map<string, BijouxStock[]>([[fonderieLot, selection]]);
     await createBonsLivraison({ groups, fonderies });
@@ -137,9 +154,6 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
     const envoyes = new Set(selection.map((i) => i.id));
     setStockItems((prev) => prev.filter((i) => !envoyes.has(i.id)));
     setSelectedIds(new Set());
-    setFonderieAssignments((prev) =>
-      Object.fromEntries(Object.entries(prev).filter(([id]) => !envoyes.has(id))),
-    );
     setFonderieLot("");
     setGenerating(false);
     router.refresh();
@@ -159,39 +173,9 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
     setMovingToStock((prev) => ({ ...prev, [itemId]: false }));
     if (error) return;
     setStockItems((prev) => prev.filter((i) => i.id !== itemId));
-    setFonderieAssignments((prev) => {
-      const next = { ...prev };
-      delete next[itemId];
-      return next;
-    });
   }
 
-  function handleAssignFonderie(stockId: string, fonderieId: string) {
-    setFonderieAssignments((prev) => ({ ...prev, [stockId]: fonderieId }));
-  }
 
-  async function handleGenerateBDL() {
-    if (!canGenerate) return;
-    setGenerating(true);
-
-    const groups = new Map<string, BijouxStock[]>();
-    for (const [stockId, fonderieId] of assignedEntries) {
-      const item = stockItems.find((i) => i.id === stockId);
-      if (!item) continue;
-      const existing = groups.get(fonderieId) ?? [];
-      existing.push(item);
-      groups.set(fonderieId, existing);
-    }
-
-    await createBonsLivraison({ groups, fonderies });
-
-    // Remove dispatched items from local list
-    const dispatchedIds = new Set(assignedEntries.map(([id]) => id));
-    setStockItems((prev) => prev.filter((i) => !dispatchedIds.has(i.id)));
-    setFonderieAssignments({});
-    setGenerating(false);
-    router.refresh();
-  }
 
   return (
     <div className="flex flex-col flex-1 min-h-0 min-w-0 gap-4">
@@ -205,58 +189,8 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
             className="pl-9"
           />
         </div>
-        {canGenerate && selection.length === 0 && (
-          <Button
-            disabled={generating}
-            onClick={handleGenerateBDL}
-          >
-            <Factory size={14} weight="duotone" />
-            {generating
-              ? "Génération..."
-              : `Générer ${uniqueFonderies.size} bon${uniqueFonderies.size > 1 ? "s" : ""} de livraison`}
-          </Button>
-        )}
       </div>
 
-      {/* Traiter la fournee : une fonderie, un bouton, tous les articles coches. */}
-      {selection.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
-          <span className="text-sm font-medium">
-            {selection.length} article{selection.length > 1 ? "s" : ""}
-            <span className="text-muted-foreground font-normal">
-              {" "}· {poidsSelection.toFixed(1)} g
-            </span>
-          </span>
-          <Select value={fonderieLot} onValueChange={(v) => { if (v) setFonderieLot(v); }}>
-            <SelectTrigger className="h-8 w-[220px] text-xs">
-              <Factory size={12} weight="duotone" />
-              <span className="flex-1 text-left truncate">
-                {fonderieNameMap[fonderieLot] ?? "Choisir une fonderie"}
-              </span>
-            </SelectTrigger>
-            <SelectContent className="min-w-[220px]">
-              {fonderies.map((f) => (
-                <SelectItem key={f.id} value={f.id}>{f.nom}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            size="sm"
-            disabled={generating || !fonderieLot}
-            onClick={handleEnvoyerSelection}
-          >
-            <Factory size={14} weight="duotone" />
-            {generating ? "Envoi..." : "Envoyer en fonderie"}
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedIds(new Set())}
-          >
-            Annuler
-          </Button>
-        </div>
-      )}
 
       <div className="flex-1 min-h-0 overflow-auto rounded-lg border bg-white dark:bg-card">
         <Table className={paginatedData.length === 0 ? "h-full" : ""}>
@@ -273,28 +207,25 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
               <TableHead>Métal / Titrage</TableHead>
               <TableHead className="text-right">Poids</TableHead>
               <TableHead className="text-right">Prix achat</TableHead>
-              <TableHead className="w-[200px]">Fonderie</TableHead>
               <TableHead className="w-[100px] pr-4" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {loadingStock ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
                   Chargement...
                 </TableCell>
               </TableRow>
             ) : paginatedData.length === 0 ? (
               <TableRow className="hover:bg-transparent h-full">
-                <TableCell colSpan={7} className="text-center align-middle text-muted-foreground">
+                <TableCell colSpan={6} className="text-center align-middle text-muted-foreground">
                   <Diamond size={32} weight="duotone" className="mx-auto mb-2 opacity-40" />
                   Aucun article à envoyer en fonderie.
                 </TableCell>
               </TableRow>
             ) : (
               paginatedData.map((item) => {
-                const assigned = fonderieAssignments[item.id];
-                const assignedName = assigned ? fonderieNameMap[assigned] : null;
 
                 return (
                   <TableRow key={item.id} className="bg-white dark:bg-card">
@@ -329,24 +260,6 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
                     <TableCell className="text-right text-sm font-medium">
                       {item.prix_achat != null ? formatCurrency(item.prix_achat) : "—"}
                     </TableCell>
-                    <TableCell>
-                      <Select
-                        value={assigned ?? ""}
-                        onValueChange={(v) => { if (v) handleAssignFonderie(item.id, v); }}
-                      >
-                        <SelectTrigger className="h-7 w-[180px] text-xs">
-                          <Factory size={12} weight="duotone" />
-                          <span className="flex-1 text-left truncate">
-                            {assignedName ?? "Fonderie"}
-                          </span>
-                        </SelectTrigger>
-                        <SelectContent className="min-w-[200px]">
-                          {fonderies.map((f) => (
-                            <SelectItem key={f.id} value={f.id}>{f.nom}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
                     <TableCell className="pr-4">
                       <Button
                         variant="ghost"
@@ -376,6 +289,120 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
           onPageSizeChange={setPageSize}
         />
       </div>
+
+      {/*
+        Le paquet en cours de composition. Flottant et centre, il suit le
+        defilement : on coche des lignes en haut du tableau et on lit le poids
+        et la valeur sans remonter.
+      */}
+      {selection.length > 0 && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center px-4">
+          <div
+            className={`pointer-events-auto flex flex-wrap items-center gap-x-6 gap-y-2 rounded-full border bg-background/95 px-5 py-3 shadow-lg ring-1 backdrop-blur ${
+              plafondDepasse
+                ? "border-destructive/40 ring-destructive/20"
+                : "ring-foreground/10"
+            }`}
+          >
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm font-semibold tabular-nums">{selection.length}</span>
+              <span className="text-xs text-muted-foreground">
+                article{selection.length > 1 ? "s" : ""}
+              </span>
+            </div>
+
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-sm font-semibold tabular-nums">
+                {poidsSelection.toFixed(2)}
+              </span>
+              <span className="text-xs text-muted-foreground">g</span>
+            </div>
+
+            <div className="flex items-baseline gap-1.5">
+              <span
+                className={`text-sm font-semibold tabular-nums ${plafondDepasse ? "text-destructive" : ""}`}
+              >
+                {formatCurrency(valeurSelection)}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                / {formatCurrency(PLAFOND_ENVOI)}
+              </span>
+            </div>
+
+            {plafondDepasse && (
+              <span className="flex items-center gap-1 text-xs font-medium text-destructive">
+                <WarningCircle size={14} weight="duotone" />
+                Retirez {formatCurrency(valeurSelection - PLAFOND_ENVOI)} pour rester
+                sous le plafond
+              </span>
+            )}
+
+            <div className="flex items-center gap-1">
+              <Button
+                size="sm"
+                disabled={generating || plafondDepasse}
+                onClick={() => setChoixFonderie(true)}
+              >
+                <Factory size={14} weight="duotone" />
+                Créer un lot d&apos;envoi
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Annuler
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Le paquet est compose : reste a dire chez qui il part. */}
+      <Dialog open={choixFonderie} onOpenChange={setChoixFonderie}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Factory size={20} weight="duotone" />
+              Créer un lot d&apos;envoi
+            </DialogTitle>
+            <DialogDescription>
+              {selection.length} article{selection.length > 1 ? "s" : ""} ·{" "}
+              {poidsSelection.toFixed(2)} g · {formatCurrency(valeurSelection)}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Fonderie destinataire</label>
+            <Select value={fonderieLot} onValueChange={(v) => { if (v) setFonderieLot(v); }}>
+              <SelectTrigger>
+                <Factory size={14} weight="duotone" />
+                <span className="flex-1 text-left truncate">
+                  {fonderieNameMap[fonderieLot] ?? "Choisir une fonderie"}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {fonderies.map((f) => (
+                  <SelectItem key={f.id} value={f.id}>{f.nom}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChoixFonderie(false)}>
+              Annuler
+            </Button>
+            <Button
+              disabled={generating || !fonderieLot}
+              onClick={handleEnvoyerSelection}
+            >
+              <Factory size={14} weight="duotone" />
+              {generating ? "Envoi..." : "Envoyer en fonderie"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
