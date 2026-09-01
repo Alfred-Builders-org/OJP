@@ -35,7 +35,6 @@ test.describe("Security", () => {
   test("API routes return 401 for unauthenticated requests", async ({ request }) => {
     const routes = [
       { url: "/api/search?q=test", method: "GET" as const },
-      { url: "/api/email/send", method: "POST" as const },
       { url: "/api/users/invite", method: "POST" as const },
     ];
 
@@ -45,6 +44,18 @@ test.describe("Security", () => {
         : await request.post(route.url, { data: {} });
       expect(response.status()).toBe(401);
     }
+  });
+
+  /**
+   * Le balayage des courriels n'est appele par aucun utilisateur : c'est
+   * `pg_cron` qui frappe, avec un secret partage. La route doit donc refuser
+   * un appel nu — 401 quand le secret est configure et ne correspond pas, 503
+   * quand il ne l'est pas du tout, comme sur cet environnement de recette.
+   * Ce qui compte ici est qu'aucun courriel ne parte sur une simple requete.
+   */
+  test("le balayage des courriels refuse un appel sans secret", async ({ request }) => {
+    const response = await request.post("/api/cron/emails", { data: {} });
+    expect([401, 503]).toContain(response.status());
   });
 
   test("security headers are present", async ({ page }) => {
