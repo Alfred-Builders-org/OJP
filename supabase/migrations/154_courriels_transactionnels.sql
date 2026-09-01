@@ -55,35 +55,65 @@ DROP FUNCTION IF EXISTS public.notify_depot_vente_invendus();
 -- 2. Les modeles editables disparaissent
 -- ============================================================
 
-DROP TRIGGER IF EXISTS email_templates_updated_at ON public.email_templates;
-DROP TABLE IF EXISTS public.email_templates;
+-- Le trigger `email_templates_updated_at` part avec la table : le supprimer
+-- d'abord aurait echoue si la table n'existait plus, `IF EXISTS` ne portant
+-- alors que sur le trigger, jamais sur la relation qui le porte.
+DROP TABLE IF EXISTS public.email_templates CASCADE;
 
 -- ============================================================
 -- 3. L'heure qui sonne
 -- ============================================================
 
 /**
+ * Ou frapper, et avec quel secret.
+ *
+ * Ces deux valeurs different d'un environnement a l'autre : la base de staging
+ * reveille l'application de staging, celle de production la sienne. Elles ne
+ * peuvent donc pas vivre dans le depot — et le secret n'y aurait de toute façon
+ * pas sa place.
+ *
+ * Le premier reflexe avait ete de les poser en parametres de base
+ * (`ALTER DATABASE postgres SET app.app_url = ...`), comme le suggeraient les
+ * anciennes migrations. Supabase le refuse : le role disponible n'est pas
+ * superuser, et la commande rend « permission denied to set parameter ». D'ou
+ * cette table, que la cle de service sait remplir.
+ *
+ * Elle porte un secret : la securite au niveau ligne est activee et **aucune
+ * politique n'est definie**, ce qui la rend invisible a `anon` comme a
+ * `authenticated`. Seuls la cle de service et les fonctions `SECURITY DEFINER`
+ * la lisent.
+ */
+CREATE TABLE IF NOT EXISTS public.cron_config (
+  cle TEXT PRIMARY KEY,
+  valeur TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE public.cron_config ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.cron_config IS
+  'Adresse publique et secret partagé du balayage horaire. Aucune politique RLS : hors de portée des utilisateurs.';
+
+/**
  * Reveille l'application pour qu'elle fasse son balayage.
  *
  * La fonction ne sait rien des courriels : elle frappe a une porte, et c'est
  * l'application qui decide qui doit recevoir quoi. Elle s'abstient tant que
- * l'adresse publique et le secret partage ne sont pas connus — un appel sans
- * secret serait refuse par la route, et un appel vers une adresse inconnue
- * n'irait nulle part.
- *
- * Les deux valeurs se posent hors migration, parce qu'un secret n'a pas sa
- * place dans un depot :
- *   ALTER DATABASE postgres SET app.app_url = 'https://...';
- *   ALTER DATABASE postgres SET app.cron_secret = '...';
+ * l'adresse et le secret ne sont pas connus — un appel sans secret serait
+ * refuse par la route, et un appel vers une adresse inconnue n'irait nulle
+ * part.
  */
 CREATE OR REPLACE FUNCTION public.declencher_balayage_courriels()
 RETURNS void AS $$
 DECLARE
-  adresse TEXT := current_setting('app.app_url', true);
-  secret  TEXT := current_setting('app.cron_secret', true);
+  adresse TEXT;
+  secret  TEXT;
 BEGIN
+  SELECT valeur INTO adresse FROM public.cron_config WHERE cle = 'app_url';
+  SELECT valeur INTO secret  FROM public.cron_config WHERE cle = 'cron_secret';
+
   IF adresse IS NULL OR adresse = '' OR secret IS NULL OR secret = '' THEN
-    RAISE NOTICE 'Balayage des courriels ignoré : app.app_url ou app.cron_secret absent';
+    RAISE NOTICE 'Balayage des courriels ignoré : app_url ou cron_secret absent de cron_config';
     RETURN;
   END IF;
 
