@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SquaresFour, Diamond, Coins, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings } from "@phosphor-icons/react";
+import { SquaresFour, Diamond, Coins, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings, BookOpen } from "@phosphor-icons/react";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -31,6 +31,9 @@ const fonderieItems = [
 
 const comptabiliteItems = [
   { title: "Impôts", href: "/impots", icon: Receipt, disabled: false },
+  // Le registre des objets mobiliers repond a une obligation penale, pas
+  // fiscale — mais c'est aupres de la comptabilite qu'on va le chercher.
+  { title: "Registre", href: "/registre", icon: BookOpen, disabled: false },
 ];
 
 // Rachats, ventes et depots-vente se consultent depuis leur dossier : ils n'ont
