@@ -153,7 +153,13 @@ export function ReferenceFormBijoux({
   })();
 
   // Taxe forfaitaire sur les objets precieux : 6 % + 0,5 % de CRDS au-dela de
-  // 5 000 EUR, appreciee par objet (prix unitaire x quantite de la ligne).
+  // 5 000 EUR.
+  //
+  // L'assiette est la REFERENCE entiere — prix unitaire multiplie par la
+  // quantite — et non l'unite prise a part. Trois chevalieres a 2 000 EUR
+  // saisies sur une meme ligne forment donc une assiette de 6 000 EUR, taxee.
+  // C'est la meme regle que sur une quittance de rachat classique : une
+  // reference est une cession.
   const tfopMontant = !isDepotVente && prixAchatTotal !== null ? calculerTFOP(prixAchatTotal) : null;
 
   async function handleSubmit(e: React.FormEvent) {
