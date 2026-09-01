@@ -173,6 +173,16 @@ export function DossierDetailPage({
     router.refresh();
   }
 
+  const fonderieParBdc = Object.fromEntries(
+    bonsCommande
+      .map((bdc) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const nom = (bdc as any).fonderie?.nom as string | undefined;
+        return nom ? [bdc.id, nom] : null;
+      })
+      .filter(Boolean) as [string, string][]
+  );
+
   // Build LotWithReferences for ActionDashboard
   const lotsWithRefs: LotWithReferences[] = lots.map((lot) => ({
     ...lot,
@@ -443,6 +453,8 @@ export function DossierDetailPage({
             lots={lots}
             dossierStatus={dossier.status}
             lotReferences={lotReferences}
+            venteLignes={venteLignes}
+            fonderieParBdc={fonderieParBdc}
             onRefAction={handleRefAction}
             creatingLot={creatingLot}
             onCreateLot={handleCreateLot}
