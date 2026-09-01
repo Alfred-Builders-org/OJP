@@ -11,6 +11,7 @@ import {
   ArrowUUpLeft,
   PenNib,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { executeAction } from "@/lib/actions/action-executor";
@@ -49,10 +50,16 @@ export function ActionButton({ action, ctx, size = "sm", onComplete }: ActionBut
       referenceId: action.referenceId,
     });
     setLoading(false);
-    if (result.success) {
-      onComplete?.();
-      router.refresh();
+
+    if (!result.success) {
+      // Un echec passait totalement inaperçu : on cliquait, rien ne bougeait, et
+      // rien n'expliquait pourquoi. Une action qui refuse doit le dire.
+      toast.error(result.error ?? "L'action n'a pas abouti.");
+      return;
     }
+
+    onComplete?.();
+    router.refresh();
   }
 
   return (

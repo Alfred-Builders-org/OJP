@@ -33,11 +33,11 @@ export function EmailWrapper({ body, logoUrl }: EmailWrapperProps) {
               <Img
                 src={logoUrl}
                 width="180"
-                alt="Or au Juste Prix"
+                alt="L'Or au Juste Prix"
                 style={{ margin: "0 auto" }}
               />
             ) : (
-              <Text style={enseigneStyle}>Or au Juste Prix</Text>
+              <Text style={enseigneStyle}>L&apos;Or au Juste Prix</Text>
             )}
           </Section>
 
@@ -59,7 +59,7 @@ export function EmailWrapper({ body, logoUrl }: EmailWrapperProps) {
 
           <Section style={footerStyle}>
             <Text style={footerTextStyle}>
-              Or au Juste Prix — Achat, vente et dépôt-vente d&apos;or et bijoux
+              L&apos;Or au Juste Prix — Achat, vente et dépôt-vente d&apos;or et bijoux
             </Text>
             <Text style={footerTextStyle}>
               Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.

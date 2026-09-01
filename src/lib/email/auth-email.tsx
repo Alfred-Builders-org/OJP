@@ -57,7 +57,7 @@ export function AuthEmail({
             <Img
               src={logoUrl}
               width="180"
-              alt="Or au Juste Prix"
+              alt="L'Or au Juste Prix"
               style={{ margin: "0 auto" }}
             />
           </Section>
@@ -102,7 +102,7 @@ export function AuthEmail({
 
           <Section style={footerStyle}>
             <Text style={footerTextStyle}>
-              Or au Juste Prix — Achat, vente et dépôt-vente d&apos;or et bijoux
+              L&apos;Or au Juste Prix — Achat, vente et dépôt-vente d&apos;or et bijoux
             </Text>
             <Text style={footerTextStyle}>
               Si vous n&apos;êtes pas à l&apos;origine de cette demande, ignorez ce

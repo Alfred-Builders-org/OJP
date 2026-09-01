@@ -38,7 +38,74 @@ export async function executeAction(params: {
 
     // Document actions
     case "doc.signer_contrat_dpv": {
-      // 1. Marquer le contrat comme signé
+      /**
+       * Signature du contrat de depot-vente.
+       *
+       * L'ordre compte. On faisait l'inverse — signer d'abord, entrer la
+       * marchandise en stock ensuite — et le moindre refus sur le stock laissait
+       * un etat impossible a reparer depuis l'ecran : le contrat marque signe
+       * faisait disparaitre l'action, donc plus aucun moyen de reessayer, et les
+       * bijoux restaient en expertise sans que rien ne le signale. C'est
+       * exactement ce qui s'est produit quand un vendeur, qui n'a pas le droit
+       * d'ecrire dans le stock, a valide un contrat : quatre refus silencieux.
+       *
+       * Le stock passe donc en premier. Le contrat n'est signe que si toute la
+       * marchandise est entree, et le moindre echec laisse l'action disponible.
+       */
+      const clientId = ctx.dossier.client.id;
+      const aEntrer = ctx.lot.references.filter(
+        (r) => r.categorie === "bijoux" && r.status === "en_expertise"
+      );
+
+      for (const ref of aEntrer) {
+        const { data: stockEntry, error: stockErr } = await supabase
+          .from("bijoux_stock")
+          .insert({
+            nom: ref.designation,
+            metaux: ref.metal,
+            qualite: ref.qualite,
+            poids: ref.poids_net ?? ref.poids,
+            poids_brut: ref.poids_brut,
+            poids_net: ref.poids_net,
+            prix_achat: ref.prix_achat,
+            prix_revente: ref.prix_revente_estime,
+            quantite: ref.quantite,
+            statut: "en_depot_vente",
+            reference: ref.numero ?? null,
+            depot_vente_lot_id: ctx.lot.id,
+            deposant_client_id: clientId,
+          })
+          .select("id")
+          .single();
+
+        if (stockErr || !stockEntry) {
+          // Le message brut de PostgreSQL ne dit rien a un vendeur : un refus
+          // d'ecriture se traduit en clair, avec la conduite a tenir.
+          const refus =
+            stockErr?.code === "42501" ||
+            (stockErr?.message ?? "").toLowerCase().includes("row-level security");
+          return {
+            success: false,
+            error: refus
+              ? "Votre compte n'a pas le droit de faire entrer de la marchandise en stock. Demandez au propriétaire de valider ce contrat."
+              : `La mise en stock de « ${ref.designation} » a échoué : ${stockErr?.message ?? "raison inconnue"}`,
+          };
+        }
+
+        const { error: refErr } = await supabase
+          .from("lot_references")
+          .update({ status: "en_depot_vente", destination_stock_id: stockEntry.id })
+          .eq("id", ref.id);
+
+        if (refErr) {
+          return {
+            success: false,
+            error: `« ${ref.designation} » est en stock mais son statut n'a pas suivi : ${refErr.message}`,
+          };
+        }
+      }
+
+      // La marchandise est entree : le contrat peut etre marque signe.
       const { error } = await supabase
         .from("documents")
         .update({ status: "signe" })
@@ -46,46 +113,13 @@ export async function executeAction(params: {
         .eq("type", "contrat_depot_vente");
       if (error) return { success: false, error: error.message };
 
-      // 2. Marquer les confiés d'achat comme signés aussi
+      // Les confies d'achat accompagnent le contrat.
       await supabase
         .from("documents")
         .update({ status: "signe" })
         .eq("lot_id", ctx.lot.id)
         .eq("type", "confie_achat")
         .in("status", ["en_attente"]);
-
-      // 3. Créer les entrées stock et passer les refs en en_depot_vente
-      const clientId = ctx.dossier.client.id;
-      for (const ref of ctx.lot.references) {
-        if (ref.categorie === "bijoux" && ref.status === "en_expertise") {
-          const { data: stockEntry, error: stockErr } = await supabase
-            .from("bijoux_stock")
-            .insert({
-              nom: ref.designation,
-              metaux: ref.metal,
-              qualite: ref.qualite,
-              poids: ref.poids_net ?? ref.poids,
-              poids_brut: ref.poids_brut,
-              poids_net: ref.poids_net,
-              prix_achat: ref.prix_achat,
-              prix_revente: ref.prix_revente_estime,
-              quantite: ref.quantite,
-              statut: "en_depot_vente",
-              reference: ref.numero ?? null,
-              depot_vente_lot_id: ctx.lot.id,
-              deposant_client_id: clientId,
-            })
-            .select("id")
-            .single();
-          if (stockErr) return { success: false, error: `Erreur création stock: ${stockErr.message}` };
-          if (stockEntry) {
-            await supabase
-              .from("lot_references")
-              .update({ status: "en_depot_vente", destination_stock_id: stockEntry.id })
-              .eq("id", ref.id);
-          }
-        }
-      }
 
       return { success: true };
     }
