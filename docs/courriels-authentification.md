@@ -61,7 +61,6 @@ Les variables sont posées sur **chaque** environnement Railway (`staging` et
 | `RESEND_API_KEY` | La clé du compte Resend. `RESEND_KEY` est lue en repli |
 | `NEXT_PUBLIC_APP_URL` | `https://staging.oraujusteprix.fr` / `https://app.oraujusteprix.fr` |
 | `RESEND_FROM_EMAIL` | `contact@notif.oraujusteprix.fr` |
-| `SEND_EMAIL_HOOK_SECRET` | Le secret du hook, forme `v1,whsec_…`. Invitation exclue |
 
 L'adresse d'expédition vient des paramètres de la société
 (*Paramètres → Société → e-mail expéditeur*), avec `RESEND_FROM_EMAIL` en repli.
@@ -69,33 +68,40 @@ Le domaine doit être vérifié chez Resend, sans quoi les messages sont refusé
 c'est `notif.oraujusteprix.fr`. Une adresse Gmail ne peut pas servir
 d'expéditeur — elle n'est pas vérifiable.
 
-### Le hook, pour ce que Supabase déclenche seul
+### Le SMTP, pour ce que Supabase déclenche seul
 
 Le mot de passe oublié part de l'écran de connexion : c'est Supabase qui écrit,
-pas l'application. Il faut donc le hook. Dans le tableau de bord de **chaque**
-projet (branche `staging` et `ojp-prod`) :
+pas l'application. Il lui faut donc son propre expéditeur — sans quoi il retombe
+sur son service intégré, qui n'écrit qu'aux membres de l'organisation.
 
-1. **Authentication → Hooks → Send Email Hook**
-2. Type : *HTTPS*
-3. URL : `https://<adresse-de-l-environnement>/api/auth/email`
-4. Le même secret que `SEND_EMAIL_HOOK_SECRET`
-5. Activer
+*Authentication → Emails → SMTP Settings*, sur **chaque** projet (la branche
+`staging` et `ojp-prod`) :
 
-Ou, depuis le dépôt, `[auth.hook.send_email]` de `supabase/config.toml` :
+| Champ | Valeur |
+|---|---|
+| Sender email address | `contact@notif.oraujusteprix.fr` |
+| Sender name | `L'Or au Juste Prix` |
+| Host | `smtp.resend.com` |
+| Port | `465` |
+| Username | `resend` — le mot lui-même, pas un identifiant |
+| Password | la clé API Resend |
+
+La même chose est décrite dans `[auth.email.smtp]` de `supabase/config.toml`, et
+se pousse avec :
 
 ```
 SUPABASE_AUTH_SITE_URL=https://app.oraujusteprix.fr \
-SUPABASE_AUTH_HOOK_SEND_EMAIL_URI=https://app.oraujusteprix.fr/api/auth/email \
-SEND_EMAIL_HOOK_SECRET='v1,whsec_…' \
+RESEND_API_KEY=re_… \
   npx supabase config push --project-ref ycpjvznykyukffqlnqzo
 ```
 
-**Poser le secret sur Railway avant d'activer le hook.** Dans l'autre ordre, la
-route répond 500 faute de secret, Supabase considère l'envoi en échec, et le
-mot de passe oublié cesse de fonctionner le temps du décalage.
-
 `config push` remplace **toute** la section `[auth]` : lire le diff qu'il
 affiche avant de confirmer.
+
+On aurait pu confier ces envois à l'application, par le *Send Email Hook* —
+la route existe et sait le faire. Le SMTP lui est préféré : un courriel de mot
+de passe oublié ne doit pas dépendre de l'application pour partir, et un secret
+de moins est un secret de moins.
 
 ## Vérifier
 
