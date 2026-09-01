@@ -52,6 +52,8 @@ import {
 import { PieceCreateDialog } from "@/components/or-investissement/piece-create-dialog";
 import type { OrInvestissement } from "@/types/or-investissement";
 import { formatCurrency, formatDateISO } from "@/lib/format";
+import { PhotosUpload } from "@/components/photos/photos-upload";
+import { usePhotosReference } from "@/hooks/use-photos-reference";
 import type { LotReference } from "@/types/lot";
 
 interface ReferenceFormOrInvestProps {
@@ -78,6 +80,14 @@ export function ReferenceFormOrInvest({
   editData,
 }: ReferenceFormOrInvestProps) {
   const isEdit = !!editData;
+
+  // Photos de l'article, facultatives — comme sur un bijou. Un lingot scelle ou
+  // une piece de collection meritent d'etre documentes a la prise en charge.
+  const { photos, setPhotos, rattacher, fermer } = usePhotosReference(
+    lotId,
+    editData?.id,
+    onClose
+  );
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -233,16 +243,27 @@ export function ReferenceFormOrInvest({
       type_rachat: typeRachat,
     };
 
-    const { error: dbError } = isEdit
-      ? await supabase.from("lot_references").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editData.id)
-      : await supabase.from("lot_references").insert({ ...payload, lot_id: lotId, categorie: "or_investissement", status: "en_expertise" });
+    const { data: enregistree, error: dbError } = isEdit
+      ? await supabase
+          .from("lot_references")
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq("id", editData.id)
+          .select("id")
+          .single()
+      : await supabase
+          .from("lot_references")
+          .insert({ ...payload, lot_id: lotId, categorie: "or_investissement", status: "en_expertise" })
+          .select("id")
+          .single();
 
-    if (dbError) {
+    if (dbError || !enregistree) {
       toast.error("Erreur lors de l'enregistrement de la référence");
-      setError(dbError.message);
+      setError(dbError?.message ?? "La référence n'a pas pu être enregistrée.");
       setSaving(false);
       return;
     }
+
+    await rattacher(enregistree.id);
 
     toast.success(isEdit ? "Référence modifiée" : "Référence ajoutée");
     setSaving(false);
@@ -257,7 +278,7 @@ export function ReferenceFormOrInvest({
           <Coins size={16} weight="duotone" />
           {isEdit ? `Modifier — ${editData.designation}` : "Ajouter de l\u0027or investissement"}
         </CardTitle>
-        <Button variant="ghost" size="icon-xs" onClick={onClose} aria-label="Fermer">
+        <Button variant="ghost" size="icon-xs" onClick={fermer} aria-label="Fermer">
           <X size={14} weight="regular" />
         </Button>
       </CardHeader>
@@ -506,8 +527,28 @@ export function ReferenceFormOrInvest({
             </div>
           )}
 
+          <div className="space-y-2">
+            <Label>
+              Photos de l&apos;article
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                (facultatif)
+              </span>
+            </Label>
+            <PhotosUpload
+              chemins={photos}
+              onChange={setPhotos}
+              prefixe={lotId}
+              /* En creation la reference n'a pas d'identifiant : le telephone
+                 depose dans la session seule, et l'enregistrement rattache. */
+              lotId={isEdit ? lotId : null}
+              referenceId={editData?.id ?? null}
+              libelle={selectedItem?.designation || "Nouvel article"}
+              max={8}
+            />
+          </div>
+
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" onClick={fermer}>
               Annuler
             </Button>
             <Button type="submit" size="sm" disabled={saving}>

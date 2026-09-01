@@ -2,7 +2,7 @@
 
 import { FieldError } from "@/components/ui/field";
 
-import { useState, useMemo, useEffect, useRef, Fragment } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   FloppyDisk,
@@ -49,6 +49,7 @@ import {
 import { calculerTFOP } from "@/lib/calculations/taxes";
 import { formatCurrency, formatDateISO } from "@/lib/format";
 import { PhotosUpload } from "@/components/photos/photos-upload";
+import { usePhotosReference } from "@/hooks/use-photos-reference";
 import type { LotReference } from "@/types/lot";
 
 interface ReferenceFormBijouxProps {
@@ -97,14 +98,13 @@ export function ReferenceFormBijoux({
   const [prixReventeManuel, setPrixReventeManuel] = useState(editData?.prix_revente_estime?.toString() ?? "");
   const [commissionLocal, setCommissionLocal] = useState(commissionDvPct.toString());
 
-  // Photos de l'article, facultatives. En creation la reference n'a pas encore
-  // d'identifiant : les cliches attendent ici et sont rattaches a
-  // l'enregistrement. Fermer sans enregistrer les efface du bucket.
-  const [photos, setPhotos] = useState<string[]>([]);
-  const enregistreRef = useRef(false);
-  // Ce qui etait deja en base au chargement : la difference avec `photos` dit
-  // ce qu'il faut inscrire et ce qu'il faut retirer a l'enregistrement.
-  const photosInitialesRef = useRef<string[]>([]);
+  // Photos de l'article, facultatives : utiles sur une piece de valeur ou un
+  // defaut a documenter, superflues sur un lot de chutes.
+  const { photos, setPhotos, rattacher, fermer } = usePhotosReference(
+    lotId,
+    editData?.id,
+    onClose
+  );
 
   // Une matiere a tarif fixe n'a ni cours ni titrage : son prix ne depend que du
   // poids et du tarif decide par la boutique.
@@ -171,66 +171,6 @@ export function ReferenceFormBijoux({
   // C'est la meme regle que sur une quittance de rachat classique : une
   // reference est une cession.
   const tfopMontant = !isDepotVente && prixAchatTotal !== null ? calculerTFOP(prixAchatTotal) : null;
-
-  useEffect(() => {
-    if (!editData) return;
-    let annule = false;
-    const supabase = createClient();
-    supabase
-      .from("lot_photos")
-      .select("chemin")
-      .eq("reference_id", editData.id)
-      .order("created_at")
-      .order("rang")
-      .then(({ data }) => {
-        if (annule) return;
-        const chemins = (data ?? []).map((p) => p.chemin as string);
-        photosInitialesRef.current = chemins;
-        setPhotos(chemins);
-      });
-    return () => {
-      annule = true;
-    };
-  }, [editData]);
-
-  /**
-   * Rattache la galerie a la reference une fois son identifiant connu.
-   *
-   * `ignoreDuplicates` : en edition, le telephone a pu inscrire la meme photo
-   * lui-meme quelques secondes plus tot.
-   */
-  async function rattacherPhotos(referenceId: string, dejaEnBase: string[]) {
-    const supabase = createClient();
-    const ajouts = photos.filter((c) => !dejaEnBase.includes(c));
-    const retraits = dejaEnBase.filter((c) => !photos.includes(c));
-
-    if (ajouts.length > 0) {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      await supabase.from("lot_photos").upsert(
-        ajouts.map((chemin, i) => ({
-          lot_id: lotId,
-          reference_id: referenceId,
-          chemin,
-          rang: i,
-          created_by: user?.id ?? null,
-        })),
-        { onConflict: "chemin", ignoreDuplicates: true }
-      );
-    }
-    if (retraits.length > 0) {
-      await supabase.from("lot_photos").delete().in("chemin", retraits);
-    }
-  }
-
-  /** Un formulaire abandonne ne laisse pas ses cliches dans le bucket. */
-  function fermer() {
-    if (!enregistreRef.current && !isEdit && photos.length > 0) {
-      createClient().storage.from("lot-photos").remove(photos);
-    }
-    onClose();
-  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -317,8 +257,7 @@ export function ReferenceFormBijoux({
       return;
     }
 
-    enregistreRef.current = true;
-    await rattacherPhotos(enregistree.id, photosInitialesRef.current);
+    await rattacher(enregistree.id);
 
     toast.success(isEdit ? "Référence modifiée" : "Référence ajoutée");
     setSaving(false);
