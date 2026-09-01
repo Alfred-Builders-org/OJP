@@ -14,6 +14,7 @@ import { createBonsLivraison } from "@/lib/fonderie/create-bon-livraison";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -36,9 +37,11 @@ import type { BijouxStock } from "@/types/bijoux";
 
 interface BonsLivraisonListProps {
   fonderies: Fonderie[];
+  /** Remonte le nombre d'articles en attente, pour le compteur de l'onglet. */
+  onCountChange?: (count: number) => void;
 }
 
-export function BonsLivraisonList({ fonderies }: BonsLivraisonListProps) {
+export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonListProps) {
   const router = useRouter();
   const [stockItems, setStockItems] = useState<BijouxStock[]>([]);
   const [loadingStock, setLoadingStock] = useState(true);
@@ -49,6 +52,11 @@ export function BonsLivraisonList({ fonderies }: BonsLivraisonListProps) {
   // Per-item fonderie assignment: stockId → fonderieId
   const [fonderieAssignments, setFonderieAssignments] = useState<Record<string, string>>({});
   const [generating, setGenerating] = useState(false);
+
+  // Les articles a fondre s'accumulent et partent par fournees : on les
+  // selectionne en lot plutot que de choisir une fonderie ligne par ligne.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [fonderieLot, setFonderieLot] = useState("");
 
   // Build fonderie name map for Select display
   const fonderieNameMap = useMemo(
@@ -72,6 +80,10 @@ export function BonsLivraisonList({ fonderies }: BonsLivraisonListProps) {
     fetchStock();
   }, []);
 
+  useEffect(() => {
+    onCountChange?.(stockItems.length);
+  }, [stockItems.length, onCountChange]);
+
   const filtered = useMemo(() => {
     if (!search) return stockItems;
     const q = search.toLowerCase();
@@ -90,6 +102,48 @@ export function BonsLivraisonList({ fonderies }: BonsLivraisonListProps) {
   const assignedEntries = Object.entries(fonderieAssignments).filter(([, v]) => v);
   const uniqueFonderies = new Set(assignedEntries.map(([, v]) => v));
   const canGenerate = assignedEntries.length > 0;
+
+  const selection = useMemo(
+    () => filtered.filter((i) => selectedIds.has(i.id)),
+    [filtered, selectedIds],
+  );
+  const poidsSelection = selection.reduce(
+    (sum, i) => sum + (i.poids_net ?? i.poids ?? 0),
+    0,
+  );
+  const toutSelectionne = filtered.length > 0 && selection.length === filtered.length;
+
+  function basculerLigne(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function basculerTout() {
+    setSelectedIds(toutSelectionne ? new Set() : new Set(filtered.map((i) => i.id)));
+  }
+
+  /** Envoie d'un coup tous les articles coches vers la meme fonderie. */
+  async function handleEnvoyerSelection() {
+    if (!fonderieLot || selection.length === 0) return;
+    setGenerating(true);
+
+    const groups = new Map<string, BijouxStock[]>([[fonderieLot, selection]]);
+    await createBonsLivraison({ groups, fonderies });
+
+    const envoyes = new Set(selection.map((i) => i.id));
+    setStockItems((prev) => prev.filter((i) => !envoyes.has(i.id)));
+    setSelectedIds(new Set());
+    setFonderieAssignments((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([id]) => !envoyes.has(id))),
+    );
+    setFonderieLot("");
+    setGenerating(false);
+    router.refresh();
+  }
 
   // Track items being moved to stock
   const [movingToStock, setMovingToStock] = useState<Record<string, boolean>>({});
@@ -151,7 +205,7 @@ export function BonsLivraisonList({ fonderies }: BonsLivraisonListProps) {
             className="pl-9"
           />
         </div>
-        {canGenerate && (
+        {canGenerate && selection.length === 0 && (
           <Button
             disabled={generating}
             onClick={handleGenerateBDL}
@@ -164,11 +218,58 @@ export function BonsLivraisonList({ fonderies }: BonsLivraisonListProps) {
         )}
       </div>
 
+      {/* Traiter la fournee : une fonderie, un bouton, tous les articles coches. */}
+      {selection.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-muted/40 px-4 py-3">
+          <span className="text-sm font-medium">
+            {selection.length} article{selection.length > 1 ? "s" : ""}
+            <span className="text-muted-foreground font-normal">
+              {" "}· {poidsSelection.toFixed(1)} g
+            </span>
+          </span>
+          <Select value={fonderieLot} onValueChange={(v) => { if (v) setFonderieLot(v); }}>
+            <SelectTrigger className="h-8 w-[220px] text-xs">
+              <Factory size={12} weight="duotone" />
+              <span className="flex-1 text-left truncate">
+                {fonderieNameMap[fonderieLot] ?? "Choisir une fonderie"}
+              </span>
+            </SelectTrigger>
+            <SelectContent className="min-w-[220px]">
+              {fonderies.map((f) => (
+                <SelectItem key={f.id} value={f.id}>{f.nom}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            disabled={generating || !fonderieLot}
+            onClick={handleEnvoyerSelection}
+          >
+            <Factory size={14} weight="duotone" />
+            {generating ? "Envoi..." : "Envoyer en fonderie"}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            Annuler
+          </Button>
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 overflow-auto rounded-lg border bg-white dark:bg-card">
         <Table className={paginatedData.length === 0 ? "h-full" : ""}>
           <TableHeader className="sticky top-0 z-10 bg-muted">
             <TableRow className="bg-transparent hover:bg-transparent">
-              <TableHead className="pl-4">Désignation</TableHead>
+              <TableHead className="w-[44px] pl-4">
+                <Checkbox
+                  checked={toutSelectionne}
+                  onCheckedChange={basculerTout}
+                  aria-label="Tout sélectionner"
+                />
+              </TableHead>
+              <TableHead>Désignation</TableHead>
               <TableHead>Métal / Titrage</TableHead>
               <TableHead className="text-right">Poids</TableHead>
               <TableHead className="text-right">Prix achat</TableHead>
@@ -179,13 +280,13 @@ export function BonsLivraisonList({ fonderies }: BonsLivraisonListProps) {
           <TableBody>
             {loadingStock ? (
               <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                   Chargement...
                 </TableCell>
               </TableRow>
             ) : paginatedData.length === 0 ? (
               <TableRow className="hover:bg-transparent h-full">
-                <TableCell colSpan={6} className="text-center align-middle text-muted-foreground">
+                <TableCell colSpan={7} className="text-center align-middle text-muted-foreground">
                   <Diamond size={32} weight="duotone" className="mx-auto mb-2 opacity-40" />
                   Aucun article à envoyer en fonderie.
                 </TableCell>
@@ -198,6 +299,13 @@ export function BonsLivraisonList({ fonderies }: BonsLivraisonListProps) {
                 return (
                   <TableRow key={item.id} className="bg-white dark:bg-card">
                     <TableCell className="pl-4">
+                      <Checkbox
+                        checked={selectedIds.has(item.id)}
+                        onCheckedChange={() => basculerLigne(item.id)}
+                        aria-label={`Sélectionner ${item.nom}`}
+                      />
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted">
                           <Diamond size={16} weight="duotone" className="text-muted-foreground" />
