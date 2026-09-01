@@ -156,7 +156,7 @@ export function DossierDetailPage({
       ...lot,
       references: lotReferences.filter((r) => r.lot_id === lot.id),
     };
-    await executeAction({
+    const result = await executeAction({
       actionId,
       supabase,
       ctx: {
@@ -170,6 +170,10 @@ export function DossierDetailPage({
       },
       referenceId: refId,
     });
+    if (!result.success) {
+      toast.error(result.error ?? "L'action n'a pas abouti.");
+      return;
+    }
     router.refresh();
   }
 

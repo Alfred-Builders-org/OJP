@@ -8,6 +8,7 @@ import {
   CheckCircle,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 import { executeAction } from "@/lib/actions/action-executor";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,9 +70,12 @@ export function RestitutionDialog({ open, onOpenChange, lot, dossierClient }: Re
       referenceId: ref.id,
     });
     setLoadingId(null);
-    if (result.success) {
-      setRestituted((prev) => new Set(prev).add(ref.id));
+
+    if (!result.success) {
+      toast.error(result.error ?? "La restitution n'a pas abouti.");
+      return;
     }
+    setRestituted((prev) => new Set(prev).add(ref.id));
   }
 
   function handleClose() {

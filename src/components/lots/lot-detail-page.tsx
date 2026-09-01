@@ -22,6 +22,7 @@ import {
   CheckCircle,
   XCircle,
 } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
 import { Button } from "@/components/ui/button";
@@ -201,15 +202,25 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
   const availableActions = getAvailableActions({ lot, documents, paymentsDue });
 
   // ── Reference-level action handlers (delegated to action engine) ──
+  // Le resultat n'etait pas lu : une action refusee ne laissait aucune trace a
+  // l'ecran, et l'utilisateur cliquait de nouveau sans comprendre.
   async function handleRefAction(actionId: "ref.valider_rachat" | "ref.retracter" | "ref.accepter_devis" | "ref.refuser_devis" | "ref.restituer", refId: string) {
     const supabase = createClient();
-    await executeAction({ actionId, supabase, ctx: actionCtx, referenceId: refId });
+    const result = await executeAction({ actionId, supabase, ctx: actionCtx, referenceId: refId });
+    if (!result.success) {
+      toast.error(result.error ?? "L'action n'a pas abouti.");
+      return;
+    }
     router.refresh();
   }
 
   async function handleLotAction(actionId: "lot.accepter_devis" | "lot.refuser_devis") {
     const supabase = createClient();
-    await executeAction({ actionId, supabase, ctx: actionCtx });
+    const result = await executeAction({ actionId, supabase, ctx: actionCtx });
+    if (!result.success) {
+      toast.error(result.error ?? "L'action n'a pas abouti.");
+      return;
+    }
     router.refresh();
   }
 
