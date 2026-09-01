@@ -12,9 +12,14 @@ import * as React from "react";
 
 interface EmailWrapperProps {
   body: string;
+  /**
+   * Logo, en absolu. Un courriel n'a pas de racine : l'adresse doit etre
+   * complete, et suivre l'environnement qui l'envoie.
+   */
+  logoUrl?: string;
 }
 
-export function EmailWrapper({ body }: EmailWrapperProps) {
+export function EmailWrapper({ body, logoUrl = LOGO_DEFAUT }: EmailWrapperProps) {
   const lines = body.split("\n");
 
   return (
@@ -24,7 +29,7 @@ export function EmailWrapper({ body }: EmailWrapperProps) {
         <Container style={containerStyle}>
           <Section style={headerStyle}>
             <Img
-              src="https://wprsfakodbuvszporcoe.supabase.co/storage/v1/object/public/assets/logo-light.png"
+              src={logoUrl}
               width="180"
               alt="Or au Juste Prix"
               style={{ margin: "0 auto" }}
@@ -60,6 +65,17 @@ export function EmailWrapper({ body }: EmailWrapperProps) {
     </Html>
   );
 }
+
+/**
+ * Repli quand l'application ne connait pas sa propre adresse publique.
+ *
+ * L'adresse du bucket vaut mieux que rien, mais elle est fragile : celui de
+ * production ne contient pas le fichier, et affichait donc un carre casse. La
+ * bonne source est le dossier `public` de l'application, servi par
+ * l'environnement qui envoie.
+ */
+const LOGO_DEFAUT =
+  "https://wprsfakodbuvszporcoe.supabase.co/storage/v1/object/public/assets/logo-light.png";
 
 const bodyStyle: React.CSSProperties = {
   backgroundColor: "#f4f4f5",

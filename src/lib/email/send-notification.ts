@@ -126,8 +126,15 @@ export async function sendNotification(
     }
 
     // 6. Render HTML
+    // Le logo vient de l'application, pas d'un bucket : celui de production ne
+    // contient pas le fichier, et les courriels partaient avec un carre casse a
+    // la place de l'enseigne.
+    const origine = process.env.NEXT_PUBLIC_APP_URL;
     const html = await render(
-      React.createElement(EmailWrapper, { body: bodyText })
+      React.createElement(EmailWrapper, {
+        body: bodyText,
+        logoUrl: origine ? `${origine}/logo-light.png` : undefined,
+      })
     );
 
     // 7. Destinataire
