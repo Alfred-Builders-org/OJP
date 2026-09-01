@@ -5,7 +5,6 @@ import {
   Camera,
   CircleNotch,
   DeviceMobile,
-  MagnifyingGlassPlus,
   Plus,
   X,
 } from "@phosphor-icons/react";
@@ -149,38 +148,39 @@ export function PhotosUpload({
   return (
     <div className="space-y-3">
       {chemins.length > 0 && (
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+        /* Vignettes a taille fixe plutot qu'une grille qui s'etire : la carte
+           ne fait plus toute la largeur, et une photo de bijou n'a pas besoin
+           d'etre grande pour qu'on la reconnaisse. Le detail se regarde dans la
+           visionneuse, d'un clic. */
+        <div className="flex flex-wrap gap-1.5">
           {chemins.map((chemin, i) => (
             <div key={chemin} className="group relative">
               {apercus[chemin] ? (
-                <>
+                <button
+                  type="button"
+                  aria-label={`Agrandir la photo ${i + 1}`}
+                  className="block overflow-hidden rounded-md border transition-opacity hover:opacity-80"
+                  onClick={() => setAgrandie(apercus[chemin])}
+                >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={apercus[chemin]}
                     alt={`Photo ${i + 1}`}
-                    className="aspect-square w-full rounded-md border object-cover"
+                    className="h-16 w-16 object-cover"
                   />
-                  <button
-                    type="button"
-                    aria-label="Agrandir la photo"
-                    className="absolute inset-0 flex items-center justify-center rounded-md bg-black/0 opacity-0 transition-opacity group-hover:bg-black/30 group-hover:opacity-100"
-                    onClick={() => setAgrandie(apercus[chemin])}
-                  >
-                    <MagnifyingGlassPlus size={22} weight="duotone" className="text-white" />
-                  </button>
-                </>
+                </button>
               ) : (
-                <div className="aspect-square w-full animate-pulse rounded-md border bg-muted" />
+                <div className="h-16 w-16 animate-pulse rounded-md border bg-muted" />
               )}
 
               {!disabled && (
                 <button
                   type="button"
                   aria-label="Supprimer cette photo"
-                  className="absolute -top-1.5 -right-1.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background shadow-sm"
+                  className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border bg-background opacity-0 shadow-sm transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
                   onClick={() => retirer(chemin)}
                 >
-                  <X size={12} className="text-destructive" />
+                  <X size={10} className="text-destructive" />
                 </button>
               )}
             </div>
@@ -191,13 +191,13 @@ export function PhotosUpload({
               type="button"
               disabled={envoi}
               aria-label="Ajouter des photos"
-              className="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-input text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground disabled:opacity-50"
+              className="flex h-16 w-16 items-center justify-center rounded-md border-2 border-dashed border-input text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground disabled:opacity-50"
               onClick={() => inputRef.current?.click()}
             >
               {envoi ? (
-                <CircleNotch size={20} className="animate-spin" />
+                <CircleNotch size={16} className="animate-spin" />
               ) : (
-                <Plus size={20} weight="bold" />
+                <Plus size={16} weight="bold" />
               )}
             </button>
           )}
@@ -209,7 +209,7 @@ export function PhotosUpload({
           type="button"
           disabled={disabled || envoi}
           className={cn(
-            "flex h-32 w-full flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed text-sm transition-colors disabled:opacity-50",
+            "flex h-20 w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-xs transition-colors disabled:opacity-50",
             glisse
               ? "border-primary bg-primary/5 text-foreground"
               : "border-input text-muted-foreground hover:border-foreground/30 hover:text-foreground"
@@ -228,12 +228,12 @@ export function PhotosUpload({
         >
           {envoi ? (
             <>
-              <CircleNotch size={22} className="animate-spin" />
+              <CircleNotch size={18} className="animate-spin" />
               <span>Enregistrement...</span>
             </>
           ) : (
             <>
-              <Camera size={22} weight="duotone" />
+              <Camera size={18} weight="duotone" />
               <span>{glisse ? "Déposer les images" : "Glisser des photos ou parcourir"}</span>
             </>
           )}

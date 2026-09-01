@@ -87,9 +87,9 @@ export function LotPhotosCard({ lotId, numero, disabled }: LotPhotosCardProps) {
   }
 
   return (
-    <Card className="md:col-span-2">
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="flex items-center gap-2">
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-2">
+        <CardTitle className="flex min-w-0 items-center gap-2">
           <Camera size={20} weight="duotone" />
           Photos du lot
           {charge && chemins.length === 0 && !disabled && (
@@ -106,8 +106,8 @@ export function LotPhotosCard({ lotId, numero, disabled }: LotPhotosCardProps) {
             </Badge>
           )}
         </CardTitle>
-        <span className="text-xs text-muted-foreground">
-          Preuve de la marchandise remise
+        <span className="shrink-0 text-xs text-muted-foreground">
+          preuve de la marchandise
         </span>
       </CardHeader>
       <CardContent>

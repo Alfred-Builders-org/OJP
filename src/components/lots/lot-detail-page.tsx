@@ -163,6 +163,8 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
   const isBrouillon = lot.status === "brouillon";
   const isTerminal = lot.status === "finalise";
   const isDepotVente = lot.type === "depot_vente";
+  // Seuls le rachat et le dépôt-vente font entrer de la marchandise en boutique.
+  const aPhotographier = lot.type === "rachat" || lot.type === "depot_vente";
   const clientName = `${lot.dossier.client.civility === "M" ? "M." : "Mme"} ${lot.dossier.client.first_name} ${lot.dossier.client.last_name}`;
 
   const paymentsDue = detectPaymentsDue({
@@ -339,15 +341,19 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
 
           {/* Photos du lot. Exigées sur un rachat comme sur un dépôt-vente :
               c'est la preuve de ce que le client a remis, et le seul recours si
-              la composition du lot venait à être contestée. */}
-          {(lot.type === "rachat" || lot.type === "depot_vente") && (
+              la composition du lot venait à être contestée.
+
+              Sur une demi-largeur, côte à côte avec les cours : une galerie de
+              vignettes n'a pas besoin de toute la fiche, et les deux cartes se
+              répondent — ce qui est entré, et à quel cours il a été payé. */}
+          {aPhotographier && (
             <LotPhotosCard lotId={lot.id} numero={lot.numero} disabled={isTerminal} />
           )}
 
           {/* Cours appliqués — carte à part, sous les informations client.
               Noyés parmi les dates du lot, ils étaient illisibles alors que ce
               sont eux qui expliquent chaque montant de la fiche. */}
-          <Card className="md:col-span-2">
+          <Card className={aPhotographier ? undefined : "md:col-span-2"}>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Coins size={20} weight="duotone" />
