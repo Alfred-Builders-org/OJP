@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import { ThemeProvider } from "next-themes";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentationProvider } from "@/components/agentation-provider";
@@ -32,6 +31,21 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        {/*
+          Support Alfrhelp. La bulle flottante est masquee a dessein : le
+          support s'ouvre depuis le menu utilisateur, sous « Documentation »,
+          la ou l'on cherche deja son profil et l'aide. Le script est pose ici
+          pour toutes les pages ; un `defer` qui echoue ne casse rien et ne
+          montre rien.
+        */}
+        <script
+          src="https://api-ui.up.railway.app/alfrhelp/alfrhelp.js"
+          data-key="pk_77193f4854b8de3359ea6ec2ec87c1d9"
+          data-alfrhelp-hide-launcher=""
+          defer
+        />
+      </head>
       <body className="min-h-full flex flex-col">
         {/*
           Le clair est le theme de la boutique : on y compare des metaux et des
@@ -44,11 +58,6 @@ export default function RootLayout({
           <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>
         <AgentationProvider />
-        <Script
-          src="https://alfrhelp-web-staging.up.railway.app/widget.js"
-          data-site-id="6270b1bc-b08d-4c63-aabc-e02d97f0c252"
-          strategy="afterInteractive"
-        />
       </body>
     </html>
   );

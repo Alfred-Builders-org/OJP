@@ -16,6 +16,7 @@ import { SidebarProfile } from "@/components/dashboard/sidebar-profile";
 import { NotificationProvider } from "@/providers/notification-provider";
 import { PreviewDrawerProvider } from "@/providers/preview-drawer-provider";
 import { CommandPalette } from "@/components/dashboard/command-palette";
+import { AlfrhelpIdentite } from "@/components/dashboard/alfrhelp-identite";
 import type { UserRole } from "@/types/auth";
 
 export const dynamic = "force-dynamic";
@@ -81,6 +82,7 @@ export default async function DashboardLayout({
           <CommandPalette />
         </SidebarProvider>
       </PreviewDrawerProvider>
+      <AlfrhelpIdentite />
       <Toaster position="top-center" richColors closeButton />
     </NotificationProvider>
   );
