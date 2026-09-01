@@ -4,8 +4,8 @@ import { LOGO_BASE64 } from "./logo";
 import { styles as s, W_FVE, C, fmt } from "./shared-styles";
 import {
   TEXTE_CGV_VENTE, SOCIETE,
-  type ClientInfo, type DossierInfo, type FactureVenteLigne,
-} from "./blocks";
+  type ClientInfo, type DossierInfo, type FactureVenteLigne, } from "./blocks";
+import { MENTION_TVA_MARGE } from "@/lib/calculations/taxes";
 
 export interface FactureVenteData {
   numero: string;
@@ -15,6 +15,8 @@ export interface FactureVenteData {
   totalHT: number;
   tva: number;
   totalTTC: number;
+  /** Regime de la marge : ni HT ni TVA ne sont ventiles sur la facture. */
+  regimeMarge?: boolean;
   modeReglement: string;
 }
 
@@ -68,12 +70,27 @@ function Doc({ data }: { data: FactureVenteData }) {
           h(Text, { style: [s.tdBold, { width: W_FVE.totalHT, textAlign: "right" }] }, fmt(r.totalHT))))),
 
     // Totals (right-aligned)
+    // Sous le regime de la marge, la TVA n'apparait pas : elle n'est pas
+    // recuperable par l'acquereur, et la ventiler reviendrait a lui indiquer le
+    // prix d'achat du bien.
     h(View, { style: { alignItems: "flex-end", marginTop: 10 } },
       h(View, { style: { width: 200 } },
-        h(View, { style: s.totRow }, h(Text, { style: s.totLabel }, "TOTAL HT"), h(Text, { style: s.totValue }, fmt(totalHT))),
-        h(View, { style: s.totRow }, h(Text, { style: s.totLabel }, "TVA"), h(Text, { style: s.totValue }, fmt(tva))),
+        data.regimeMarge
+          ? null
+          : h(View, { style: s.totRow }, h(Text, { style: s.totLabel }, "TOTAL HT"), h(Text, { style: s.totValue }, fmt(totalHT))),
+        data.regimeMarge
+          ? null
+          : h(View, { style: s.totRow }, h(Text, { style: s.totLabel }, "TVA"), h(Text, { style: s.totValue }, fmt(tva))),
         h(View, { style: s.totGoldLine }),
-        h(View, { style: s.netRow }, h(Text, { style: s.netLabel }, "TOTAL TTC"), h(Text, { style: s.netValue }, fmt(totalTTC))))),
+        h(View, { style: s.netRow },
+          h(Text, { style: s.netLabel }, data.regimeMarge ? "TOTAL À PAYER" : "TOTAL TTC"),
+          h(Text, { style: s.netValue }, fmt(totalTTC))))),
+
+    // Mention obligatoire du regime particulier
+    data.regimeMarge
+      ? h(View, { style: { marginTop: 10 } },
+          h(Text, { style: s.fveCgvText }, MENTION_TVA_MARGE))
+      : null,
 
     // CGV
     h(View, { style: { marginTop: 30 } },

@@ -2,7 +2,7 @@
 
 import { FieldError } from "@/components/ui/field";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   FloppyDisk,
@@ -29,6 +29,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Card,
@@ -36,7 +38,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { METAL_OPTIONS, estMetalPrixFixe } from "@/lib/validations/lot";
+import { METAL_OPTIONS, METAL_GROUPES, estMetalPrixFixe } from "@/lib/validations/lot";
 import { TitrageInput } from "@/components/ui/titrage-input";
 import {
   calculerPrixBijou,
@@ -295,13 +297,20 @@ export function ReferenceFormBijoux({
               <Label required>Métal</Label>
               <Select value={metal} onValueChange={(v) => { if (v) setMetal(v as "Or" | "Argent" | "Platine"); }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner" />
+                  <SelectValue placeholder="Sélectionner" items={selectItems(METAL_OPTIONS)} />
                 </SelectTrigger>
                 <SelectContent>
-                  {METAL_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
+                  {/* Trois familles separees : metaux au cours, plaques, non
+                      precieux. Elles ne se valorisent pas de la meme facon. */}
+                  {METAL_GROUPES.map((groupe, i) => (
+                    <Fragment key={i}>
+                      {i > 0 && <SelectSeparator />}
+                      {groupe.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </Fragment>
                   ))}
                 </SelectContent>
               </Select>

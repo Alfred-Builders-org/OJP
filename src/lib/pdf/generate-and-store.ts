@@ -46,6 +46,11 @@ export interface GenerateDocumentParams {
   numeroLot?: string;
   /** Taux de commission du depot-vente, tel que parametre au moment du contrat. */
   commissionPct?: number;
+  /**
+   * Vente d'un bien d'occasion sous le regime de la marge (art. 297 A du CGI) :
+   * la facture ne ventile ni HT ni TVA, elle porte la mention et le total.
+   */
+  regimeMarge?: boolean;
   // Quittance depot-vente specific
   quittanceDepotVenteLignes?: QuittanceDepotVenteLigne[];
   totalVentes?: number;
@@ -153,6 +158,7 @@ export async function generateAndStoreDocument(params: GenerateDocumentParams, d
       lignes: params.factureVenteLignes!,
       totalHT: params.totalHT!, tva: params.tva!, totalTTC: params.totalTTC!,
       modeReglement: params.modeReglement!,
+      regimeMarge: params.regimeMarge,
     });
   } else if (type === "facture_acompte") {
     blob = await generateFactureAcompte({

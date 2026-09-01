@@ -37,10 +37,30 @@ export const METAL_COURS_OPTIONS = [
  * sens — c'est une couche de metal precieux sur un support qui n'en est pas —
  * et le prix ne depend donc que du poids.
  */
-export const METAL_PRIX_FIXE_OPTIONS = [
+export const METAL_PLAQUE_OPTIONS = [
   { value: "Plaque or", label: "Plaqué or" },
   { value: "Plaque argent", label: "Plaqué argent" },
+] as const;
+
+/** Ce qui n'est fait d'aucun metal precieux : fantaisie, acier, cuir. */
+export const METAL_AUTRE_OPTIONS = [
   { value: "Autre", label: "Autre (non précieux)" },
+] as const;
+
+export const METAL_PRIX_FIXE_OPTIONS = [
+  ...METAL_PLAQUE_OPTIONS,
+  ...METAL_AUTRE_OPTIONS,
+] as const;
+
+/**
+ * Les trois familles, dans l'ordre d'affichage. Le selecteur les separe : un
+ * metal au cours, un plaque et une matiere non precieuse ne se valorisent pas de
+ * la meme facon, et les confondre dans une liste plate invite a l'erreur.
+ */
+export const METAL_GROUPES = [
+  METAL_COURS_OPTIONS,
+  METAL_PLAQUE_OPTIONS,
+  METAL_AUTRE_OPTIONS,
 ] as const;
 
 /** Matieres dont le titrage n'a pas a etre saisi. */

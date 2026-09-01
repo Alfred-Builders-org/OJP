@@ -736,9 +736,13 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
 
   // Phase 2: Facture de vente (bijoux)
   if (bijouxLignes.length > 0) {
-    const totalHT = bijouxLignes.reduce((s: number, l: VenteLigne) => s + l.prix_total, 0);
+    // Le prix affiche au client est TTC : la TVA sur marge y est deja incluse.
+    // Le calcul precedent l'ajoutait par-dessus — un bijou en vitrine a 1 000 EUR
+    // se facturait 1 050 EUR. Sous le regime de la marge, la facture ne ventile
+    // d'ailleurs ni HT ni TVA : elle porte le total et la mention 297 A.
+    const totalTTC = bijouxLignes.reduce((s: number, l: VenteLigne) => s + l.prix_total, 0);
     const tva = bijouxLignes.reduce((s: number, l: VenteLigne) => s + l.montant_taxe, 0);
-    const totalTTC = totalHT + tva;
+    const totalHT = Math.round((totalTTC - tva) * 100) / 100;
 
     const res = await genDoc({
       type: "facture_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id,
@@ -746,6 +750,8 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
       totaux: { totalBrut: totalHT, taxe: tva, netAPayer: totalTTC },
       factureVenteLignes: buildFactureLignes(bijouxLignes),
       totalHT, tva, totalTTC, modeReglement: "—",
+      // Bien d'occasion acquis aupres d'un particulier : regime de la marge.
+      regimeMarge: true,
     }, "facture_vente");
     if (res.error) docErrors.push(res.error);
     else if (res.path) {

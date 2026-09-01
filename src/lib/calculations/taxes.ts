@@ -95,15 +95,24 @@ export function calculerTFOP(prixCession: number): number {
   return Math.round(prix * 0.065 * 100) / 100;
 }
 
+/** Mention obligatoire sur une facture soumise au regime des biens d'occasion. */
+export const MENTION_TVA_MARGE =
+  "Regime particulier des biens d'occasion - article 297 A du CGI. TVA non recuperable par l'acquereur.";
+
 /**
- * Calcul de la TVA sur la marge (régime des biens d'occasion, art. 297 A CGI).
- * Taux de 20% appliqué sur la marge (prix de vente - prix d'achat).
- * Si la marge est négative ou nulle, pas de TVA.
+ * TVA sur la marge (regime des biens d'occasion, art. 297 A du CGI).
+ *
+ * La marge est TTC : le prix de vente affiche au client contient deja la taxe.
+ * On l'en extrait donc avec 20/120, et non en ajoutant 20 % par-dessus — ce que
+ * faisait le calcul precedent, qui surevaluait la TVA d'un cinquieme. Sur une
+ * vente a 1 000 EUR pour un achat a 700 EUR : 300 x 20/120 = 50 EUR, et non 60.
+ *
+ * Marge nulle ou negative : pas de TVA.
  */
 export function calculerTVAMarge(prixVente: number, prixAchat: number): number {
   const marge = safeNum(prixVente) - safeNum(prixAchat);
   if (marge <= 0) return 0;
-  return Math.round(marge * 0.2 * 100) / 100;
+  return Math.round((marge * 20 / 120) * 100) / 100;
 }
 
 /**

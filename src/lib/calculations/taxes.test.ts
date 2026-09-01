@@ -74,9 +74,13 @@ describe("calculerTFOP", () => {
 // calculerTVAMarge
 // ============================================================
 describe("calculerTVAMarge", () => {
-  it("calcule 20% sur la marge positive", () => {
-    // marge = 9000 - 7000 = 2000, TVA = 400
-    expect(calculerTVAMarge(9000, 7000)).toBe(400);
+  it("extrait la TVA d'une marge TTC avec 20/120", () => {
+    // marge = 2000 TTC -> 2000 x 20/120 = 333,33
+    expect(calculerTVAMarge(9000, 7000)).toBe(333.33);
+  });
+
+  it("suit l'exemple de reference : vente 1000, achat 700 -> 50", () => {
+    expect(calculerTVAMarge(1000, 700)).toBe(50);
   });
 
   it("retourne 0 si pas de marge", () => {
@@ -85,8 +89,8 @@ describe("calculerTVAMarge", () => {
   });
 
   it("arrondit à 2 décimales", () => {
-    // marge = 100.50, TVA = 20.10
-    expect(calculerTVAMarge(7100.50, 7000)).toBe(20.1);
+    // marge = 100,50 TTC -> 100,50 x 20/120 = 16,75
+    expect(calculerTVAMarge(7100.50, 7000)).toBe(16.75);
   });
 
   it("retourne 0 quand prixVente est NaN, Infinity ou négatif", () => {
@@ -96,9 +100,9 @@ describe("calculerTVAMarge", () => {
   });
 
   it("traite prixAchat NaN/négatif comme 0 (marge = prixVente entier)", () => {
-    // safeNum(NaN) = 0, donc marge = 9000 - 0 = 9000, TVA = 1800
-    expect(calculerTVAMarge(9000, NaN)).toBe(1800);
-    expect(calculerTVAMarge(9000, -1000)).toBe(1800);
+    // safeNum(NaN) = 0, donc marge = 9000 TTC -> 9000 x 20/120 = 1500
+    expect(calculerTVAMarge(9000, NaN)).toBe(1500);
+    expect(calculerTVAMarge(9000, -1000)).toBe(1500);
   });
 });
 
