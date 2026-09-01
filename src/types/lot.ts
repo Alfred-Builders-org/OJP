@@ -62,6 +62,12 @@ export interface Lot {
   mode_reglement: "especes" | "carte" | "virement" | "cheque" | null;
   numero_facture: string | null;
   // Acompte fields (for or investissement sales)
+  /**
+   * Vente d'or d'investissement : le comptoir demande-t-il un acompte ?
+   * false = une facture unique, reglee en une fois, sans echeance de solde.
+   * Sans effet sur les autres types de lot.
+   */
+  avec_acompte: boolean;
   acompte_montant: number | null;
   acompte_paye: boolean;
   date_acompte: string | null;

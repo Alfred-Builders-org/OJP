@@ -26,18 +26,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { EmailTemplatesTab } from "@/components/parametres/email-templates-tab";
 import { SocieteTab } from "@/components/parametres/societe-tab";
 import { ReglesMetierTab } from "@/components/parametres/regles-metier-tab";
 import { DocumentsTab } from "@/components/parametres/documents-tab";
 import { NotificationsTab } from "@/components/parametres/notifications-tab";
 import type { Parametres } from "@/types/parametres";
-import type { EmailTemplate } from "@/types/email";
 import type { SettingsMap } from "@/types/settings";
 
 interface ParametresFormProps {
   parametres: Parametres;
-  emailTemplates: EmailTemplate[];
   settings: SettingsMap;
 }
 
@@ -46,7 +43,6 @@ type Section =
   | "prix"
   | "regles"
   | "documents"
-  | "emails"
   | "notifications";
 
 const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
@@ -54,7 +50,6 @@ const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "prix", label: "Prix & Coefficients", icon: <CurrencyEur size={16} weight="duotone" /> },
   { key: "regles", label: "Règles métier", icon: <Gavel size={16} weight="duotone" /> },
   { key: "documents", label: "Documents & PDF", icon: <FileText size={16} weight="duotone" /> },
-  { key: "emails", label: "Emails", icon: <EnvelopeSimple size={16} weight="duotone" /> },
   { key: "notifications", label: "Notifications", icon: <Bell size={16} weight="duotone" /> },
 ];
 
@@ -75,10 +70,6 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
     title: "Documents & PDF",
     description: "Préfixes de numérotation, textes légaux et style des documents générés.",
   },
-  emails: {
-    title: "Emails",
-    description: "Templates des emails envoyés aux clients et à l'équipe.",
-  },
   notifications: {
     title: "Notifications",
     description: "Types de notifications actives, automatismes et destinataires internes.",
@@ -87,7 +78,7 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
 
 const SECTION_KEYS = NAV_ITEMS.map((item) => item.key) as readonly Section[];
 
-export function ParametresForm({ parametres, emailTemplates, settings }: ParametresFormProps) {
+export function ParametresForm({ parametres, settings }: ParametresFormProps) {
   const [activeSection, setActiveSection] = useUrlTab<Section>(
     "section",
     "societe",
@@ -276,7 +267,6 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
   }
 
   const sectionMeta = SECTION_META[activeSection];
-  const showGlobalSave = activeSection !== "emails";
 
   return (
     <div style={{ height: "100%" }} className="flex overflow-hidden">
@@ -303,10 +293,7 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
       </nav>
 
       {/* Contenu */}
-      <div className={cn("min-w-0 flex-1 flex flex-col", activeSection === "emails" ? "overflow-hidden" : "overflow-y-auto px-6 py-6")}>
-        {activeSection === "emails" ? (
-          <EmailTemplatesTab templates={emailTemplates} />
-        ) : (
+      <div className="min-w-0 flex-1 flex flex-col overflow-y-auto px-6 py-6">
         <div className="pb-8">
           {/* En-tête de section avec bouton de sauvegarde global */}
           <div className="mx-auto max-w-3xl mb-6 flex items-start justify-between gap-4">
@@ -314,16 +301,14 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
               <h2 className="text-lg font-semibold">{sectionMeta.title}</h2>
               <p className="text-sm text-muted-foreground mt-1">{sectionMeta.description}</p>
             </div>
-            {showGlobalSave && (
-              <Button
-                onClick={handleGlobalSave}
-                disabled={globalSaving || savingPrix || savingCoeff}
-                className="shrink-0"
-              >
-                <FloppyDisk size={16} weight="duotone" />
-                {globalSaving || savingPrix || savingCoeff ? "Enregistrement..." : "Enregistrer"}
-              </Button>
-            )}
+            <Button
+              onClick={handleGlobalSave}
+              disabled={globalSaving || savingPrix || savingCoeff}
+              className="shrink-0"
+            >
+              <FloppyDisk size={16} weight="duotone" />
+              {globalSaving || savingPrix || savingCoeff ? "Enregistrement..." : "Enregistrer"}
+            </Button>
           </div>
 
           {/* Société */}
@@ -655,7 +640,6 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
           )}
 
         </div>
-        )}
       </div>
     </div>
   );

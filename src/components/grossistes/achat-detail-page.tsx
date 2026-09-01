@@ -102,6 +102,11 @@ export function AchatDetailPage({
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Montant acheté</p>
                 <p className="font-medium">{formatCurrency(achat.montant_total)}</p>
+                {achat.montant_tva > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    dont {formatCurrency(achat.montant_tva)} de TVA déductible
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground">Valeur de revente</p>

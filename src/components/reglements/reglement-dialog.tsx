@@ -195,8 +195,15 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
         .neq("status", "regle");
     }
 
-    // Auto-finaliser les refs après paiement rachat (or invest + bijoux)
-    if (isFullyPaid && paymentDue.type === "rachat" && paymentDue.pre_fill.document_id) {
+    // Auto-finaliser les refs après paiement rachat (or invest + bijoux).
+    // Seul un versement au client entre ici : un mouvement entrant est un
+    // remboursement de rétractation, qui ne met rien en stock ni ne finalise.
+    if (
+      isFullyPaid &&
+      paymentDue.type === "rachat" &&
+      paymentDue.sens === "sortant" &&
+      paymentDue.pre_fill.document_id
+    ) {
       // Récupérer les refs liées à la quittance
       const { data: docRefs } = await supabase
         .from("document_references")

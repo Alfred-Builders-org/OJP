@@ -117,11 +117,23 @@ export function DossierRecapFinancier({
       // Determine the expected amount for this document
       let expectedAmount = 0;
       if (doc.type === "facture_vente") {
-        const lignes = venteLignes.filter((l) => l.lot_id === lot.id && !l.or_investissement_id);
-        expectedAmount = lignes.reduce((s, l) => s + l.prix_total + l.montant_taxe, 0);
+        // Le prix d'un bijou est TTC : la TVA y est comprise, marge ou pas.
+        // Seule la TFOP des lignes anciennes s'ajoutait au prix.
+        //
+        // Sans acompte, l'or d'investissement figure sur cette meme facture :
+        // l'ecarter du calcul l'annoncerait pour une fraction de son montant.
+        const lignes = venteLignes.filter(
+          (l) =>
+            l.lot_id === lot.id &&
+            (lot.avec_acompte === false || !l.or_investissement_id)
+        );
+        expectedAmount = lignes.reduce(
+          (s, l) => s + l.prix_total + (l.type_taxe === "tfop" ? l.montant_taxe : 0),
+          0
+        );
         if (lignes.length === 0) {
           // Could be a full vente lot without or invest
-          expectedAmount = lot.total_prix_revente + lot.montant_taxe;
+          expectedAmount = lot.total_prix_revente;
         }
       } else if (doc.type === "facture_acompte") {
         expectedAmount = lot.acompte_montant ?? 0;

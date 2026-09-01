@@ -1,38 +1,28 @@
-export type EmailNotificationType =
-  | "devis_envoye"
-  | "contrat_rachat_finalise"
-  | "contrat_depot_vente"
-  | "facture_acompte"
-  | "facture_vente"
-  | "quittance_depot_vente"
-  | "interne_devis_accepte"
-  | "interne_retractation"
-  | "interne_lot_finalisable"
-  | "interne_acompte_expire";
+/**
+ * Les courriels que l'application ecrit d'elle-meme.
+ *
+ * Ils ne sont plus modifiables depuis l'application : leur texte vit dans
+ * `src/lib/email/gabarits.ts`, sous revue comme le reste du code. Un courriel
+ * qui part au nom de la boutique engage la boutique — il se relit en diff, pas
+ * dans un formulaire.
+ *
+ * `email_logs` reste : c'est la qu'on regarde quand quelqu'un dit n'avoir rien
+ * reçu, et c'est aussi ce qui empeche un rappel de partir deux fois.
+ */
+export type CourrielType =
+  | "dossier_cloture"
+  | "devis_expire_bientot"
+  | "commande_prete"
+  | "rappel_solde";
 
-export type EmailCategory = "client" | "interne";
+/** Les courriels d'authentification, journalises au meme endroit. */
+export type CourrielAuthType = "auth_invite" | "auth_recovery";
 
-export interface EmailTemplateVariable {
-  key: string;
-  description: string;
-}
-
-export interface EmailTemplate {
-  id: string;
-  notification_type: EmailNotificationType;
-  label: string;
-  subject: string;
-  body: string;
-  is_active: boolean;
-  category: EmailCategory;
-  available_variables: EmailTemplateVariable[];
-  created_at: string;
-  updated_at: string;
-}
+export type NotificationType = CourrielType | CourrielAuthType;
 
 export interface EmailLog {
   id: string;
-  notification_type: EmailNotificationType;
+  notification_type: NotificationType;
   recipient_email: string;
   subject: string;
   resend_id: string | null;
@@ -42,14 +32,4 @@ export interface EmailLog {
   dossier_id: string | null;
   client_id: string | null;
   created_at: string;
-}
-
-export interface SendEmailRequest {
-  notification_type: EmailNotificationType;
-  lot_id?: string;
-  dossier_id?: string;
-  client_id?: string;
-  attachment_paths?: string[];
-  extra_variables?: Record<string, string>;
-  test?: boolean;
 }

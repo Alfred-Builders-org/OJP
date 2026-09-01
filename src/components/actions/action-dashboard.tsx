@@ -356,7 +356,7 @@ function ActionRow({ row, onRestituer, onPayment, onLivraison }: {
             <ActionLabel label={row.label} />
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <ActionButton action={{ ...row.primary.action, label: "Accepter", variant: "outline", icon: "CheckCircle" }} ctx={row.primary.ctx} />
+            <ActionButton action={{ ...row.primary.action, label: "Accepter", variant: "secondary", icon: "CheckCircle" }} ctx={row.primary.ctx} />
             <ActionButton action={{ ...row.secondary.action, label: "Refuser", variant: "destructive", icon: "XCircle" }} ctx={row.secondary.ctx} />
           </div>
         </div>
@@ -380,7 +380,7 @@ function ActionRow({ row, onRestituer, onPayment, onLivraison }: {
             <ActionIcon type="depot_vente" />
             <ActionLabel label={row.label} />
           </div>
-          <Button size="sm" variant="outline" onClick={() => onRestituer(row.lot)}><ArrowUUpLeft size={14} weight="duotone" />Restituer un article</Button>
+          <Button size="sm" variant="secondary" onClick={() => onRestituer(row.lot)}><ArrowUUpLeft size={14} weight="duotone" />Restituer un article</Button>
         </div>
       );
 
@@ -391,7 +391,7 @@ function ActionRow({ row, onRestituer, onPayment, onLivraison }: {
             <ActionIcon type="signer_contrat" />
             <ActionLabel label={row.label} />
           </div>
-          <ActionButton action={{ ...row.flat.action, label: "Marquer comme signé", variant: "outline", icon: "PenNib" }} ctx={row.flat.ctx} />
+          <ActionButton action={{ ...row.flat.action, label: "Marquer comme signé", variant: "secondary", icon: "PenNib" }} ctx={row.flat.ctx} />
         </div>
       );
 
@@ -407,7 +407,7 @@ function ActionRow({ row, onRestituer, onPayment, onLivraison }: {
           </div>
           <Button
             size="sm"
-            variant="outline"
+            variant="secondary"
             onClick={() => {
               if (row.flat.action.paymentDue) {
                 onPayment(row.flat.action.paymentDue, row.flat.lot.id);
@@ -427,7 +427,7 @@ function ActionRow({ row, onRestituer, onPayment, onLivraison }: {
             <ActionIcon type="vente" />
             <ActionLabel label={row.label} />
           </div>
-          <Button size="sm" variant="outline" onClick={() => onLivraison(row.lotId)}>
+          <Button size="sm" variant="secondary" onClick={() => onLivraison(row.lotId)}>
             <Handshake size={14} weight="duotone" />
             Livrer au client
           </Button>
@@ -444,12 +444,12 @@ function ActionRow({ row, onRestituer, onPayment, onLivraison }: {
             <ActionLabel label={row.label} />
           </div>
           {row.lotHref ? (
-            <Button size="sm" variant="outline" onClick={() => router.push(row.lotHref!)}>
+            <Button size="sm" variant="secondary" onClick={() => router.push(row.lotHref!)}>
               {isCommander ? <ShoppingCart size={14} weight="duotone" /> : <Package size={14} weight="duotone" />}
               {btnLabel}
             </Button>
           ) : (
-            <ActionButton action={{ ...row.flat.action, label: btnLabel, variant: "outline" }} ctx={row.flat.ctx} />
+            <ActionButton action={{ ...row.flat.action, label: btnLabel, variant: "secondary" }} ctx={row.flat.ctx} />
           )}
         </div>
       );

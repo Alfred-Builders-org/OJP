@@ -109,9 +109,10 @@ export function FonderieDetailPage({
 
   // Financial summary
   const financialSummary = useMemo(() => {
+    // Ce qu'on doit a cette fonderie : ses devis, pas nos prix de vente.
     const totalBDC = bonsCommande
       .filter((b) => b.statut !== "annule")
-      .reduce((sum, b) => sum + b.montant_total, 0);
+      .reduce((sum, b) => sum + b.montant_fonderie, 0);
     const totalBDL = bonsLivraison
       .filter((b) => b.statut !== "annule")
       .reduce((sum, b) => sum + b.valeur_estimee, 0);
@@ -301,7 +302,9 @@ export function FonderieDetailPage({
                               {statusConfig.label}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-right font-medium">{formatCurrency(bdc.montant_total)}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {bdc.montant_fonderie > 0 ? formatCurrency(bdc.montant_fonderie) : "—"}
+                          </TableCell>
                           <TableCell className="text-muted-foreground">{formatDate(bdc.created_at)}</TableCell>
                         </TableRow>
                       );

@@ -20,7 +20,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { generateDocument } from "@/lib/pdf/pdf-actions";
-import { triggerEmail } from "@/lib/email/trigger";
 import { formatDate, formatTime } from "@/lib/format";
 import type { ClientInfo, QuittanceDepotVenteLigne } from "@/lib/pdf/blocks";
 import type { LotWithVenteLignes } from "@/types/lot";

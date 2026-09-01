@@ -91,10 +91,7 @@ export async function createBonsCommande(params: {
           metal: l.metal ?? "Or",
           poids: l.poids ?? 0,
           quantite: l.quantite,
-          prixUnitaire: l.prix_unitaire,
-          total: l.prix_total,
         })),
-        bonCommandeTotalHT: lignes.reduce((sum, l) => sum + l.prix_total, 0),
       });
     }
   }

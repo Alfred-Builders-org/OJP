@@ -51,6 +51,11 @@ export interface GenerateDocumentParams {
    * la facture ne ventile ni HT ni TVA, elle porte la mention et le total.
    */
   regimeMarge?: boolean;
+  /**
+   * Au moins une ligne en releve, sans que toutes le fassent : la facture
+   * ventile la TVA des autres, et renvoie ces lignes-ci vers la mention.
+   */
+  mentionMarge?: boolean;
   // Quittance depot-vente specific
   quittanceDepotVenteLignes?: QuittanceDepotVenteLigne[];
   totalVentes?: number;
@@ -75,7 +80,6 @@ export interface GenerateDocumentParams {
   // Bon de commande specific
   fonderie?: FonderieInfo;
   bonCommandeLignes?: BonCommandeLigne[];
-  bonCommandeTotalHT?: number;
   // Link to related document
   referenceNumero?: string;
   // IDs of lot_references included in this document (for document_references junction)
@@ -159,6 +163,7 @@ export async function generateAndStoreDocument(params: GenerateDocumentParams, d
       totalHT: params.totalHT!, tva: params.tva!, totalTTC: params.totalTTC!,
       modeReglement: params.modeReglement!,
       regimeMarge: params.regimeMarge,
+      mentionMarge: params.mentionMarge,
     });
   } else if (type === "facture_acompte") {
     blob = await generateFactureAcompte({
@@ -190,7 +195,6 @@ export async function generateAndStoreDocument(params: GenerateDocumentParams, d
       numero, dossier,
       fonderie: params.fonderie!,
       lignes: params.bonCommandeLignes!,
-      totalHT: params.bonCommandeTotalHT!,
     });
   } else {
     blob = await generateDevisRachat(data);

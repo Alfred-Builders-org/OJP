@@ -29,8 +29,10 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
-  calculerTVAMarge,
+  MENTION_TVA_MARGE,
+  calculerTaxeVente,
 } from "@/lib/calculations/taxes";
 import { formatCurrency } from "@/lib/format";
 import type { BijouxStock, Reparation } from "@/types/bijoux";
@@ -59,6 +61,11 @@ export function StockPickerForm({
   const [catalogSearch, setCatalogSearch] = useState("");
   const isEdit = !!editData;
   const [selectedId, setSelectedId] = useState(editData?.bijoux_stock_id ?? "");
+  // Renoncer au regime de la marge : la TVA porte alors sur le prix entier.
+  // Cela n'a d'interet que si le client est un professionnel qui la recupere.
+  const [optionPrixTotal, setOptionPrixTotal] = useState(
+    editData?.option_tva_prix_total ?? false
+  );
 
   useEffect(() => {
     async function fetchStock() {
@@ -130,23 +137,36 @@ export function StockPickerForm({
   const isDepotVente = !!selectedItem?.depot_vente_lot_id;
   const prixBase = selectedItem?.prix_revente ?? 0;
   const prixAchatOrigine = selectedItem?.prix_achat ?? 0;
+  // Les frais de remise en etat gonflent le prix demande au client, jamais le
+  // prix d'achat : ils n'entrent pas dans le calcul de la marge. Leur propre TVA
+  // se recupere a part, sur la facture du reparateur.
   const prixVente = Math.round((prixBase + coutReparation) * 100) / 100;
 
-  // La vente au client est le meme evenement fiscal, que le bijou vienne d'un
-  // rachat ou d'un depot-vente : la boutique revend un bien d'occasion acquis
-  // aupres d'un particulier, donc TVA sur la marge (art. 297 A du CGI).
+  // Le regime ne depend pas du bijou, mais de qui l'a vendu a la boutique.
   //
-  // Le depot-vente portait auparavant la taxe forfaitaire sur cette facture.
-  // C'etait deux erreurs a la fois : la taxe forfaitaire est due par le vendeur
-  // particulier, elle se retient sur la quittance qui lui est reglee, pas sur la
-  // facture du client final ; et elle s'appliquait au prix de vente entier au
-  // lieu de la marge.
+  // Rachete a un particulier — ou depose par lui : la boutique revend un bien
+  // d'occasion, donc TVA sur la seule marge (art. 297 A du CGI). Le prix d'achat
+  // de reference est celui de la quittance ; pour un depot-vente, le net verse
+  // au deposant. Le depot-vente portait auparavant la taxe forfaitaire sur cette
+  // facture : c'etait deux erreurs a la fois, elle est due par le vendeur
+  // particulier et se retient sur sa quittance, et elle portait sur le prix
+  // entier au lieu de la marge.
   //
-  // Le prix d'achat de reference est celui de la quittance : pour un article en
-  // depot-vente, c'est le net verse au deposant.
-  const montantTaxe = calculerTVAMarge(prixVente, prixAchatOrigine);
+  // Achete a un grossiste assujetti qui a facture sa TVA : le bien n'a jamais
+  // releve de la marge, sa revente est taxee sur le prix total.
+  const regimeArticle = selectedItem?.regime_tva_revente ?? "marge";
+  const taxe = calculerTaxeVente({
+    prixVenteTTC: prixVente,
+    prixAchat: prixAchatOrigine,
+    regimeArticle,
+    optionPrixTotal,
+  });
+  const montantTaxe = taxe.montantTVA;
   const taxeApplicable = montantTaxe > 0;
-  const taxeLabel = "TVA sur marge (art. 297 A du CGI)";
+  const taxeLabel =
+    taxe.regime === "marge"
+      ? "TVA sur marge (art. 297 A du CGI)"
+      : "TVA sur le prix total (20 %)";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -173,7 +193,12 @@ export function StockPickerForm({
       prix_total: prixVente,
       taxe_applicable: taxeApplicable,
       montant_taxe: montantTaxe,
-      type_taxe: taxeApplicable ? "tva_marge" : null,
+      type_taxe: taxe.typeTaxe,
+      taux_tva: taxe.taux,
+      // Fige le prix d'achat : le registre de marge s'y adosse, et une
+      // correction ulterieure de la fiche stock ne doit pas le deplacer.
+      prix_achat_origine: prixAchatOrigine,
+      option_tva_prix_total: optionPrixTotal,
       cout_reparation: coutReparation,
     };
 
@@ -344,15 +369,47 @@ export function StockPickerForm({
                     <p className="text-lg font-bold">
                       {formatCurrency(montantTaxe)}
                     </p>
-                    {prixAchatOrigine > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Marge : {formatCurrency(prixVente - prixAchatOrigine)}
-                        {isDepotVente ? " (sur le net déposant)" : ""}
-                      </p>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {taxe.regime === "marge"
+                        ? `Marge : ${formatCurrency(taxe.base)}${isDepotVente ? " (sur le net déposant)" : ""}`
+                        : "Comprise dans le prix affiché, et récupérable par le client"}
+                    </p>
                   </div>
                 )}
               </div>
+
+              {/* Le prix demande au client ne bouge pas : c'est celui de
+                  l'etiquette. Le regime ne change que ce que la boutique
+                  reverse, et ce que la facture montre. */}
+              {regimeArticle === "marge" ? (
+                <div className="space-y-2">
+                  <label className="flex items-start gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      className="mt-0.5"
+                      checked={optionPrixTotal}
+                      onCheckedChange={(v) => setOptionPrixTotal(!!v)}
+                    />
+                    <span>
+                      Facturer la TVA sur le prix total
+                      <span className="block text-xs text-muted-foreground">
+                        Renonce au régime de la marge pour cette vente. À ne
+                        cocher que si le client est un professionnel qui veut
+                        récupérer la TVA — la boutique y perd.
+                      </span>
+                    </span>
+                  </label>
+                  {!optionPrixTotal && (
+                    <p className="text-xs text-muted-foreground">
+                      {MENTION_TVA_MARGE}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Article acheté avec TVA à un professionnel : sa revente est
+                  taxée sur le prix total, et la TVA figure sur la facture.
+                </p>
+              )}
             </div>
           )}
 

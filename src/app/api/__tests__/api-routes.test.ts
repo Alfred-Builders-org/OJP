@@ -52,6 +52,14 @@ vi.mock("@/lib/email/envoyer-invitation", () => ({
   envoyerInvitation: mockEnvoyerInvitation,
 }));
 
+const { mockExecuterBalayage } = vi.hoisted(() => ({
+  mockExecuterBalayage: vi.fn(),
+}));
+
+vi.mock("@/lib/email/rappels", () => ({
+  executerBalayage: mockExecuterBalayage,
+}));
+
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn().mockReturnValue({
     auth: {
@@ -275,52 +283,89 @@ describe("POST /api/users/invite", () => {
 });
 
 // ============================================================
-// /api/email/send
+// /api/cron/emails
+//
+// Le balayage n'est appele par aucun utilisateur : c'est pg_cron qui frappe a
+// la porte. Seul un secret partage l'ouvre, et ces cas verifient qu'elle reste
+// fermee dans tous les autres.
 // ============================================================
-describe("POST /api/email/send", () => {
-  it("retourne 401 si non authentifié", async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: null } });
-    const { POST } = await import("@/app/api/email/send/route");
-    const req = makeNextRequest("POST", "http://localhost/api/email/send", {
-      notification_type: "devis_envoye",
+describe("POST /api/cron/emails", () => {
+  const SECRET = "secret-de-balayage";
+
+  beforeEach(() => {
+    process.env.CRON_SECRET = SECRET;
+    mockExecuterBalayage.mockResolvedValue({
+      devis: 0,
+      commandes: 0,
+      soldes: 0,
+      clotures: 0,
+      echecs: 0,
     });
-    const res = await POST(req);
+  });
+
+  it("refuse tout quand aucun secret n'est configuré", async () => {
+    delete process.env.CRON_SECRET;
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const res = await POST(makeNextRequest("POST", "http://localhost/api/cron/emails"));
+
+    expect(res.status).toBe(503);
+    expect(mockExecuterBalayage).not.toHaveBeenCalled();
+  });
+
+  it("retourne 401 sans en-tête d'autorisation", async () => {
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const res = await POST(makeNextRequest("POST", "http://localhost/api/cron/emails"));
+
     expect(res.status).toBe(401);
+    expect(mockExecuterBalayage).not.toHaveBeenCalled();
   });
 
-  it("retourne 403 si pas propriétaire", async () => {
-    mockEqChain.mockReturnValueOnce({
-      single: vi.fn().mockResolvedValue({ data: { role: "vendeur" }, error: null }),
-      limit: mockLimit,
-    });
-    const { POST } = await import("@/app/api/email/send/route");
-    const req = makeNextRequest("POST", "http://localhost/api/email/send", {
-      notification_type: "devis_envoye",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(403);
-  });
-
-  it("retourne 400 si notification_type invalide", async () => {
-    const { POST } = await import("@/app/api/email/send/route");
-    const req = makeNextRequest("POST", "http://localhost/api/email/send", {
-      notification_type: "type_inexistant",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toContain("Invalid notification_type");
-  });
-
-  it("retourne 400 si JSON invalide", async () => {
-    const { POST } = await import("@/app/api/email/send/route");
-    const req = new NextRequest(new URL("http://localhost/api/email/send"), {
+  it("retourne 401 sur un mauvais secret", async () => {
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const req = new NextRequest(new URL("http://localhost/api/cron/emails"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "not json{{{",
+      headers: { authorization: "Bearer mauvais-secret" },
     });
     const res = await POST(req);
-    expect(res.status).toBe(400);
+
+    expect(res.status).toBe(401);
+    expect(mockExecuterBalayage).not.toHaveBeenCalled();
+  });
+
+  it("balaye sur présentation du bon secret", async () => {
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const req = new NextRequest(new URL("http://localhost/api/cron/emails"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}` },
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(mockExecuterBalayage).toHaveBeenCalledOnce();
+  });
+
+  it("accepte aussi le secret en en-tête dédié", async () => {
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const req = new NextRequest(new URL("http://localhost/api/cron/emails"), {
+      method: "POST",
+      headers: { "x-cron-secret": SECRET },
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+  });
+
+  it("rend 500 quand le balayage échoue, sans masquer le motif", async () => {
+    mockExecuterBalayage.mockRejectedValueOnce(new Error("base injoignable"));
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const req = new NextRequest(new URL("http://localhost/api/cron/emails"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}` },
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("base injoignable");
   });
 });
 

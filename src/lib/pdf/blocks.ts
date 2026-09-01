@@ -288,6 +288,12 @@ export interface FactureVenteLigne {
   quantite: number;
   prixUnitaireHT: number;
   totalHT: number;
+  /**
+   * Article vendu sous le regime des biens d'occasion. Son prix ne se ventile
+   * pas : le montant affiche est celui paye, taxe comprise. Sur une facture qui
+   * melange les deux regimes, ces lignes portent un renvoi vers la mention.
+   */
+  sousMarge?: boolean;
 }
 
 export const TEXTE_CONDITIONS_QUITTANCE_DV =
@@ -297,13 +303,12 @@ export const TEXTE_CGV_VENTE =
   "La TVA n'est pas applicable pour des achats ou vente d'or d'investissement.\n1) Exonération suivant l'article 298 sexdecies A du CGI. AUTOLIQUIDATION TVA\n2) Opération bénéficiant du régime de l'autoliquidation prévue à l'article 283-2 sexis du CGI.";
 
 // Bon de commande fonderie types
+// Sans prix : le bon dit ce qu'on commande, la fonderie repond par son devis.
 export interface BonCommandeLigne {
   designation: string;
   metal: string;
   poids: number;
   quantite: number;
-  prixUnitaire: number;
-  total: number;
 }
 
 export interface FonderieInfo {
@@ -316,7 +321,7 @@ export interface FonderieInfo {
 }
 
 export const TEXTE_CONDITIONS_BON_COMMANDE =
-  "Ce bon de commande est émis par L'Or au Juste Prix pour l'achat d'or d'investissement. Les prix sont basés sur les cours en vigueur au moment de l'établissement de la commande. Merci de confirmer la réception de cette commande par retour.";
+  "Ce bon de commande est émis par L'Or au Juste Prix pour l'achat d'or d'investissement. Merci de confirmer la réception de cette commande par retour, accompagnée de votre devis chiffré aux cours en vigueur.";
 
 // Bon de livraison fonderie types
 export interface BonLivraisonLigneData {

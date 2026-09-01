@@ -4,7 +4,6 @@ import { LOGO_BASE64 } from "./logo";
 import { styles as s } from "./shared-styles";
 import {
   SOCIETE,
-  formatCurrency,
   TEXTE_CONDITIONS_BON_COMMANDE,
   type BonCommandeLigne,
   type FonderieInfo,
@@ -16,11 +15,10 @@ export interface BonCommandeData {
   dossier: DossierInfo;
   fonderie: FonderieInfo;
   lignes: BonCommandeLigne[];
-  totalHT: number;
 }
 
 function Doc({ data }: { data: BonCommandeData }) {
-  const { dossier, fonderie, lignes, totalHT } = data;
+  const { dossier, fonderie, lignes } = data;
   const h = React.createElement;
 
   return h(Document, null, h(Page, { size: "A4", style: s.page },
@@ -54,24 +52,20 @@ function Doc({ data }: { data: BonCommandeData }) {
       ),
     ),
 
-    // Table
+    // Table — sans prix : c'est la fonderie qui chiffre, sur son devis
     h(View, { style: s.tableWrap },
       h(View, { style: s.tableHead },
-        h(Text, { style: [s.th, { flex: 3 }] }, "DÉSIGNATION"),
-        h(Text, { style: [s.th, { flex: 1, textAlign: "center" }] }, "MÉTAL"),
-        h(Text, { style: [s.th, { flex: 1, textAlign: "right" }] }, "POIDS"),
-        h(Text, { style: [s.th, { flex: 0.7, textAlign: "right" }] }, "QTÉ"),
-        h(Text, { style: [s.th, { flex: 1.3, textAlign: "right" }] }, "P.U. HT"),
-        h(Text, { style: [s.th, { flex: 1.3, textAlign: "right" }] }, "TOTAL HT"),
+        h(Text, { style: [s.th, { flex: 4 }] }, "DÉSIGNATION"),
+        h(Text, { style: [s.th, { flex: 1.5, textAlign: "center" }] }, "MÉTAL"),
+        h(Text, { style: [s.th, { flex: 1.5, textAlign: "right" }] }, "POIDS"),
+        h(Text, { style: [s.th, { flex: 1, textAlign: "right" }] }, "QTÉ"),
       ),
       ...lignes.map((l, i) =>
         h(View, { key: i, style: s.tableRow },
-          h(Text, { style: [s.tdBold, { flex: 3 }] }, l.designation),
-          h(Text, { style: [s.td, { flex: 1, textAlign: "center" }] }, l.metal),
-          h(Text, { style: [s.td, { flex: 1, textAlign: "right" }] }, `${l.poids}g`),
-          h(Text, { style: [s.td, { flex: 0.7, textAlign: "right" }] }, String(l.quantite)),
-          h(Text, { style: [s.td, { flex: 1.3, textAlign: "right" }] }, formatCurrency(l.prixUnitaire)),
-          h(Text, { style: [s.tdBold, { flex: 1.3, textAlign: "right" }] }, formatCurrency(l.total)),
+          h(Text, { style: [s.tdBold, { flex: 4 }] }, l.designation),
+          h(Text, { style: [s.td, { flex: 1.5, textAlign: "center" }] }, l.metal),
+          h(Text, { style: [s.td, { flex: 1.5, textAlign: "right" }] }, `${l.poids}g`),
+          h(Text, { style: [s.td, { flex: 1, textAlign: "right" }] }, String(l.quantite)),
         ),
       ),
     ),
@@ -81,13 +75,6 @@ function Doc({ data }: { data: BonCommandeData }) {
       h(View, { style: s.bottomLeft },
         h(Text, { style: s.sectionLabel }, "CONDITIONS"),
         h(Text, { style: s.condText }, TEXTE_CONDITIONS_BON_COMMANDE),
-      ),
-      h(View, { style: s.bottomRight },
-        h(View, { style: s.totGoldLine }),
-        h(View, { style: s.netRow },
-          h(Text, { style: s.netLabel }, "TOTAL HT"),
-          h(Text, { style: s.netValue }, formatCurrency(totalHT)),
-        ),
       ),
     ),
 

@@ -34,6 +34,20 @@ import { METAL_STOCK_OPTIONS, QUALITE_OPTIONS } from "@/lib/validations/lot";
 import type { Grossiste, LigneAchatGrossiste } from "@/types/grossiste";
 
 const AUCUNE_VALEUR = "—";
+const SANS_TVA = "sans";
+
+/**
+ * Les taux qu'une facture de grossiste peut porter. « Sans TVA » n'est pas un
+ * taux a zero : c'est un achat qui n'en portait aucune — grossiste non
+ * assujetti, ou qui vend lui-meme sous le regime de la marge. L'article reste
+ * alors revendable sous ce regime, alors qu'une facture avec TVA l'en sort.
+ */
+const TAUX_TVA_OPTIONS = [
+  { value: "20", label: "20 %" },
+  { value: "10", label: "10 %" },
+  { value: "5.5", label: "5,5 %" },
+  { value: "2.1", label: "2,1 %" },
+] as const;
 
 function ligneVide(): LigneAchatGrossiste {
   return {
@@ -45,6 +59,7 @@ function ligneVide(): LigneAchatGrossiste {
     poids: "",
     quantite: "1",
     prix_achat: "",
+    tva_taux: "20",
     prix_revente: "",
   };
 }
@@ -77,11 +92,34 @@ export function NewAchatClient({ grossiste }: { grossiste: Grossiste }) {
     setLignes((prev) => (prev.length === 1 ? prev : prev.filter((l) => l.id !== id)));
   }
 
-  const totalAchat = lignes.reduce((sum, l) => {
-    const prix = nombre(l.prix_achat) ?? 0;
+  /** La ventilation d'une ligne, telle qu'elle partira en base. */
+  function ventilation(l: LigneAchatGrossiste) {
+    const ht = nombre(l.prix_achat) ?? 0;
     const qte = nombre(l.quantite) ?? 1;
-    return sum + prix * qte;
-  }, 0);
+    const taux = l.tva_taux === SANS_TVA ? null : nombre(l.tva_taux);
+    const tva = taux ? Math.round(ht * (taux / 100) * 100) / 100 : 0;
+    return { ht, qte, taux, tva, ttc: Math.round((ht + tva) * 100) / 100 };
+  }
+
+  const totaux = lignes.reduce(
+    (acc, l) => {
+      const { ht, qte, tva, ttc } = ventilation(l);
+      return {
+        ht: acc.ht + ht * qte,
+        tva: acc.tva + tva * qte,
+        ttc: acc.ttc + ttc * qte,
+      };
+    },
+    { ht: 0, tva: 0, ttc: 0 }
+  );
+
+  /**
+   * Un article achete sans TVA reste revendable sous le regime de la marge :
+   * autant le dire ici, c'est la seule fois ou l'information se saisit.
+   */
+  const nbSousMarge = lignes.filter(
+    (l) => l.designation.trim() && l.tva_taux === SANS_TVA
+  ).length;
 
   const totalRevente = lignes.reduce((sum, l) => {
     const prix = nombre(l.prix_revente) ?? 0;
@@ -129,6 +167,7 @@ export function NewAchatClient({ grossiste }: { grossiste: Grossiste }) {
     // boutique, sans passer par un dossier ni un delai de retractation.
     const articles = remplies.map((l) => {
       const poids = nombre(l.poids);
+      const { ht, taux, tva, ttc } = ventilation(l);
       return {
         nom: l.designation.trim(),
         statut: "en_stock",
@@ -138,7 +177,14 @@ export function NewAchatClient({ grossiste }: { grossiste: Grossiste }) {
         poids_brut: poids,
         poids_net: poids,
         quantite: nombre(l.quantite) ?? 1,
-        prix_achat: nombre(l.prix_achat),
+        // prix_achat porte le cout reel, TVA comprise ; la ventilation vit a cote.
+        prix_achat: ttc,
+        prix_achat_ht: ht,
+        tva_achat_taux: taux,
+        tva_achat_montant: tva,
+        // Une facture qui porte la TVA sort l'article du regime de la marge :
+        // sa revente sera taxee sur le prix entier, et cette TVA-ci se deduit.
+        regime_tva_revente: taux ? "normal" : "marge",
         prix_revente: nombre(l.prix_revente),
         grossiste_id: grossiste.id,
         achat_grossiste_id: achat.id,
@@ -345,9 +391,9 @@ export function NewAchatClient({ grossiste }: { grossiste: Grossiste }) {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-4">
                   <div className="space-y-1.5">
-                    <Label required>Prix d&apos;achat (€)</Label>
+                    <Label required>Prix d&apos;achat HT (€)</Label>
                     <Input
                       inputMode="decimal"
                       value={ligne.prix_achat}
@@ -356,6 +402,38 @@ export function NewAchatClient({ grossiste }: { grossiste: Grossiste }) {
                       }
                       placeholder="38,50"
                     />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>TVA</Label>
+                    <Select
+                      value={ligne.tva_taux}
+                      onValueChange={(v) =>
+                        updateLigne(ligne.id, "tva_taux", v || SANS_TVA)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TAUX_TVA_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={SANS_TVA}>Sans TVA</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Prix d&apos;achat TTC</Label>
+                    <p className="flex h-9 items-center text-sm tabular-nums">
+                      {formatCurrency(ventilation(ligne).ttc)}
+                      {ventilation(ligne).tva > 0 && (
+                        <span className="ml-1.5 text-xs text-muted-foreground">
+                          dont {formatCurrency(ventilation(ligne).tva)}
+                        </span>
+                      )}
+                    </p>
                   </div>
                   <div className="space-y-1.5">
                     <Label>Prix de revente (€)</Label>
@@ -369,21 +447,43 @@ export function NewAchatClient({ grossiste }: { grossiste: Grossiste }) {
                     />
                   </div>
                 </div>
+
+                {ligne.tva_taux === SANS_TVA && (
+                  <p className="text-xs text-muted-foreground">
+                    Facture sans TVA : cet article se revendra sous le régime de
+                    la marge (art. 297 A du CGI).
+                  </p>
+                )}
               </div>
             ))}
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Total HT</span>
+              <span className="tabular-nums">{formatCurrency(totaux.ht)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">TVA déductible</span>
+              <span className="tabular-nums">{formatCurrency(totaux.tva)}</span>
+            </div>
             <div className="flex items-center justify-between border-b pb-2">
-              <span className="text-muted-foreground">Total achat</span>
-              <span className="text-lg font-bold">{formatCurrency(totalAchat)}</span>
+              <span className="text-muted-foreground">Total TTC</span>
+              <span className="text-lg font-bold">{formatCurrency(totaux.ttc)}</span>
             </div>
             <div className="flex items-center justify-between pt-2">
               <span className="text-muted-foreground">Valeur de revente</span>
               <span className="text-lg font-bold">{formatCurrency(totalRevente)}</span>
             </div>
+            {nbSousMarge > 0 && (
+              <p className="pt-2 text-xs text-muted-foreground">
+                {nbSousMarge === 1
+                  ? "1 article sans TVA à l'achat : il se revendra sous le régime de la marge."
+                  : `${nbSousMarge} articles sans TVA à l'achat : ils se revendront sous le régime de la marge.`}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>

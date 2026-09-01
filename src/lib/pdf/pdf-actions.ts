@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSettingServer } from "@/lib/settings-server";
 import { formatDate, formatTime } from "@/lib/format";
 import type { FactureVenteLigne } from "./blocks";
+import { ligneSousMarge, totauxFactureVente } from "./facture-vente-regime";
 
 export async function generateDocument(
   params: GenerateDocumentParams
@@ -26,8 +27,8 @@ export async function generateBonLivraison(
 
 /**
  * Generate all factures for a vente lot when it transitions to en_cours.
- * - facture_vente (bijoux lines)
- * - facture_acompte + facture_solde (or investissement lines)
+ * - facture_vente (bijoux lines, et l'or d'investissement vendu sans acompte)
+ * - facture_acompte + facture_solde (or investissement reserve contre acompte)
  */
 export async function generateVenteFactures(lotId: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -91,16 +92,24 @@ export async function generateVenteFactures(lotId: string): Promise<{ success: b
         quantite: l.quantite ?? 1,
         prixUnitaireHT: l.prix_unitaire ?? 0,
         totalHT: l.prix_total ?? 0,
+        sousMarge: ligneSousMarge(l),
       }));
     }
 
     const errors: string[] = [];
 
-    // --- Facture de vente (bijoux) ---
-    if (bijouxLignes.length > 0) {
-      const totalHT = bijouxLignes.reduce((s: number, l: { prix_total: number }) => s + l.prix_total, 0);
-      const tva = bijouxLignes.reduce((s: number, l: { montant_taxe: number }) => s + l.montant_taxe, 0);
-      const totalTTC = totalHT + tva;
+    // Meme lecture que la finalisation : l'acompte n'est demande que si la
+    // vente le porte, et sans lui l'or d'investissement se facture avec le
+    // reste du panier.
+    const avecAcompte = orInvestLignes.length > 0 && lot.avec_acompte !== false;
+
+    // --- Facture de vente ---
+    // Meme lecture que la finalisation : le prix est TTC, et ce qui se ventile
+    // depend du regime de chaque ligne.
+    const lignesFacturees = avecAcompte ? bijouxLignes : lignes;
+    if (lignesFacturees.length > 0) {
+      const { totalTTC, totalHT, tva, regimeMarge, mentionMarge } =
+        totauxFactureVente(lignesFacturees);
 
       const facturePath = await generateAndStoreDocument({
         type: "facture_vente",
@@ -111,10 +120,12 @@ export async function generateVenteFactures(lotId: string): Promise<{ success: b
         dossier: dossierInfo,
         references: [],
         totaux: { totalBrut: totalHT, taxe: tva, netAPayer: totalTTC },
-        factureVenteLignes: buildFactureLignes(bijouxLignes),
+        factureVenteLignes: buildFactureLignes(lignesFacturees),
         totalHT,
         tva,
         totalTTC,
+        regimeMarge,
+        mentionMarge,
         modeReglement: "—",
       });
       if (!facturePath) errors.push("facture_vente");
@@ -122,7 +133,7 @@ export async function generateVenteFactures(lotId: string): Promise<{ success: b
     }
 
     // --- Factures or investissement (acompte + solde) ---
-    if (orInvestLignes.length > 0) {
+    if (avecAcompte) {
       const rules = await getSettingServer("business_rules");
       const acomptePct = rules?.acompte_pct ?? 10;
 
@@ -132,8 +143,12 @@ export async function generateVenteFactures(lotId: string): Promise<{ success: b
       const montantAcompte = Math.round(totalTTC * (acomptePct / 100) * 100) / 100;
       const montantSolde = totalTTC - montantAcompte;
 
-      // Date limite solde = 48h après
-      const dateLimite = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+      // L'echeance du solde suit le reglage de la boutique. Elle valait
+      // quarante-huit heures en dur, quel que soit ce que disait l'ecran des
+      // regles metier — et le rappel envoye a la moitie du delai n'aurait pas
+      // porte sur la meme duree que celle imprimee sur la facture.
+      const delaiSoldeH = rules?.solde_delai_heures ?? 48;
+      const dateLimite = new Date(now.getTime() + delaiSoldeH * 60 * 60 * 1000);
 
       // Facture d'acompte
       const acomptePath = await generateAndStoreDocument({

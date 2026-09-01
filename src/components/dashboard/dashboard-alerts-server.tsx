@@ -202,7 +202,10 @@ export async function DashboardAlertsServer({
     }
 
     if (lot.acompte_montant && acomptePaid >= lot.acompte_montant && !lot.solde_paye) {
-      const totalTTC = (lot.total_prix_revente ?? 0) + (lot.montant_taxe ?? 0);
+      // Les prix de vente sont ceux de l'etiquette : la TVA y est deja
+      // comprise, qu'elle porte sur la marge ou sur le prix entier. La
+      // rajouter reclamerait au client plus que ce qu'il a vu en vitrine.
+      const totalTTC = lot.total_prix_revente ?? 0;
       const soldeExpected = totalTTC - lot.acompte_montant;
       if (soldePaid < soldeExpected) {
         paiements.push({
@@ -220,7 +223,10 @@ export async function DashboardAlertsServer({
 
     // Vente without full payment (bijoux or general)
     if (!lot.acompte_montant) {
-      const totalTTC = (lot.total_prix_revente ?? 0) + (lot.montant_taxe ?? 0);
+      // Les prix de vente sont ceux de l'etiquette : la TVA y est deja
+      // comprise, qu'elle porte sur la marge ou sur le prix entier. La
+      // rajouter reclamerait au client plus que ce qu'il a vu en vitrine.
+      const totalTTC = lot.total_prix_revente ?? 0;
       const totalPaid = ventePaid + acomptePaid + soldePaid;
       if (totalTTC > 0 && totalPaid < totalTTC) {
         // If some payment exists, it's a "solde" ; otherwise it's the full "vente"

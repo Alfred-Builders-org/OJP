@@ -53,7 +53,7 @@ export function BonCommandeCard({ bdc, reglements, lotId }: BonCommandeCardProps
   const dejaPaye = reglements
     .filter((r) => r.type === "fonderie" && r.bon_commande_id === bdc.id)
     .reduce((sum, r) => sum + r.montant, 0);
-  const restant = Math.max(0, bdc.montant_total - dejaPaye);
+  const restant = Math.max(0, bdc.montant_fonderie - dejaPaye);
 
   async function handleEnvoyer() {
     setLoading(true);
@@ -108,7 +108,7 @@ export function BonCommandeCard({ bdc, reglements, lotId }: BonCommandeCardProps
     sens: "sortant",
     label: `Paiement fonderie — ${bdc.numero}`,
     description: `Bon de commande ${bdc.numero} (${fonderieName})`,
-    montant_attendu: bdc.montant_total,
+    montant_attendu: bdc.montant_fonderie,
     montant_deja_paye: dejaPaye,
     montant_restant: restant,
     is_fully_paid: restant <= 0,
@@ -131,7 +131,9 @@ export function BonCommandeCard({ bdc, reglements, lotId }: BonCommandeCardProps
             <Badge variant="secondary" className={statutConfig.className}>
               {statutConfig.label}
             </Badge>
-            <span className="ml-auto text-base font-bold">{formatCurrency(bdc.montant_total)}</span>
+            <span className="ml-auto text-base font-bold">
+              {bdc.montant_fonderie > 0 ? formatCurrency(bdc.montant_fonderie) : "—"}
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -160,7 +162,7 @@ export function BonCommandeCard({ bdc, reglements, lotId }: BonCommandeCardProps
               {bdc.lignes.map((ligne) => (
                 <div key={ligne.id} className="flex items-center justify-between rounded-md bg-muted px-3 py-1.5 text-sm">
                   <span>{ligne.designation}</span>
-                  <span className="text-muted-foreground">x{ligne.quantite} · {formatCurrency(ligne.prix_total)}</span>
+                  <span className="text-muted-foreground">x{ligne.quantite}</span>
                 </div>
               ))}
             </div>
