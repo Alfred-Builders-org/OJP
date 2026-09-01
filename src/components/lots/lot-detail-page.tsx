@@ -283,12 +283,6 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
               {lot.date_finalisation && (
                 <DetailRow label="Date de finalisation" value={formatDate(lot.date_finalisation)} />
               )}
-              <CoursAppliques
-                or={lot.cours_or_snapshot}
-                argent={lot.cours_argent_snapshot}
-                platine={lot.cours_platine_snapshot}
-                coefficient={lot.coefficient_rachat_snapshot}
-              />
             </CardContent>
           </Card>
 
@@ -321,6 +315,29 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
               <DetailRow label="Telephone" value={lot.dossier.client.phone ? <CopyableText value={lot.dossier.client.phone} /> : "—"} />
               <DetailRow label="Email" value={lot.dossier.client.email ? <CopyableText value={lot.dossier.client.email} /> : "—"} />
               <DetailRow label="Ville" value={lot.dossier.client.city ?? "—"} />
+            </CardContent>
+          </Card>
+
+          {/* Cours appliqués — carte à part, sous les informations client.
+              Noyés parmi les dates du lot, ils étaient illisibles alors que ce
+              sont eux qui expliquent chaque montant de la fiche. */}
+          <Card className="md:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Coins size={20} weight="duotone" />
+                Cours appliqués
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">
+                figés à la création du lot
+              </span>
+            </CardHeader>
+            <CardContent>
+              <CoursAppliques
+                or={lot.cours_or_snapshot}
+                argent={lot.cours_argent_snapshot}
+                platine={lot.cours_platine_snapshot}
+                coefficient={lot.coefficient_rachat_snapshot}
+              />
             </CardContent>
           </Card>
         </div>
@@ -702,26 +719,17 @@ function CoursAppliques({
   }
 
   return (
-    // Pas de bordure ici : la ligne précédente fournit déjà le séparateur.
-    <div className="space-y-2 pt-1">
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">Cours appliqués</span>
-        <span className="text-xs text-muted-foreground">
-          figés à la création
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {metaux.map((m) => (
-          <Badge key={m.label} variant="outline" className="font-normal tabular-nums">
-            {m.label} {formatCoursGramme(m.valeur as number)}
-          </Badge>
-        ))}
-        {coefficient != null && coefficient > 0 && (
-          <Badge variant="outline" className="font-normal tabular-nums">
-            Coefficient &times;{formatNombre(coefficient)}
-          </Badge>
-        )}
-      </div>
+    <div className="flex flex-wrap gap-1.5">
+      {metaux.map((m) => (
+        <Badge key={m.label} variant="outline" className="font-normal tabular-nums">
+          {m.label} {formatCoursGramme(m.valeur as number)}
+        </Badge>
+      ))}
+      {coefficient != null && coefficient > 0 && (
+        <Badge variant="outline" className="font-normal tabular-nums">
+          Coefficient &times;{formatNombre(coefficient)}
+        </Badge>
+      )}
     </div>
   );
 }

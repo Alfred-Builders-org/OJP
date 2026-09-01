@@ -33,14 +33,36 @@ export default async function StockPage({
   const params = await searchParams;
   const etat = lireParams(params);
 
-  // Le Stock bijoux montre tout ce qui est physiquement en boutique : articles
-  // en stock, en depot-vente, en reparation, et ceux qui attendent un envoi en
-  // fonderie. Seul « fondu » est exclu — cette marchandise n'existe plus.
-  //
-  // Les deux filtres precedents (`depot_vente_lot_id IS NULL` et l'exclusion de
-  // « a_fondre ») rendaient invisibles les articles justement crees par un
-  // rachat ou un depot-vente : deux filtres de la barre d'outils ne pouvaient
-  // structurellement rien renvoyer.
+  // La provenance n'est pas une colonne : elle se lit dans deux clés étrangères.
+  // Un dépôt-vente porte `depot_vente_lot_id`, un achat grossiste porte
+  // `grossiste_id`, un rachat n'a ni l'un ni l'autre. Le filtre est donc appliqué
+  // à la main, hors du helper générique.
+  const provenances = etat.filtres.provenance ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filtrerProvenance = <T extends { not: any; is: any; or: any }>(q: T): T => {
+    if (provenances.length === 0 || provenances.length === 3) return q;
+    const clauses: string[] = [];
+    if (provenances.includes("depot_vente")) clauses.push("depot_vente_lot_id.not.is.null");
+    if (provenances.includes("grossiste")) clauses.push("grossiste_id.not.is.null");
+    if (provenances.includes("rachat")) {
+      clauses.push("and(depot_vente_lot_id.is.null,grossiste_id.is.null)");
+    }
+    return clauses.length ? q.or(clauses.join(",")) : q;
+  };
+
+  // Retirée des filtres génériques : elle ne correspond à aucune colonne.
+  const etatSansProvenance = {
+    ...etat,
+    filtres: Object.fromEntries(
+      Object.entries(etat.filtres).filter(([cle]) => cle !== "provenance")
+    ),
+  };
+
+  // Un seul inventaire, toutes provenances confondues : rachats, depots-vente et
+  // achats grossistes. Seul « fondu » est exclu — cette marchandise n'existe
+  // plus. Les deux filtres precedents (`depot_vente_lot_id IS NULL` et
+  // l'exclusion de « a_fondre ») rendaient invisibles les articles justement
+  // crees par un rachat ou un depot-vente.
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
@@ -51,18 +73,22 @@ export default async function StockPage({
       .select("role")
       .eq("id", user!.id)
       .single(),
-    appliquerFiltres(
-      supabase
-        .from("bijoux_stock")
-        .select("*", { count: "exact", head: true })
-        .neq("statut", "fondu"),
-      etat,
-      { ...OPTIONS, triParDefaut: undefined }
+    filtrerProvenance(
+      appliquerFiltres(
+        supabase
+          .from("bijoux_stock")
+          .select("*", { count: "exact", head: true })
+          .neq("statut", "fondu"),
+        etatSansProvenance,
+        { ...OPTIONS, triParDefaut: undefined }
+      )
     ),
-    appliquerFiltres(
-      supabase.from("bijoux_stock").select("*").neq("statut", "fondu"),
-      etat,
-      OPTIONS
+    filtrerProvenance(
+      appliquerFiltres(
+        supabase.from("bijoux_stock").select("*").neq("statut", "fondu"),
+        etatSansProvenance,
+        OPTIONS
+      )
     ).range(etat.from, etat.to),
     supabase
       .from("lot_references")
@@ -122,7 +148,7 @@ export default async function StockPage({
   });
 
   return (
-    <PageWrapper title="Bijoux" fullHeight>
+    <PageWrapper title="Stock" fullHeight>
       <StockTable data={bijoux} canEdit={role === "proprietaire" || role === "super_admin"} totalItems={count ?? 0} />
     </PageWrapper>
   );

@@ -15,6 +15,7 @@ import {
   Plus,
   SquaresFour,
   ArrowRight,
+  Tag,
 } from "@phosphor-icons/react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useGlobalSearch } from "@/hooks/use-global-search";
@@ -25,6 +26,7 @@ const ENTITY_ICONS: Record<SearchResult["entity_type"], typeof UsersThree> = {
   client: UsersThree,
   dossier: FolderOpen,
   lot: ShoppingCart,
+  reference: Tag,
   vente: Storefront,
   bijoux: Diamond,
   confie_achat: HandCoins,
@@ -35,6 +37,7 @@ const ENTITY_ORDER: SearchResult["entity_type"][] = [
   "client",
   "dossier",
   "lot",
+  "reference",
   "vente",
   "bijoux",
   "confie_achat",
@@ -55,12 +58,10 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: "new-client", label: "Nouveau client", url: "/clients/new", icon: Plus, iconWeight: "regular", group: "actions" },
   { id: "new-dossier", label: "Nouveau dossier", url: "/dossiers/new", icon: Plus, iconWeight: "regular", shortcut: "Alt+N", group: "actions" },
   { id: "nav-dashboard", label: "Aller au tableau de bord", url: "/dashboard", icon: SquaresFour, shortcut: "Alt+D", group: "navigation" },
-  { id: "nav-lots", label: "Aller aux lots", url: "/lots", icon: ShoppingCart, shortcut: "Alt+L", group: "navigation" },
   { id: "nav-stock", label: "Aller au stock", url: "/stock", icon: Diamond, shortcut: "Alt+S", group: "navigation" },
-  { id: "nav-confie-achat", label: "Aller au confié d'achat", url: "/confie-achat", icon: HandCoins, group: "navigation" },
-  { id: "nav-ventes", label: "Aller aux ventes", url: "/ventes", icon: Storefront, shortcut: "Alt+V", group: "navigation" },
+  { id: "nav-or-invest", label: "Aller à l'or d'investissement", url: "/or-investissement", icon: Coins, group: "navigation" },
   { id: "nav-clients", label: "Aller aux clients", url: "/clients", icon: UsersThree, shortcut: "Alt+C", group: "navigation" },
-  { id: "nav-dossiers", label: "Aller aux dossiers", url: "/dossiers", icon: FolderOpen, group: "navigation" },
+  { id: "nav-dossiers", label: "Aller aux dossiers", url: "/dossiers", icon: FolderOpen, shortcut: "Alt+O", group: "navigation" },
 ];
 
 export function CommandPalette() {

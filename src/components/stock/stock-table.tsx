@@ -37,6 +37,24 @@ export const STOCK_STATUT_OPTIONS = Object.entries(statutConfig).map(
   ([value, { label }]) => ({ value, label })
 );
 
+/**
+ * Provenance de l'article : d'ou il est entre en boutique.
+ *
+ * Les rachats, les depots-vente et les achats grossistes vivaient dans trois
+ * listes distinctes. Il fallait savoir d'ou venait un article avant de pouvoir
+ * le chercher — alors qu'en boutique, on cherche d'abord un bijou. Un seul
+ * inventaire, avec la provenance en colonne et en filtre.
+ */
+const provenanceConfig: Record<string, { label: string; className: string }> = {
+  rachat: { label: "Rachat", className: "bg-blue-500/10 text-blue-600 border-blue-600/30 dark:bg-blue-500/20 dark:text-blue-400 dark:border-blue-400/30" },
+  depot_vente: { label: "Dépôt-vente", className: "bg-cyan-500/10 text-cyan-600 border-cyan-600/30 dark:bg-cyan-500/20 dark:text-cyan-400 dark:border-cyan-400/30" },
+  grossiste: { label: "Grossiste", className: "bg-amber-500/10 text-amber-600 border-amber-600/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-400/30" },
+};
+
+export const PROVENANCE_OPTIONS = Object.entries(provenanceConfig).map(
+  ([value, { label }]) => ({ value, label })
+);
+
 interface StockTableProps {
   data: BijouxStockWithOrigin[];
   canEdit?: boolean;
@@ -108,13 +126,31 @@ export function StockTable({
       groupe: (item) => statutConfig[item.statut]?.label ?? item.statut,
     },
     {
-      cle: "origine",
-      titre: "Origine",
-      cellule: (item) => (
-        <span className="text-sm text-muted-foreground">
-          {item.origin_client_name ?? "—"}
-        </span>
-      ),
+      cle: "provenance",
+      titre: "Provenance",
+      cellule: (item) => {
+        const provenance = item.origin_type ? provenanceConfig[item.origin_type] : null;
+        return (
+          <div className="flex flex-col gap-1">
+            {provenance ? (
+              <Badge variant="outline" className={provenance.className}>
+                {provenance.label}
+              </Badge>
+            ) : (
+              <span className="text-sm text-muted-foreground">—</span>
+            )}
+            {item.origin_client_name && (
+              <span className="text-xs text-muted-foreground">
+                {item.origin_client_name}
+              </span>
+            )}
+          </div>
+        );
+      },
+      groupe: (item) =>
+        item.origin_type
+          ? provenanceConfig[item.origin_type]?.label ?? item.origin_type
+          : "Sans provenance",
     },
     {
       cle: "metal",
@@ -165,10 +201,12 @@ export function StockTable({
       placeholderRecherche="Rechercher un article..."
       messageVide="Aucun produit trouvé."
       filtres={[
+        { cle: "provenance", label: "Provenance", options: PROVENANCE_OPTIONS },
         { cle: "statut", label: "Statut", options: STOCK_STATUT_OPTIONS },
         { cle: "metal", label: "Métal", options: METAL_STOCK_OPTIONS },
       ]}
       groupements={[
+        { cle: "provenance", label: "Provenance" },
         { cle: "statut", label: "Statut" },
         { cle: "metal", label: "Métal" },
       ]}

@@ -17,10 +17,9 @@ const SHORTCUTS = [
     category: "Navigation",
     items: [
       { keys: ["Alt", "D"], description: "Aller au tableau de bord" },
-      { keys: ["Alt", "L"], description: "Aller aux lots" },
       { keys: ["Alt", "S"], description: "Aller au stock" },
-      { keys: ["Alt", "V"], description: "Aller aux ventes" },
       { keys: ["Alt", "C"], description: "Aller aux clients" },
+      { keys: ["Alt", "O"], description: "Aller aux dossiers" },
     ],
   },
   {

@@ -184,7 +184,7 @@ export function ConfieAchatDetailPage({
       <Header
         title={bijou.nom}
         backAction={
-          <Button variant="ghost" size="icon-sm" aria-label="Retour" onClick={() => router.push("/confie-achat")}>
+          <Button variant="ghost" size="icon-sm" aria-label="Retour" onClick={() => router.push("/stock")}>
             <ArrowLeft size={16} weight="regular" />
           </Button>
         }

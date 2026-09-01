@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePreviewDrawer } from "@/hooks/use-preview-drawer";
 import {
   Plus,
   ShoppingCart,
@@ -12,6 +13,7 @@ import {
   Trash,
   WarningCircle,
   Package,
+  ArrowSquareOut,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -58,7 +60,21 @@ export function DossierLotsSection({
   onDeleteLot,
 }: DossierLotsSectionProps) {
   const router = useRouter();
+  const { openPreview } = usePreviewDrawer();
   const [deletingLotId, setDeletingLotId] = useState<string | null>(null);
+
+  /**
+   * Le tiroir ne sait rendre qu'un lot de rachat ou de depot-vente : l'apercu
+   * des ventes n'est pas encore ecrit. Plutot que d'ouvrir un panneau vide, une
+   * vente ouvre directement sa page.
+   */
+  function ouvrirLot(lot: Lot) {
+    if (lot.type === "vente") {
+      router.push(getLotUrl(lot));
+      return;
+    }
+    openPreview("lot", lot.id);
+  }
 
   function getLotUrl(lot: Lot): string {
     if (lot.type === "vente") return `/ventes/${lot.id}`;
@@ -114,7 +130,10 @@ export function DossierLotsSection({
               >
                 <div
                   className="flex items-center gap-3 flex-1 cursor-pointer"
-                  onClick={() => router.push(getLotUrl(lot))}
+                  // Consulter un lot depuis son dossier ouvre un tiroir plutot
+                  // que de quitter la page : on suit l'avancement du lot sans
+                  // perdre le contexte du dossier, et sans navigation aller-retour.
+                  onClick={() => ouvrirLot(lot)}
                 >
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted shrink-0">
                     {lot.type === "vente" ? (
@@ -155,9 +174,13 @@ export function DossierLotsSection({
                       <DotsThree size={16} weight="regular" />
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => router.push(getLotUrl(lot))}>
+                      <DropdownMenuItem onClick={() => ouvrirLot(lot)}>
                         <Eye size={14} weight="duotone" />
-                        Voir le lot
+                        Aperçu rapide
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push(getLotUrl(lot))}>
+                        <ArrowSquareOut size={14} weight="duotone" />
+                        Ouvrir le lot
                       </DropdownMenuItem>
                       {dossierStatus === "brouillon" && (
                         <>

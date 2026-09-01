@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SquaresFour, Diamond, Coins, UsersThree, FolderOpen, ShoppingCart, Storefront, HandCoins, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings } from "@phosphor-icons/react";
+import { SquaresFour, Diamond, Coins, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings } from "@phosphor-icons/react";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -14,9 +14,11 @@ import {
 } from "@/components/ui/sidebar";
 import type { UserRole } from "@/types/auth";
 
+// Un seul inventaire : rachats, depots-vente et achats grossistes vivent dans
+// le meme stock, avec l'origine en colonne. Trois listes separees obligeaient a
+// savoir d'ou venait un article avant de pouvoir le chercher.
 const stockItems = [
-  { title: "Bijoux", href: "/stock", icon: Diamond, disabled: false },
-  { title: "Confié d'achat", href: "/confie-achat", icon: HandCoins, disabled: false },
+  { title: "Stock", href: "/stock", icon: Diamond, disabled: false },
   { title: "Or Investissement", href: "/or-investissement", icon: Coins, disabled: false },
   { title: "Grossistes", href: "/grossistes", icon: Buildings, disabled: false },
 ];
@@ -27,16 +29,12 @@ const fonderieItems = [
   { title: "Suivi", href: "/fonderie/suivi", icon: Fire, disabled: false },
 ];
 
-const commerceItems = [
-  { title: "Rachat", href: "/lots", icon: ShoppingCart, disabled: false },
-  { title: "Dépôt-vente", href: "/depot-vente", icon: HandCoins, disabled: false },
-  { title: "Ventes", href: "/ventes", icon: Storefront, disabled: false },
-];
-
 const comptabiliteItems = [
   { title: "Impôts", href: "/impots", icon: Receipt, disabled: false },
 ];
 
+// Rachats, ventes et depots-vente se consultent depuis leur dossier : ils n'ont
+// de sens qu'au regard du client et de l'affaire qui les porte.
 const crmItems = [
   { title: "Clients", href: "/clients", icon: UsersThree, disabled: false },
   { title: "Dossiers", href: "/dossiers", icon: FolderOpen, disabled: false },
@@ -74,27 +72,6 @@ export function SidebarNav({ role }: SidebarNavProps) {
         <SidebarGroupContent>
           <SidebarMenu className="gap-2">
             {crmItems.map((item) => (
-              <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton
-                  isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-                  disabled={item.disabled}
-                  render={item.disabled ? undefined : <Link href={item.href} />}
-                >
-                  <item.icon size={18} weight="duotone" />
-                  <span>{item.title}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            ))}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-
-      <SidebarGroup>
-        <SidebarGroupLabel>Commerce</SidebarGroupLabel>
-        <SidebarSeparator className="mb-2" />
-        <SidebarGroupContent>
-          <SidebarMenu className="gap-2">
-            {commerceItems.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   isActive={pathname === item.href || pathname.startsWith(item.href + "/")}

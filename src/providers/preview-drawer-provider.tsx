@@ -50,8 +50,19 @@ export function PreviewDrawerProvider({ children }: { children: ReactNode }) {
           side="right"
           className="sm:max-w-lg w-full overflow-y-auto"
         >
-          <SheetHeader>
-            <SheetTitle>
+          {/* « Ouvrir en pleine page » en haut à gauche, la croix de fermeture
+              restant en haut à droite : les deux sorties du tiroir sont ainsi
+              visibles d'emblée. Le bouton était auparavant en pied de panneau,
+              qu'il fallait atteindre en faisant défiler tout le contenu.
+              La marge droite laisse la place à la croix, positionnée en absolu. */}
+          <SheetHeader className="flex-row items-center gap-2 pr-10">
+            <Link href={href} onClick={() => setIsOpen(false)}>
+              <Button variant="outline" size="sm">
+                <ArrowSquareOut size={14} weight="duotone" />
+                Pleine page
+              </Button>
+            </Link>
+            <SheetTitle className="truncate">
               {currentEntity ? entityLabels[currentEntity.type] : "Aperçu"}
             </SheetTitle>
           </SheetHeader>
@@ -63,14 +74,6 @@ export function PreviewDrawerProvider({ children }: { children: ReactNode }) {
               />
             )}
           </div>
-          <SheetFooter>
-            <Link href={href} onClick={() => setIsOpen(false)}>
-              <Button className="w-full">
-                <ArrowSquareOut size={16} weight="duotone" />
-                Ouvrir la page complète
-              </Button>
-            </Link>
-          </SheetFooter>
         </SheetContent>
       </Sheet>
     </PreviewDrawerContext.Provider>

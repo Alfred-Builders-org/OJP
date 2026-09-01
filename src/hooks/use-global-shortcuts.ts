@@ -17,10 +17,9 @@ import { useRouter } from "next/navigation";
  */
 const NAVIGATION: Record<string, string> = {
   KeyD: "/dashboard",
-  KeyL: "/lots",
   KeyS: "/stock",
-  KeyV: "/ventes",
   KeyC: "/clients",
+  KeyO: "/dossiers",
   KeyN: "/dossiers/new",
 };
 

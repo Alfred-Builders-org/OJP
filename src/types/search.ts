@@ -3,6 +3,7 @@ export interface SearchResult {
     | "client"
     | "dossier"
     | "lot"
+    | "reference"
     | "vente"
     | "bijoux"
     | "confie_achat"
@@ -17,6 +18,7 @@ export const ENTITY_LABELS: Record<SearchResult["entity_type"], string> = {
   client: "Clients",
   dossier: "Dossiers",
   lot: "Rachat",
+  reference: "Références",
   vente: "Ventes",
   bijoux: "Bijoux",
   confie_achat: "Confié d'achat",
