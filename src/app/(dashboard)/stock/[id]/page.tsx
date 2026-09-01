@@ -1,7 +1,13 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { StockDetailPage } from "@/components/stock/stock-detail-page";
-import type { BijouxStock, Reparation, StockOrigin, StockSale } from "@/types/bijoux";
+import type {
+  BijouxStock,
+  Reparation,
+  StockOrigin,
+  StockOriginGrossiste,
+  StockSale,
+} from "@/types/bijoux";
 import type { UserRole } from "@/types/auth";
 
 export default async function StockDetailRoute({
@@ -178,6 +184,41 @@ export default async function StockDetailRoute({
     };
   }
 
+  // Un bijou neuf n'a ni lot ni vendeur : sa provenance est l'achat passe chez
+  // un grossiste.
+  let originGrossiste: StockOriginGrossiste | null = null;
+
+  if (bijou.grossiste_id) {
+    const [{ data: grossiste }, { data: achat }] = await Promise.all([
+      supabase
+        .from("grossistes")
+        .select("id, nom")
+        .eq("id", bijou.grossiste_id)
+        .maybeSingle(),
+      bijou.achat_grossiste_id
+        ? supabase
+            .from("achats_grossiste")
+            .select("id, numero, date_achat, numero_facture")
+            .eq("id", bijou.achat_grossiste_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+
+    if (grossiste) {
+      originGrossiste = {
+        grossiste: { id: grossiste.id, nom: grossiste.nom },
+        achat: achat
+          ? {
+              id: achat.id,
+              numero: achat.numero,
+              date_achat: achat.date_achat,
+              numero_facture: achat.numero_facture,
+            }
+          : null,
+      };
+    }
+  }
+
   const reparations = (reparationsData ?? []) as Reparation[];
   const activeReparation = reparations.find((r) => r.statut === "en_cours") ?? null;
 
@@ -186,6 +227,7 @@ export default async function StockDetailRoute({
       bijou={bijou}
       canEdit={role === "proprietaire" || role === "super_admin"}
       origin={origin}
+      originGrossiste={originGrossiste}
       sale={sale}
       reparations={reparations}
       activeReparation={activeReparation}

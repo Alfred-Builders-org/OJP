@@ -71,6 +71,12 @@ export interface StockOrigin {
   };
 }
 
+/** La provenance d'un bijou neuf : l'achat par lequel il est entre en boutique. */
+export interface StockOriginGrossiste {
+  grossiste: { id: string; nom: string };
+  achat: { id: string; numero: string; date_achat: string; numero_facture: string | null } | null;
+}
+
 export interface StockSale {
   ligne: {
     id: string;
