@@ -29,6 +29,9 @@ export function RoutagePageClient({
   const [canGenerate, setCanGenerate] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [bdcCount, setBdcCount] = useState(0);
+  // Les articles a fondre s'accumulent : le compteur dit combien attendent sans
+  // qu'il faille ouvrir l'onglet.
+  const [aFondreCount, setAFondreCount] = useState(0);
 
   const onGenerateReady = useCallback(
     (fn: (() => void) | null, can: boolean, count: number, isGenerating: boolean) => {
@@ -59,7 +62,12 @@ export function RoutagePageClient({
           </TabsTrigger>
           <TabsTrigger value="envois" className="gap-1.5">
             <Diamond size={14} weight="duotone" />
-            Fonte
+            À fondre
+            {aFondreCount > 0 && (
+              <span className="ml-1 text-[10px] font-semibold bg-foreground/10 text-foreground rounded-full px-1.5 py-0.5">
+                {aFondreCount}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 
@@ -90,6 +98,7 @@ export function RoutagePageClient({
       <TabsContent value="envois" className="flex flex-col flex-1 min-h-0 mt-4">
         <BonsLivraisonList
           fonderies={fonderies}
+          onCountChange={setAFondreCount}
         />
       </TabsContent>
     </Tabs>

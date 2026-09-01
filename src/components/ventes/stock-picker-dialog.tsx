@@ -30,7 +30,6 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import {
-  calculerTFOP,
   calculerTVAMarge,
 } from "@/lib/calculations/taxes";
 import { formatCurrency } from "@/lib/format";
@@ -133,13 +132,21 @@ export function StockPickerForm({
   const prixAchatOrigine = selectedItem?.prix_achat ?? 0;
   const prixVente = Math.round((prixBase + coutReparation) * 100) / 100;
 
-  // Dépôt-vente → TFOP (6,5% si > 5 000 €, pour le compte du déposant)
-  // Bijou racheté → TVA sur la marge (20% sur prix_vente - prix_achat)
-  const montantTaxe = isDepotVente
-    ? calculerTFOP(prixVente)
-    : calculerTVAMarge(prixVente, prixAchatOrigine);
+  // La vente au client est le meme evenement fiscal, que le bijou vienne d'un
+  // rachat ou d'un depot-vente : la boutique revend un bien d'occasion acquis
+  // aupres d'un particulier, donc TVA sur la marge (art. 297 A du CGI).
+  //
+  // Le depot-vente portait auparavant la taxe forfaitaire sur cette facture.
+  // C'etait deux erreurs a la fois : la taxe forfaitaire est due par le vendeur
+  // particulier, elle se retient sur la quittance qui lui est reglee, pas sur la
+  // facture du client final ; et elle s'appliquait au prix de vente entier au
+  // lieu de la marge.
+  //
+  // Le prix d'achat de reference est celui de la quittance : pour un article en
+  // depot-vente, c'est le net verse au deposant.
+  const montantTaxe = calculerTVAMarge(prixVente, prixAchatOrigine);
   const taxeApplicable = montantTaxe > 0;
-  const taxeLabel = isDepotVente ? "TFOP (6,5%)" : "TVA sur marge (20%)";
+  const taxeLabel = "TVA sur marge (art. 297 A du CGI)";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -166,7 +173,7 @@ export function StockPickerForm({
       prix_total: prixVente,
       taxe_applicable: taxeApplicable,
       montant_taxe: montantTaxe,
-      type_taxe: isDepotVente ? "tfop" : (taxeApplicable ? "tva_marge" : null),
+      type_taxe: taxeApplicable ? "tva_marge" : null,
       cout_reparation: coutReparation,
     };
 
@@ -337,9 +344,10 @@ export function StockPickerForm({
                     <p className="text-lg font-bold">
                       {formatCurrency(montantTaxe)}
                     </p>
-                    {!isDepotVente && prixAchatOrigine > 0 && (
+                    {prixAchatOrigine > 0 && (
                       <p className="text-xs text-muted-foreground">
                         Marge : {formatCurrency(prixVente - prixAchatOrigine)}
+                        {isDepotVente ? " (sur le net déposant)" : ""}
                       </p>
                     )}
                   </div>

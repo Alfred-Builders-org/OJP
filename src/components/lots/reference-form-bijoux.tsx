@@ -2,7 +2,7 @@
 
 import { FieldError } from "@/components/ui/field";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import {
   FloppyDisk,
@@ -29,6 +29,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectSeparator,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Card,
@@ -36,13 +38,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { METAL_OPTIONS, QUALITE_OPTIONS } from "@/lib/validations/lot";
+import { METAL_OPTIONS, METAL_GROUPES, estMetalPrixFixe } from "@/lib/validations/lot";
+import { TitrageInput } from "@/components/ui/titrage-input";
 import {
-  calculerPrixRachatBijoux,
+  calculerPrixBijou,
   getCoursMetalFromSnapshot,
+  TARIFS_FIXES_DEFAUT,
+  type TarifsFixes,
 } from "@/lib/calculations/prix-rachat";
 import { calculerTFOP } from "@/lib/calculations/taxes";
 import { formatCurrency, formatDateISO } from "@/lib/format";
+import { PhotosUpload } from "@/components/photos/photos-upload";
+import { usePhotosReference } from "@/hooks/use-photos-reference";
 import type { LotReference } from "@/types/lot";
 
 interface ReferenceFormBijouxProps {
@@ -56,6 +63,8 @@ interface ReferenceFormBijouxProps {
   editData?: LotReference;
   lotType?: "rachat" | "depot_vente";
   commissionDvPct?: number;
+  /** Tarifs au gramme des matieres sans cours, tels que parametres. */
+  tarifs?: TarifsFixes;
 }
 
 export function ReferenceFormBijoux({
@@ -69,6 +78,7 @@ export function ReferenceFormBijoux({
   editData,
   lotType = "rachat",
   commissionDvPct = 40,
+  tarifs = TARIFS_FIXES_DEFAUT,
 }: ReferenceFormBijouxProps) {
   const isDepotVente = lotType === "depot_vente";
   const isEdit = !!editData;
@@ -78,7 +88,7 @@ export function ReferenceFormBijoux({
 
   const [typeRachat, setTypeRachat] = useState<"direct" | "devis">(editData?.type_rachat ?? "direct");
   const [designation, setDesignation] = useState(editData?.designation ?? "");
-  const [metal, setMetal] = useState<"Or" | "Argent" | "Platine" | "">(editData?.metal ?? "");
+  const [metal, setMetal] = useState<string>(editData?.metal ?? "");
   const [qualite, setQualite] = useState(editData?.qualite ?? "");
   const [poidsBrut, setPoidsBrut] = useState(editData?.poids_brut?.toString() ?? editData?.poids?.toString() ?? "");
   const [poidsNet, setPoidsNet] = useState(editData?.poids_net?.toString() ?? editData?.poids?.toString() ?? "");
@@ -88,21 +98,35 @@ export function ReferenceFormBijoux({
   const [prixReventeManuel, setPrixReventeManuel] = useState(editData?.prix_revente_estime?.toString() ?? "");
   const [commissionLocal, setCommissionLocal] = useState(commissionDvPct.toString());
 
+  // Photos de l'article, facultatives : utiles sur une piece de valeur ou un
+  // defaut a documenter, superflues sur un lot de chutes.
+  const { photos, setPhotos, rattacher, fermer } = usePhotosReference(
+    lotId,
+    editData?.id,
+    onClose
+  );
+
+  // Une matiere a tarif fixe n'a ni cours ni titrage : son prix ne depend que du
+  // poids et du tarif decide par la boutique.
+  const prixFixe = estMetalPrixFixe(metal);
+
   const prixCalcule = useMemo(() => {
-    if (!metal || !qualite || !poidsNet) return null;
-    const coursMetalGramme = getCoursMetalFromSnapshot(
-      metal as "Or" | "Argent" | "Platine",
-      coursOrSnapshot,
-      coursArgentSnapshot,
-      coursPlatineSnapshot
-    );
-    return calculerPrixRachatBijoux(
-      coursMetalGramme,
-      parseInt(qualite),
-      parseFloat(poidsNet),
-      coefficientSnapshot
-    );
-  }, [metal, qualite, poidsNet, coursOrSnapshot, coursArgentSnapshot, coursPlatineSnapshot, coefficientSnapshot]);
+    if (!metal || !poidsNet) return null;
+    if (!prixFixe && !qualite) return null;
+    return calculerPrixBijou({
+      metal,
+      coursMetalGramme: getCoursMetalFromSnapshot(
+        metal,
+        coursOrSnapshot,
+        coursArgentSnapshot,
+        coursPlatineSnapshot
+      ),
+      qualite: parseInt(qualite) || 0,
+      poids: parseFloat(poidsNet),
+      coefficient: coefficientSnapshot,
+      tarifs,
+    });
+  }, [metal, prixFixe, qualite, poidsNet, coursOrSnapshot, coursArgentSnapshot, coursPlatineSnapshot, coefficientSnapshot, tarifs]);
 
   const commissionPct = parseFloat(commissionLocal) || commissionDvPct;
 
@@ -113,20 +137,22 @@ export function ReferenceFormBijoux({
       const markup = 1 + commissionPct / 100;
       return Math.round(basePrix * markup * 100) / 100;
     }
-    if (!metal || !qualite || !poidsNet) return null;
-    const coursMetalGramme = getCoursMetalFromSnapshot(
-      metal as "Or" | "Argent" | "Platine",
-      coursOrSnapshot,
-      coursArgentSnapshot,
-      coursPlatineSnapshot
-    );
-    return calculerPrixRachatBijoux(
-      coursMetalGramme,
-      parseInt(qualite),
-      parseFloat(poidsNet),
-      coefficientVenteSnapshot
-    );
-  }, [metal, qualite, poidsNet, coursOrSnapshot, coursArgentSnapshot, coursPlatineSnapshot, coefficientVenteSnapshot, isDepotVente, prixAchatManuel, prixCalcule, commissionPct]);
+    if (!metal || !poidsNet) return null;
+    if (!prixFixe && !qualite) return null;
+    return calculerPrixBijou({
+      metal,
+      coursMetalGramme: getCoursMetalFromSnapshot(
+        metal,
+        coursOrSnapshot,
+        coursArgentSnapshot,
+        coursPlatineSnapshot
+      ),
+      qualite: parseInt(qualite) || 0,
+      poids: parseFloat(poidsNet),
+      coefficient: coefficientVenteSnapshot,
+      tarifs,
+    });
+  }, [metal, prixFixe, qualite, poidsNet, coursOrSnapshot, coursArgentSnapshot, coursPlatineSnapshot, coefficientVenteSnapshot, isDepotVente, prixAchatManuel, prixCalcule, commissionPct, tarifs]);
 
   // --- Calculs fiscaux (rachat uniquement) ---
   const qty = parseInt(quantite) || 1;
@@ -137,15 +163,25 @@ export function ReferenceFormBijoux({
   })();
 
   // Taxe forfaitaire sur les objets precieux : 6 % + 0,5 % de CRDS au-dela de
-  // 5 000 EUR, appreciee par objet (prix unitaire x quantite de la ligne).
+  // 5 000 EUR.
+  //
+  // L'assiette est la REFERENCE entiere — prix unitaire multiplie par la
+  // quantite — et non l'unite prise a part. Trois chevalieres a 2 000 EUR
+  // saisies sur une meme ligne forment donc une assiette de 6 000 EUR, taxee.
+  // C'est la meme regle que sur une quittance de rachat classique : une
+  // reference est une cession.
   const tfopMontant = !isDepotVente && prixAchatTotal !== null ? calculerTFOP(prixAchatTotal) : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    if (!designation || !metal || !qualite || !poidsBrut || !poidsNet || !quantite) {
-      setError("Désignation, métal, qualité, poids brut, poids net et quantité sont requis.");
+    if (!designation || !metal || !poidsBrut || !poidsNet || !quantite) {
+      setError("Désignation, métal, poids brut, poids net et quantité sont requis.");
+      return;
+    }
+    if (!prixFixe && !qualite) {
+      setError("Le titrage est requis pour cette matière.");
       return;
     }
 
@@ -166,7 +202,7 @@ export function ReferenceFormBijoux({
 
     setSaving(true);
     const coursMetalGramme = getCoursMetalFromSnapshot(
-      metal as "Or" | "Argent" | "Platine",
+      metal,
       coursOrSnapshot,
       coursArgentSnapshot,
       coursPlatineSnapshot
@@ -176,7 +212,8 @@ export function ReferenceFormBijoux({
     const payload = {
       designation,
       metal,
-      qualite,
+      // Le titrage reste vide sur une matiere qui n'en a pas.
+      qualite: prixFixe ? null : qualite,
       poids: parseFloat(poidsNet),
       poids_brut: parseFloat(poidsBrut),
       poids_net: parseFloat(poidsNet),
@@ -200,16 +237,27 @@ export function ReferenceFormBijoux({
       montant_taxe: isDepotVente ? 0 : ((tfopMontant ?? 0) / qty),
     };
 
-    const { error: dbError } = isEdit
-      ? await supabase.from("lot_references").update({ ...payload, updated_at: new Date().toISOString() }).eq("id", editData.id)
-      : await supabase.from("lot_references").insert({ ...payload, lot_id: lotId, categorie: "bijoux", status: "en_expertise" });
+    const { data: enregistree, error: dbError } = isEdit
+      ? await supabase
+          .from("lot_references")
+          .update({ ...payload, updated_at: new Date().toISOString() })
+          .eq("id", editData.id)
+          .select("id")
+          .single()
+      : await supabase
+          .from("lot_references")
+          .insert({ ...payload, lot_id: lotId, categorie: "bijoux", status: "en_expertise" })
+          .select("id")
+          .single();
 
-    if (dbError) {
+    if (dbError || !enregistree) {
       toast.error("Erreur lors de l'enregistrement de la référence");
-      setError(dbError.message);
+      setError(dbError?.message ?? "La référence n'a pas pu être enregistrée.");
       setSaving(false);
       return;
     }
+
+    await rattacher(enregistree.id);
 
     toast.success(isEdit ? "Référence modifiée" : "Référence ajoutée");
     setSaving(false);
@@ -224,7 +272,7 @@ export function ReferenceFormBijoux({
           <Diamond size={16} weight="duotone" />
           {isEdit ? `Modifier — ${editData.designation}` : "Ajouter un bijoux"}
         </CardTitle>
-        <Button variant="ghost" size="icon-xs" onClick={onClose} aria-label="Fermer">
+        <Button variant="ghost" size="icon-xs" onClick={fermer} aria-label="Fermer">
           <X size={14} weight="regular" />
         </Button>
       </CardHeader>
@@ -276,31 +324,32 @@ export function ReferenceFormBijoux({
               <Label required>Métal</Label>
               <Select value={metal} onValueChange={(v) => { if (v) setMetal(v as "Or" | "Argent" | "Platine"); }}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner" />
+                  <SelectValue placeholder="Sélectionner" items={selectItems(METAL_OPTIONS)} />
                 </SelectTrigger>
                 <SelectContent>
-                  {METAL_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
+                  {/* Trois familles separees : metaux au cours, plaques, non
+                      precieux. Elles ne se valorisent pas de la meme facon. */}
+                  {METAL_GROUPES.map((groupe, i) => (
+                    <Fragment key={i}>
+                      {i > 0 && <SelectSeparator />}
+                      {groupe.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </Fragment>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label required>Qualité</Label>
-              <Select value={qualite} onValueChange={(v) => { if (v) setQualite(v); }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner" />
-                </SelectTrigger>
-                <SelectContent>
-                  {QUALITE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="titrage" required={!prixFixe}>Titrage (millièmes)</Label>
+              <TitrageInput
+                id="titrage"
+                value={qualite}
+                onValueChange={setQualite}
+                disabled={prixFixe}
+              />
             </div>
           </div>
 
@@ -452,8 +501,31 @@ export function ReferenceFormBijoux({
             </div>
           )}
 
+          {/* Photos de l'article. Facultatives, contrairement a celles du lot :
+              utiles sur une piece de valeur ou un defaut a documenter,
+              superflues sur un lot de chutes. */}
+          <div className="space-y-2">
+            <Label>
+              Photos de l&apos;article
+              <span className="ml-1 text-xs font-normal text-muted-foreground">
+                (facultatif)
+              </span>
+            </Label>
+            <PhotosUpload
+              chemins={photos}
+              onChange={setPhotos}
+              prefixe={lotId}
+              /* En creation la reference n'a pas d'identifiant : le telephone
+                 depose dans la session seule, et l'enregistrement rattache. */
+              lotId={isEdit ? lotId : null}
+              referenceId={editData?.id ?? null}
+              libelle={designation || "Nouvel article"}
+              max={8}
+            />
+          </div>
+
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+            <Button type="button" variant="outline" size="sm" onClick={fermer}>
               Annuler
             </Button>
             <Button type="submit" size="sm" disabled={saving}>

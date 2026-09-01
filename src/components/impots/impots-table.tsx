@@ -2,7 +2,15 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Receipt } from "@phosphor-icons/react";
+import { Receipt, DownloadSimple } from "@phosphor-icons/react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  construireCsv,
+  telechargerCsv,
+  nomFichierDate,
+  nombreFr,
+} from "@/lib/export-csv";
 import type { TaxeRow } from "@/types/impots";
 import { TaxeTypeBadge } from "@/components/impots/taxe-type-badge";
 import { DataGrid, type ColonneGrid } from "@/components/ui/data-grid";
@@ -68,6 +76,33 @@ export function ImpotsTable({ data }: ImpotsTableProps) {
     grid.page * grid.pageSize + grid.pageSize
   );
 
+  /**
+   * Export du registre des taxes.
+   *
+   * Porte sur l'ensemble des lignes retenues par la recherche et les filtres, et
+   * non sur la page affichee : c'est un document qu'on remet a un comptable, ou
+   * dont on recopie les totaux sur le formulaire 2091. Une version tronquee a la
+   * page consultee serait fausse sans le dire.
+   */
+  function exporter() {
+    const contenu = construireCsv(filtrees, [
+      { entete: "Date", valeur: (t: TaxeRow) => formatDate(t.date) },
+      { entete: "Référence", valeur: (t: TaxeRow) => t.reference },
+      { entete: "Client", valeur: (t: TaxeRow) => t.client_name },
+      { entete: "Type de taxe", valeur: (t: TaxeRow) => t.type },
+      { entete: "Origine", valeur: (t: TaxeRow) => (t.source_type === "rachat" ? "Rachat" : "Vente") },
+      { entete: "Montant brut (€)", valeur: (t: TaxeRow) => nombreFr(t.montant_brut) },
+      { entete: "Taxe (€)", valeur: (t: TaxeRow) => nombreFr(t.montant_taxe) },
+    ]);
+    telechargerCsv(contenu, nomFichierDate("registre-des-taxes"));
+  }
+
+  // Totaux par type : ce sont eux qu'on reporte sur une declaration.
+  const totauxParType = filtrees.reduce<Record<string, number>>((acc, t) => {
+    acc[t.type] = (acc[t.type] ?? 0) + t.montant_taxe;
+    return acc;
+  }, {});
+
   const colonnes: ColonneGrid<TaxeRow>[] = [
     {
       cle: "date",
@@ -108,9 +143,29 @@ export function ImpotsTable({ data }: ImpotsTableProps) {
   ];
 
   return (
-    <DataGrid
-      colonnes={colonnes}
-      donnees={page}
+    <>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {Object.entries(totauxParType).map(([type, montant]) => (
+            <Badge key={type} variant="outline" className="font-normal tabular-nums">
+              {type} : {formatCurrency(montant)}
+            </Badge>
+          ))}
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={exporter}
+          disabled={filtrees.length === 0}
+        >
+          <DownloadSimple size={16} weight="duotone" />
+          Exporter ({filtrees.length})
+        </Button>
+      </div>
+
+      <DataGrid
+        colonnes={colonnes}
+        donnees={page}
       totalItems={filtrees.length}
       cleLigne={(t) => t.id}
       onRowClick={(t) =>
@@ -121,10 +176,11 @@ export function ImpotsTable({ data }: ImpotsTableProps) {
       placeholderRecherche="Rechercher une taxe..."
       messageVide="Aucune taxe trouvée."
       filtres={[{ cle: "type", label: "Type", options: TYPE_OPTIONS }]}
-      groupements={[
-        { cle: "type", label: "Type de taxe" },
-        { cle: "client_name", label: "Client" },
-      ]}
-    />
+        groupements={[
+          { cle: "type", label: "Type de taxe" },
+          { cle: "client_name", label: "Client" },
+        ]}
+      />
+    </>
   );
 }

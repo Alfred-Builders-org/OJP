@@ -40,6 +40,19 @@ const MODE_OPTIONS: { value: ModeReglement; label: string; icon: typeof Money }[
   { value: "cheque", label: "Cheque", icon: Check },
 ];
 
+/**
+ * Le reglement d'un achat de metaux precieux a un particulier ne peut pas se
+ * faire en especes : il passe par cheque barre ou virement. La regle vaut pour
+ * ce que la boutique verse au vendeur — un rachat ou le net d'un depot-vente —
+ * et non pour ce qu'un client paie en caisse.
+ */
+function especesInterdites(paymentDue: PaymentDue): boolean {
+  return (
+    paymentDue.sens === "sortant" &&
+    (paymentDue.type === "rachat" || paymentDue.type === "depot_vente")
+  );
+}
+
 interface ReglementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -67,6 +80,10 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
   const [error, setError] = useState("");
 
   const isSortant = paymentDue.sens === "sortant";
+  const sansEspeces = especesInterdites(paymentDue);
+  const modesDisponibles = sansEspeces
+    ? MODE_OPTIONS.filter((m) => m.value !== "especes")
+    : MODE_OPTIONS;
 
   const totalSaisi = lignes.reduce(
     (sum, l) => sum + (parseFloat(l.montant) || 0),
@@ -98,6 +115,13 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
 
     if (lignes.some((l) => !l.mode)) {
       setError("Chaque ligne doit porter un moyen de paiement.");
+      return;
+    }
+
+    if (sansEspeces && lignes.some((l) => l.mode === "especes")) {
+      setError(
+        "Un achat de métaux précieux à un particulier ne peut pas être réglé en espèces : chèque barré ou virement."
+      );
       return;
     }
 
@@ -184,7 +208,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
         // Récupérer toutes les refs en attente de paiement
         const { data: pendingRefs } = await supabase
           .from("lot_references")
-          .select("id, categorie, or_investissement_id, quantite, designation, metal, qualite, poids, poids_brut, poids_net, prix_achat, prix_revente_estime, destination")
+          .select("id, numero, categorie, or_investissement_id, quantite, designation, metal, qualite, poids, poids_brut, poids_net, prix_achat, prix_revente_estime, destination")
           .in("id", refIds)
           .eq("status", "en_attente_paiement");
 
@@ -206,6 +230,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
               poids: ref.poids_net ?? ref.poids, poids_brut: ref.poids_brut, poids_net: ref.poids_net,
               prix_achat: ref.prix_achat, prix_revente: ref.prix_revente_estime, quantite: ref.quantite,
               statut: statutsPourDestination(ref.destination, false).stock,
+              reference: ref.numero ?? null,
             }).select("id").single();
 
             if (stockEntry) {
@@ -574,7 +599,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
                     )}
                   </SelectTrigger>
                   <SelectContent>
-                    {MODE_OPTIONS.map((opt) => {
+                    {modesDisponibles.map((opt) => {
                       const Icon = opt.icon;
                       return (
                         <SelectItem key={opt.value} value={opt.value}>
@@ -600,6 +625,14 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
                 )}
               </div>
             ))}
+
+            {sansEspeces && (
+              <p className="text-xs text-muted-foreground">
+                Le règlement d&apos;un achat de métaux précieux à un particulier se
+                fait par chèque barré ou virement : les espèces ne sont pas
+                proposées.
+              </p>
+            )}
 
             {lignes.length > 1 && (
               <div className="flex items-center justify-between text-sm pt-1">

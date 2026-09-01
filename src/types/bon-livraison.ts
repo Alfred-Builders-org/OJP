@@ -12,6 +12,8 @@ export interface BonLivraisonLigne {
   titrage_declare: string | null;
   poids_declare: number | null;
   cours_utilise: number | null;
+  /** Cours au gramme retenu par la fonderie ; prime sur `cours_utilise`. */
+  cours_reel: number | null;
   valeur_estimee: number | null;
   titrage_reel: string | null;
   poids_reel: number | null;

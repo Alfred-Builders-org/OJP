@@ -356,8 +356,10 @@ export function detectPaymentsDue({
       const linkedRefs = lotReferences.filter((r) => linkedRefIds.has(r.id));
       if (linkedRefs.length === 0) continue;
 
+      // Net verse au deposant : son prix, moins la taxe forfaitaire que la
+      // boutique retient et declare pour son compte — comme sur un rachat.
       const totalNetDeposant = linkedRefs.reduce(
-        (sum, r) => sum + r.prix_achat * r.quantite,
+        (sum, r) => sum + (r.prix_achat - r.montant_taxe) * r.quantite,
         0
       );
       const dejaPaye = reglements

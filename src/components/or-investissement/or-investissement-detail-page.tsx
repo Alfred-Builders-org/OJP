@@ -12,6 +12,7 @@ import {
   CurrencyEur,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
+import { calculerPrixRachatOrInvest } from "@/lib/calculations/prix-rachat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -79,6 +80,13 @@ export function OrInvestissementDetailPage({ item, canEdit = true }: { item: OrI
   const [titre, setTitre] = useState(item.titre ?? "");
   const [poids, setPoids] = useState(item.poids?.toString() ?? "");
   const [quantite, setQuantite] = useState(item.quantite.toString());
+  // Vide : la piece suit les coefficients generaux des parametres.
+  const [coeffAchatLocal, setCoeffAchatLocal] = useState(
+    item.coefficient_achat?.toString() ?? ""
+  );
+  const [coeffVenteLocal, setCoeffVenteLocal] = useState(
+    item.coefficient_vente?.toString() ?? ""
+  );
   const [parametres, setParametres] = useState<{
     prix_or: number | null;
     prix_argent: number | null;
@@ -105,13 +113,21 @@ export function OrInvestissementDetailPage({ item, canEdit = true }: { item: OrI
   }
 
   const cours = getCoursForMetal(item.metal);
-  const titreNum = item.titre ? parseFloat(item.titre) : 0;
   const poidsNum = item.poids ?? 0;
-  const coeffRachat = parametres?.coefficient_rachat ?? 0;
-  const coeffVente = parametres?.coefficient_vente ?? 0;
 
-  const prixRachat = cours * poidsNum * (titreNum / 1000) * coeffRachat;
-  const prixVente = cours * poidsNum * (titreNum / 1000) * coeffVente;
+  // Le coefficient de la piece prime sur celui des parametres. « General »
+  // signale, plus bas, que la piece n'en a pas de propre.
+  const coeffPropreAchat = item.coefficient_achat;
+  const coeffPropreVente = item.coefficient_vente;
+  const coeffRachat = coeffPropreAchat ?? parametres?.coefficient_rachat ?? 0;
+  const coeffVente = coeffPropreVente ?? parametres?.coefficient_vente ?? 0;
+
+  // Meme formule que le formulaire de rachat : cours x poids x coefficient. La
+  // fiche appliquait en plus le titrage, si bien qu'une meme piece n'etait pas
+  // valorisee pareil ici et dans un lot. Le poids du catalogue est celui d'or
+  // fin, le titrage n'a donc pas a etre applique une seconde fois.
+  const prixRachat = calculerPrixRachatOrInvest(cours, poidsNum, coeffRachat);
+  const prixVente = calculerPrixRachatOrInvest(cours, poidsNum, coeffVente);
 
   async function handleSave() {
     setSaving(true);
@@ -126,6 +142,8 @@ export function OrInvestissementDetailPage({ item, canEdit = true }: { item: OrI
         titre: titre || null,
         poids: poids ? parseFloat(poids) : null,
         quantite: quantite ? parseInt(quantite) : 0,
+        coefficient_achat: coeffAchatLocal ? parseFloat(coeffAchatLocal) : null,
+        coefficient_vente: coeffVenteLocal ? parseFloat(coeffVenteLocal) : null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", item.id);
@@ -216,6 +234,30 @@ export function OrInvestissementDetailPage({ item, canEdit = true }: { item: OrI
             </CardHeader>
             <CardContent>
               <DetailRow label="Cours du métal" value={parametres ? `${formatCurrency(cours)}/g` : "Chargement..."} />
+              <DetailRow
+                label="Coefficient d'achat"
+                value={
+                  coeffPropreAchat != null
+                    ? String(coeffPropreAchat)
+                    : `${coeffRachat} (général)`
+                }
+                editing={editing}
+                editValue={coeffAchatLocal}
+                onEditChange={setCoeffAchatLocal}
+                type="number"
+              />
+              <DetailRow
+                label="Coefficient de vente"
+                value={
+                  coeffPropreVente != null
+                    ? String(coeffPropreVente)
+                    : `${coeffVente} (général)`
+                }
+                editing={editing}
+                editValue={coeffVenteLocal}
+                onEditChange={setCoeffVenteLocal}
+                type="number"
+              />
               <DetailRow label="Prix de rachat" value={formatCurrency(prixRachat)} />
               <DetailRow label="Prix de vente" value={formatCurrency(prixVente)} />
               {prixVente > 0 && prixRachat > 0 && (

@@ -33,7 +33,14 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        {/*
+          Le clair est le theme de la boutique : on y compare des metaux et des
+          pierres a l'oeil, sous la lumiere du comptoir. Suivre l'OS faisait
+          basculer l'application en sombre chez qui l'a regle ainsi, sans qu'il
+          l'ait demande pour ce poste-la. « Systeme » reste offert dans le
+          profil, pour qui le veut.
+        */}
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <TooltipProvider>{children}</TooltipProvider>
         </ThemeProvider>
         <AgentationProvider />

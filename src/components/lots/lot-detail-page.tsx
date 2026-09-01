@@ -53,6 +53,8 @@ import { ReferenceFormOrInvest } from "@/components/lots/reference-form-or-inves
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { ReglementsCard } from "@/components/reglements/reglements-card";
 import { detectPaymentsDue } from "@/lib/reglements/detect-payments-due";
+import { TARIFS_FIXES_DEFAUT, type TarifsFixes } from "@/lib/calculations/prix-rachat";
+import { LotPhotosCard } from "@/components/photos/lot-photos-card";
 import { getAvailableActions } from "@/lib/actions/action-registry";
 import { executeAction } from "@/lib/actions/action-executor";
 import type { ActionContext } from "@/lib/actions/action-types";
@@ -97,6 +99,8 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
   const [retractationMs, setRetractationMs] = useState(48 * 3600_000);
   const [acomptePct, setAcomptePct] = useState(10);
   const [commissionDvPct, setCommissionDvPct] = useState(40);
+  // Tarifs des matieres sans cours, lus une fois pour les formulaires.
+  const [tarifs, setTarifs] = useState<TarifsFixes>(TARIFS_FIXES_DEFAUT);
 
   // Track latest values in refs for cleanup on navigation away
   const refsCountRef = useRef(lot.references.length);
@@ -138,12 +142,29 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
         if (rules.commission_dv_pct) setCommissionDvPct(rules.commission_dv_pct);
       }
     });
+
+    const supabase = createClient();
+    supabase
+      .from("parametres")
+      .select("prix_plaque_or, prix_plaque_argent, prix_autre")
+      .eq("id", 1)
+      .single()
+      .then(({ data }) => {
+        if (!data) return;
+        setTarifs({
+          plaqueOr: Number(data.prix_plaque_or) || TARIFS_FIXES_DEFAUT.plaqueOr,
+          plaqueArgent: Number(data.prix_plaque_argent) || TARIFS_FIXES_DEFAUT.plaqueArgent,
+          autre: Number(data.prix_autre) || TARIFS_FIXES_DEFAUT.autre,
+        });
+      });
   }, []);
 
   const supabase = createClient();
   const isBrouillon = lot.status === "brouillon";
   const isTerminal = lot.status === "finalise";
   const isDepotVente = lot.type === "depot_vente";
+  // Seuls le rachat et le dépôt-vente font entrer de la marchandise en boutique.
+  const aPhotographier = lot.type === "rachat" || lot.type === "depot_vente";
   const clientName = `${lot.dossier.client.civility === "M" ? "M." : "Mme"} ${lot.dossier.client.first_name} ${lot.dossier.client.last_name}`;
 
   const paymentsDue = detectPaymentsDue({
@@ -318,10 +339,21 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
             </CardContent>
           </Card>
 
+          {/* Photos du lot. Exigées sur un rachat comme sur un dépôt-vente :
+              c'est la preuve de ce que le client a remis, et le seul recours si
+              la composition du lot venait à être contestée.
+
+              Sur une demi-largeur, côte à côte avec les cours : une galerie de
+              vignettes n'a pas besoin de toute la fiche, et les deux cartes se
+              répondent — ce qui est entré, et à quel cours il a été payé. */}
+          {aPhotographier && (
+            <LotPhotosCard lotId={lot.id} numero={lot.numero} disabled={isTerminal} />
+          )}
+
           {/* Cours appliqués — carte à part, sous les informations client.
               Noyés parmi les dates du lot, ils étaient illisibles alors que ce
               sont eux qui expliquent chaque montant de la fiche. */}
-          <Card className="md:col-span-2">
+          <Card className={aPhotographier ? undefined : "md:col-span-2"}>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
                 <Coins size={20} weight="duotone" />
@@ -436,6 +468,7 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
                 onClose={() => setShowFormBijoux(false)}
                 lotType={isDepotVente ? "depot_vente" : "rachat"}
                 commissionDvPct={commissionDvPct}
+                tarifs={tarifs}
               />
             )}
             {showFormOrInvest && (
@@ -470,6 +503,7 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
                       editData={ref}
                       lotType={isDepotVente ? "depot_vente" : "rachat"}
                       commissionDvPct={commissionDvPct}
+                      tarifs={tarifs}
                     />
                   ) : (
                     <ReferenceFormOrInvest

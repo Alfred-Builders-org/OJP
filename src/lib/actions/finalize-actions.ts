@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { generateAndStoreDocument } from "@/lib/pdf/generate-and-store";
 import { tauxLigne, libelleTotalTaxe } from "@/lib/pdf/taxes-labels";
+import { calculerTFOP } from "@/lib/calculations/taxes";
 import { getSettingServer } from "@/lib/settings-server";
 import { formatDate, formatDateTime, formatTime } from "@/lib/format";
 import type {
@@ -157,6 +158,7 @@ export async function autoProcessExpiredRetractation(dossierId: string): Promise
           const contratRefs = expiredRefs.filter((r: Ref) => contratRefIds.includes(r.id));
           const refLignes: ReferenceLigne[] = contratRefs.map((r: Ref) => ({
             designation: r.designation,
+            reference: r.numero ?? null,
             metal: r.metal ?? "—",
             titrage: r.qualite ?? "—",
             poids: r.poids_net ?? r.poids ?? 0,
@@ -242,6 +244,42 @@ export async function finaliserDossierAction(dossierId: string): Promise<Finalis
 
     if (!brouillonLots || brouillonLots.length === 0) {
       return { success: false, error: "Aucun lot brouillon à finaliser" };
+    }
+
+    // Photo obligatoire sur ce qui entre en boutique. La finalisation est le
+    // moment ou l'on s'engage : contrat emis, delai de retractation ouvert,
+    // marchandise prise en charge. Passe ce point, plus personne ne
+    // photographiera le lot tel qu'il a ete remis.
+    //
+    // Le controle est ici, cote serveur, et pas seulement sur l'ecran de
+    // confirmation : c'est la seule barriere que l'appelant ne peut pas
+    // contourner.
+    const lotsAPhotographier = brouillonLots.filter(
+      (l: { type: string }) => l.type === "rachat" || l.type === "depot_vente"
+    );
+
+    if (lotsAPhotographier.length > 0) {
+      const { data: photos } = await supabase
+        .from("lot_photos")
+        .select("lot_id")
+        .in("lot_id", lotsAPhotographier.map((l: { id: string }) => l.id))
+        .is("reference_id", null);
+
+      const photographies = new Set((photos ?? []).map((p: { lot_id: string }) => p.lot_id));
+      const manquants = lotsAPhotographier.filter(
+        (l: { id: string }) => !photographies.has(l.id)
+      );
+
+      if (manquants.length > 0) {
+        const numeros = manquants.map((l: { numero: string }) => l.numero).join(", ");
+        return {
+          success: false,
+          error:
+            manquants.length > 1
+              ? `Photo manquante sur les lots ${numeros}. Photographiez la marchandise avant de finaliser.`
+              : `Photo manquante sur le lot ${numeros}. Photographiez la marchandise avant de finaliser.`,
+        };
+      }
     }
 
     const now = new Date();
@@ -333,6 +371,7 @@ function buildDossierInfo(dossier: { numero: string }, lot: { numero: string }, 
 function buildRefLignes(refList: Ref[]): ReferenceLigne[] {
   return refList.map((r: Ref) => ({
     designation: r.designation,
+    reference: r.numero ?? null,
     metal: r.metal ?? "—",
     titrage: r.qualite ?? "—",
     poids: r.poids_net ?? r.poids ?? 0,
@@ -535,6 +574,7 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
   const dossierInfo = buildDossierInfo(dossier, lot, now);
   const dvRefs: DepotVenteReferenceLigne[] = allDvRefs.map((r: Ref) => ({
     designation: r.designation,
+    reference: r.numero ?? null,
     description: [r.metal, r.qualite].filter(Boolean).join(" ") || "—",
     // Le poids ne remontait pas jusqu'au template : le contrat engageait la
     // boutique sur de la marchandise dont il ne disait pas la masse.
@@ -564,6 +604,7 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
     const confieRef: ConfieReferenceLigne = {
       titre: ref.qualite ?? "—",
       designation: `${ref.designation} (${ref.metal ?? "—"})`,
+      reference: ref.numero ?? null,
       quantite: ref.quantite,
       poids: ref.poids_net ?? ref.poids ?? 0,
       prixAchat: ref.prix_achat,
@@ -699,15 +740,35 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
     let totalCommission = 0;
     let totalNetDeposant = 0;
 
+    // La quittance de depot-vente est l'acte par lequel la boutique achete le
+    // bijou au deposant : elle porte la meme fiscalite qu'une quittance de
+    // rachat. La taxe forfaitaire s'apprecie par objet, sur le net verse au
+    // deposant, et se retient sur ce qu'on lui doit.
+    let totalTaxe = 0;
+    const taxesParRef: { refId: string; taxe: number }[] = [];
+
     for (const item of items) {
       const ref = refByStockId.get(item.stockId);
       const prixVente = item.prixVente;
       const netDeposant = ref?.prix_achat ?? prixVente * 0.6;
       const commission = prixVente - netDeposant;
+      const taxe = calculerTFOP(netDeposant);
+      if (ref?.id) taxesParRef.push({ refId: ref.id, taxe });
       qdvLignes.push({ designation: ref?.designation ?? item.designation, description: item.designation, prixVentePublic: prixVente, netDeposant, commission });
       totalVentes += prixVente;
       totalCommission += commission;
-      totalNetDeposant += netDeposant;
+      totalTaxe += taxe;
+      totalNetDeposant += netDeposant - taxe;
+    }
+
+    // La taxe retenue est portee sur la reference : c'est de la qu'elle remonte
+    // au registre des impots, comme celle d'un rachat.
+    for (const { refId, taxe } of taxesParRef) {
+      if (taxe <= 0) continue;
+      await supabase
+        .from("lot_references")
+        .update({ regime_fiscal: "TFOP", montant_taxe: taxe })
+        .eq("id", refId);
     }
 
     const dvClientInfo: ClientInfo = {
@@ -721,7 +782,13 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
       type: "quittance_depot_vente", lotId: dvLot.id, dossierId: dvDossier.id, clientId: deposant.id,
       client: dvClientInfo,
       dossier: { numeroDossier: dvDossier.numero, numeroLot: dvLot.numero, date: formatDate(now.toISOString()), heure: formatTime(now) },
-      references: [], totaux: { totalBrut: totalVentes, taxe: totalCommission, netAPayer: totalNetDeposant },
+      references: [],
+      totaux: {
+        totalBrut: totalVentes,
+        taxe: totalTaxe,
+        netAPayer: totalNetDeposant,
+        taxeLabel: "Taxe forfaitaire (6,5%)",
+      },
       quittanceDepotVenteLignes: qdvLignes, totalVentes, totalCommission, venteDossierNumero: dossier.numero,
       lotReferenceIds: (lotRefs ?? []).map((r: Ref) => r.id),
     }, "quittance_depot_vente");
@@ -736,9 +803,13 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
 
   // Phase 2: Facture de vente (bijoux)
   if (bijouxLignes.length > 0) {
-    const totalHT = bijouxLignes.reduce((s: number, l: VenteLigne) => s + l.prix_total, 0);
+    // Le prix affiche au client est TTC : la TVA sur marge y est deja incluse.
+    // Le calcul precedent l'ajoutait par-dessus — un bijou en vitrine a 1 000 EUR
+    // se facturait 1 050 EUR. Sous le regime de la marge, la facture ne ventile
+    // d'ailleurs ni HT ni TVA : elle porte le total et la mention 297 A.
+    const totalTTC = bijouxLignes.reduce((s: number, l: VenteLigne) => s + l.prix_total, 0);
     const tva = bijouxLignes.reduce((s: number, l: VenteLigne) => s + l.montant_taxe, 0);
-    const totalTTC = totalHT + tva;
+    const totalHT = Math.round((totalTTC - tva) * 100) / 100;
 
     const res = await genDoc({
       type: "facture_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id,
@@ -746,6 +817,8 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
       totaux: { totalBrut: totalHT, taxe: tva, netAPayer: totalTTC },
       factureVenteLignes: buildFactureLignes(bijouxLignes),
       totalHT, tva, totalTTC, modeReglement: "—",
+      // Bien d'occasion acquis aupres d'un particulier : regime de la marge.
+      regimeMarge: true,
     }, "facture_vente");
     if (res.error) docErrors.push(res.error);
     else if (res.path) {

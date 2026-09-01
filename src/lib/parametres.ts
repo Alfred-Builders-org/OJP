@@ -8,6 +8,10 @@ const DEFAULT_PARAMETRES: Parametres = {
   prix_platine: 0,
   coefficient_rachat: 0.85,
   coefficient_vente: 1.05,
+  // Tarifs de reprise des matieres sans cours, alignes sur ceux de la base.
+  prix_plaque_or: 0.07,
+  prix_plaque_argent: 0.01,
+  prix_autre: 0.01,
   updated_at: new Date().toISOString(),
   cours_maj_le: null,
 };

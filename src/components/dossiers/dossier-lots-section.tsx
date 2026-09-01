@@ -39,10 +39,20 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { LotStatusBadge } from "@/components/lots/lot-status-badge";
+import { ReferenceCard } from "@/components/lots/reference-card";
+import { VenteLigneCard } from "@/components/ventes/vente-ligne-card";
 import { VenteStatusBadge } from "@/components/ventes/vente-status-badge";
 import { formatDate, formatCurrency } from "@/lib/format";
-import type { Lot, LotStatus } from "@/types/lot";
+import type { Lot, LotStatus, LotReference } from "@/types/lot";
+import type { VenteLigne } from "@/types/vente";
 import type { DossierStatus } from "@/types/dossier";
+
+export type RefActionId =
+  | "ref.valider_rachat"
+  | "ref.retracter"
+  | "ref.accepter_devis"
+  | "ref.refuser_devis"
+  | "ref.restituer";
 
 interface DossierLotsSectionProps {
   lots: Lot[];
@@ -50,6 +60,14 @@ interface DossierLotsSectionProps {
   creatingLot: boolean;
   onCreateLot: (type: "rachat" | "vente" | "depot_vente") => void;
   onDeleteLot: (lotId: string) => void;
+  /** Toutes les references du dossier, tous lots confondus. */
+  lotReferences?: LotReference[];
+  /** Lignes des lots de vente : une vente ne porte pas de references. */
+  venteLignes?: VenteLigne[];
+  /** Nom de la fonderie par bon de commande, pour les lignes deja commandees. */
+  fonderieParBdc?: Record<string, string>;
+  /** Rejoue une action de reference depuis le dossier, sans ouvrir le lot. */
+  onRefAction?: (actionId: RefActionId, refId: string, lot: Lot) => void;
 }
 
 export function DossierLotsSection({
@@ -58,6 +76,10 @@ export function DossierLotsSection({
   creatingLot,
   onCreateLot,
   onDeleteLot,
+  lotReferences = [],
+  venteLignes = [],
+  fonderieParBdc = {},
+  onRefAction,
 }: DossierLotsSectionProps) {
   const router = useRouter();
   const { openPreview } = usePreviewDrawer();
@@ -123,9 +145,24 @@ export function DossierLotsSection({
           </p>
         ) : (
           <div className="space-y-2">
-            {lots.map((lot) => (
+            {lots.map((lot) => {
+              // Une fois le lot engage, ses references portent chacune une
+              // action a mener — valider un rachat, honorer une retractation,
+              // repondre a un devis. Les tenir cachees derriere l'ouverture du
+              // lot obligeait a entrer dans chaque lot pour savoir s'il
+              // attendait quelque chose.
+              const engage = lot.status !== "brouillon";
+              const refsDuLot = engage
+                ? lotReferences.filter((r) => r.lot_id === lot.id)
+                : [];
+              const lignesDuLot = engage
+                ? venteLignes.filter((v) => v.lot_id === lot.id)
+                : [];
+              const isDepotVente = lot.type === "depot_vente";
+
+              return (
+            <div key={lot.id} className="space-y-2">
               <div
-                key={lot.id}
                 className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors"
               >
                 <div
@@ -198,7 +235,73 @@ export function DossierLotsSection({
                   </DropdownMenu>
                 </div>
               </div>
-            ))}
+
+              {/*
+                Une vente ne porte pas de references : ses articles sont des
+                lignes de vente. Sans elles, un dossier de vente n'affichait que
+                le numero de son lot, et il fallait ouvrir la vente pour savoir
+                ce qu'elle contenait ou ce qu'il restait a commander.
+              */}
+              {lignesDuLot.length > 0 && (
+                <div className="ml-4 space-y-2 border-l pl-4">
+                  {lignesDuLot.map((ligne) => (
+                    <VenteLigneCard
+                      key={ligne.id}
+                      ligne={ligne}
+                      showFulfillment
+                      showLivraison={lot.status === "finalise"}
+                      onLivraisonChange={() => router.refresh()}
+                      fonderieName={
+                        ligne.bon_commande_id
+                          ? fonderieParBdc[ligne.bon_commande_id]
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+
+              {refsDuLot.length > 0 && (
+                <div className="ml-4 space-y-2 border-l pl-4">
+                  {refsDuLot.map((reference) => (
+                    <ReferenceCard
+                      key={reference.id}
+                      reference={reference}
+                      hideTypeRachat={isDepotVente}
+                      isDepotVente={isDepotVente}
+                      canRestituer={isDepotVente && !!onRefAction}
+                      onValiderRachat={
+                        onRefAction
+                          ? (id) => onRefAction("ref.valider_rachat", id, lot)
+                          : undefined
+                      }
+                      onRetracter={
+                        onRefAction
+                          ? (id) => onRefAction("ref.retracter", id, lot)
+                          : undefined
+                      }
+                      onAccepterDevis={
+                        onRefAction
+                          ? (id) => onRefAction("ref.accepter_devis", id, lot)
+                          : undefined
+                      }
+                      onRefuserDevis={
+                        onRefAction
+                          ? (id) => onRefAction("ref.refuser_devis", id, lot)
+                          : undefined
+                      }
+                      onRestituer={
+                        onRefAction
+                          ? (id) => onRefAction("ref.restituer", id, lot)
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+              );
+            })}
 
             {/* Dialog de confirmation suppression lot */}
             <Dialog open={!!deletingLotId} onOpenChange={(open) => { if (!open) setDeletingLotId(null); }}>
