@@ -14,12 +14,13 @@ interface EmailWrapperProps {
   body: string;
   /**
    * Logo, en absolu. Un courriel n'a pas de racine : l'adresse doit etre
-   * complete, et suivre l'environnement qui l'envoie.
+   * complete, et suivre l'environnement qui l'envoie. Absente, l'enseigne
+   * s'ecrit en toutes lettres.
    */
   logoUrl?: string;
 }
 
-export function EmailWrapper({ body, logoUrl = LOGO_DEFAUT }: EmailWrapperProps) {
+export function EmailWrapper({ body, logoUrl }: EmailWrapperProps) {
   const lines = body.split("\n");
 
   return (
@@ -28,12 +29,16 @@ export function EmailWrapper({ body, logoUrl = LOGO_DEFAUT }: EmailWrapperProps)
       <Body style={bodyStyle}>
         <Container style={containerStyle}>
           <Section style={headerStyle}>
-            <Img
-              src={logoUrl}
-              width="180"
-              alt="Or au Juste Prix"
-              style={{ margin: "0 auto" }}
-            />
+            {logoUrl ? (
+              <Img
+                src={logoUrl}
+                width="180"
+                alt="Or au Juste Prix"
+                style={{ margin: "0 auto" }}
+              />
+            ) : (
+              <Text style={enseigneStyle}>Or au Juste Prix</Text>
+            )}
           </Section>
 
           <Section style={contentStyle}>
@@ -66,16 +71,18 @@ export function EmailWrapper({ body, logoUrl = LOGO_DEFAUT }: EmailWrapperProps)
   );
 }
 
-/**
- * Repli quand l'application ne connait pas sa propre adresse publique.
- *
- * L'adresse du bucket vaut mieux que rien, mais elle est fragile : celui de
- * production ne contient pas le fichier, et affichait donc un carre casse. La
- * bonne source est le dossier `public` de l'application, servi par
- * l'environnement qui envoie.
- */
-const LOGO_DEFAUT =
-  "https://wprsfakodbuvszporcoe.supabase.co/storage/v1/object/public/assets/logo-light.png";
+// Repli quand l'application ne connait pas sa propre adresse publique : le nom
+// ecrit, plutot qu'une image. Un lien code en dur vers le bucket d'un projet
+// precis serait pire — c'est ce qui se faisait, et la production, qui n'a pas
+// ce fichier, affichait un carre casse.
+const enseigneStyle: React.CSSProperties = {
+  color: "#ffffff",
+  fontSize: "20px",
+  fontWeight: 600,
+  letterSpacing: "0.5px",
+  margin: 0,
+  textAlign: "center" as const,
+};
 
 const bodyStyle: React.CSSProperties = {
   backgroundColor: "#f4f4f5",

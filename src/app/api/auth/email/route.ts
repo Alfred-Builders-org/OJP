@@ -115,7 +115,14 @@ export async function POST(request: NextRequest) {
   // un carre casse a la place du logo de la boutique inspire tout sauf
   // confiance — sur un message qui demande de changer un mot de passe, c'est le
   // pire moment pour ressembler a un courriel frauduleux.
-  const origine = donnees.site_url || process.env.NEXT_PUBLIC_APP_URL || "";
+  // NEXT_PUBLIC_APP_URL passe devant `site_url` : ce dernier est une
+  // configuration Supabase, et il etait reste sur la valeur d'exemple du CLI —
+  // http://127.0.0.1:3000. Tous les liens de reinitialisation et d'invitation
+  // pointaient donc vers localhost, et personne d'autre que le poste de
+  // developpement ne pouvait s'en servir. La variable de l'environnement qui
+  // envoie est la source la plus fiable de sa propre adresse.
+  const origine =
+    process.env.NEXT_PUBLIC_APP_URL || donnees.site_url || "";
   const logoUrl = `${origine}/logo-light.png`;
 
   const action = donnees.email_action_type;
