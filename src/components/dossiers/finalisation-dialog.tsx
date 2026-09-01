@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircle, Warning } from "@phosphor-icons/react";
+import { Camera, CheckCircle, Warning } from "@phosphor-icons/react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/format";
 import { getSettingClient } from "@/lib/settings-client";
+import { createClient } from "@/lib/supabase/client";
 import type { Lot, LotReference } from "@/types/lot";
 import type { VenteLigne } from "@/types/vente";
 
@@ -47,6 +48,8 @@ interface ResumeLot {
   /** Une ligne de consequence : ce que la finalisation va produire. */
   lignes: { badge: string; texte: string }[];
   compte: string;
+  /** Photo de prise en charge manquante : la finalisation sera refusee. */
+  photoManquante: boolean;
 }
 
 /**
@@ -82,6 +85,34 @@ export function FinalisationDialog({
   const [retractationHeures, setRetractationHeures] = useState(retractationProp ?? 48);
   const [commissionPct, setCommissionPct] = useState(commissionProp ?? 40);
 
+  // Lots deja photographies. Releve a l'ouverture plutot que lu sur les lots
+  // recus : le vendeur peut venir de prendre la photo sur la fiche du lot, et
+  // l'ecran du dossier n'aurait pas encore ete rejoue cote serveur.
+  const [lotsPhotographies, setLotsPhotographies] = useState<Set<string> | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const aPhotographier = lots
+      .filter((l) => l.type === "rachat" || l.type === "depot_vente")
+      .map((l) => l.id);
+
+    if (aPhotographier.length === 0) {
+      setLotsPhotographies(new Set());
+      return;
+    }
+
+    createClient()
+      .from("lot_photos")
+      .select("lot_id")
+      .in("lot_id", aPhotographier)
+      .is("reference_id", null)
+      .then(({ data }) => {
+        setLotsPhotographies(new Set((data ?? []).map((p) => p.lot_id as string)));
+      });
+    // `lots` est recree a chaque rendu du parent : on se cale sur son contenu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, lots.map((l) => l.id).join("|")]);
+
   useEffect(() => {
     if (!open) return;
     getSettingClient("business_rules").then((rules) => {
@@ -94,6 +125,17 @@ export function FinalisationDialog({
       }
     });
   }, [open, retractationProp, commissionProp]);
+
+  /**
+   * Un rachat comme un depot-vente doit etre photographie avant d'etre engage.
+   * Tant que le releve n'est pas revenu, on ne signale rien : annoncer un
+   * manque puis le retirer une seconde plus tard vaut moins que d'attendre.
+   */
+  function photoManque(lot: Lot): boolean {
+    if (lot.type !== "rachat" && lot.type !== "depot_vente") return false;
+    if (lotsPhotographies === null) return false;
+    return !lotsPhotographies.has(lot.id);
+  }
 
   const resume: ResumeLot[] = lots.map((lot) => {
     if (lot.type === "depot_vente") {
@@ -130,6 +172,7 @@ export function FinalisationDialog({
         total: netDeposant,
         lignes: consequences,
         compte: `${refs.length} article${refs.length > 1 ? "s" : ""} confié${refs.length > 1 ? "s" : ""} par le client`,
+        photoManquante: photoManque(lot),
       };
     }
 
@@ -163,6 +206,7 @@ export function FinalisationDialog({
         total,
         lignes: consequences,
         compte: `${lignes.length} ligne${lignes.length > 1 ? "s" : ""} de vente`,
+        photoManquante: false,
       };
     }
 
@@ -194,12 +238,14 @@ export function FinalisationDialog({
       total,
       lignes: consequences,
       compte: `${refs.length} référence${refs.length > 1 ? "s" : ""} au total`,
+      photoManquante: photoManque(lot),
     };
   });
 
   const totalGeneral = resume.reduce((sum, r) => sum + r.total, 0);
   const lotsVides = resume.filter((r) => r.vide);
   const toutVide = resume.length > 0 && lotsVides.length === resume.length;
+  const sansPhoto = resume.filter((r) => r.photoManquante && !r.vide);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -216,7 +262,7 @@ export function FinalisationDialog({
         </DialogHeader>
 
         <div className="space-y-3 py-2">
-          {resume.map(({ lot, vide, total, lignes, compte }) => (
+          {resume.map(({ lot, vide, total, lignes, compte, photoManquante }) => (
             <div key={lot.id} className="rounded-lg border p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
@@ -248,6 +294,12 @@ export function FinalisationDialog({
               ) : (
                 <ul className="space-y-1 text-sm text-muted-foreground">
                   <li>{compte}</li>
+                  {photoManquante && (
+                    <li className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
+                      <Camera size={14} weight="duotone" />
+                      <span>Photo de la marchandise manquante</span>
+                    </li>
+                  )}
                   {lignes.map((c) => (
                     <li key={c.badge} className="flex items-center gap-1.5">
                       <Badge variant="secondary" className="font-normal">
@@ -272,6 +324,18 @@ export function FinalisationDialog({
             Un lot vide parmi d'autres ne bloque plus : on le signale, et la
             finalisation reste possible pour ceux qui portent quelque chose.
           */}
+          {sansPhoto.length > 0 && (
+            <div className="flex items-start gap-2 rounded-md border border-red-500 bg-red-50 px-3 py-2 text-sm text-red-500 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-400">
+              <Camera size={16} weight="duotone" className="mt-0.5 shrink-0" />
+              <span>
+                Photographiez la marchandise avant de finaliser. Passé ce point, le
+                lot est engagé et plus personne ne pourra le photographier tel
+                qu&apos;il a été remis. La photo se prend sur la fiche du lot
+                {sansPhoto.length === 1 ? ` ${sansPhoto[0].lot.numero}` : ""}.
+              </span>
+            </div>
+          )}
+
           {lotsVides.length > 0 && !toutVide && (
             <p className="text-xs text-muted-foreground">
               {lotsVides.length} lot{lotsVides.length > 1 ? "s" : ""} sera finalisé à
@@ -288,7 +352,10 @@ export function FinalisationDialog({
           >
             Annuler
           </Button>
-          <Button onClick={onConfirm} disabled={processing || toutVide}>
+          <Button
+            onClick={onConfirm}
+            disabled={processing || toutVide || sansPhoto.length > 0}
+          >
             <CheckCircle size={16} weight="duotone" />
             {processing ? "Traitement..." : "Confirmer la finalisation"}
           </Button>

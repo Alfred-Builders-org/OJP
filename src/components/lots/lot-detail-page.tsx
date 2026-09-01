@@ -54,6 +54,7 @@ import { DocumentsTable } from "@/components/documents/documents-table";
 import { ReglementsCard } from "@/components/reglements/reglements-card";
 import { detectPaymentsDue } from "@/lib/reglements/detect-payments-due";
 import { TARIFS_FIXES_DEFAUT, type TarifsFixes } from "@/lib/calculations/prix-rachat";
+import { LotPhotosCard } from "@/components/photos/lot-photos-card";
 import { getAvailableActions } from "@/lib/actions/action-registry";
 import { executeAction } from "@/lib/actions/action-executor";
 import type { ActionContext } from "@/lib/actions/action-types";
@@ -335,6 +336,13 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
               <DetailRow label="Ville" value={lot.dossier.client.city ?? "—"} />
             </CardContent>
           </Card>
+
+          {/* Photos du lot. Exigées sur un rachat comme sur un dépôt-vente :
+              c'est la preuve de ce que le client a remis, et le seul recours si
+              la composition du lot venait à être contestée. */}
+          {(lot.type === "rachat" || lot.type === "depot_vente") && (
+            <LotPhotosCard lotId={lot.id} numero={lot.numero} disabled={isTerminal} />
+          )}
 
           {/* Cours appliqués — carte à part, sous les informations client.
               Noyés parmi les dates du lot, ils étaient illisibles alors que ce

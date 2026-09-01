@@ -246,6 +246,42 @@ export async function finaliserDossierAction(dossierId: string): Promise<Finalis
       return { success: false, error: "Aucun lot brouillon à finaliser" };
     }
 
+    // Photo obligatoire sur ce qui entre en boutique. La finalisation est le
+    // moment ou l'on s'engage : contrat emis, delai de retractation ouvert,
+    // marchandise prise en charge. Passe ce point, plus personne ne
+    // photographiera le lot tel qu'il a ete remis.
+    //
+    // Le controle est ici, cote serveur, et pas seulement sur l'ecran de
+    // confirmation : c'est la seule barriere que l'appelant ne peut pas
+    // contourner.
+    const lotsAPhotographier = brouillonLots.filter(
+      (l: { type: string }) => l.type === "rachat" || l.type === "depot_vente"
+    );
+
+    if (lotsAPhotographier.length > 0) {
+      const { data: photos } = await supabase
+        .from("lot_photos")
+        .select("lot_id")
+        .in("lot_id", lotsAPhotographier.map((l: { id: string }) => l.id))
+        .is("reference_id", null);
+
+      const photographies = new Set((photos ?? []).map((p: { lot_id: string }) => p.lot_id));
+      const manquants = lotsAPhotographier.filter(
+        (l: { id: string }) => !photographies.has(l.id)
+      );
+
+      if (manquants.length > 0) {
+        const numeros = manquants.map((l: { numero: string }) => l.numero).join(", ");
+        return {
+          success: false,
+          error:
+            manquants.length > 1
+              ? `Photo manquante sur les lots ${numeros}. Photographiez la marchandise avant de finaliser.`
+              : `Photo manquante sur le lot ${numeros}. Photographiez la marchandise avant de finaliser.`,
+        };
+      }
+    }
+
     const now = new Date();
     const delai48h = new Date(now.getTime() + RETRACTATION_DELAY_MS);
     const emailTriggers: EmailTrigger[] = [];

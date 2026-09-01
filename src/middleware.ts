@@ -8,6 +8,11 @@ const publicRoutes = [
   "/forgot-password",
   "/reset-password",
   "/auth/callback",
+  // Prise de vue au telephone. Volontairement hors authentification : on ne se
+  // connecte pas a l'ERP sur son mobile pour photographier un lot. Le jeton de
+  // l'URL fait l'autorisation, perime en trente minutes, et n'ouvre rien
+  // d'autre que le depot d'une image sur une cible deja designee.
+  "/photo/",
 ];
 
 const authRoutes = ["/sign-in", "/register"];
