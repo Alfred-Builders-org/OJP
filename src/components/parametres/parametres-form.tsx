@@ -104,6 +104,10 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
 
   // Prix du cours state
   const [prixOr, setPrixOr] = useState(parametres.prix_or.toString());
+  // Tarifs fixes : saisis a la main, hors de tout releve de marche.
+  const [prixPlaqueOr, setPrixPlaqueOr] = useState(parametres.prix_plaque_or?.toString() ?? "0.07");
+  const [prixPlaqueArgent, setPrixPlaqueArgent] = useState(parametres.prix_plaque_argent?.toString() ?? "0.01");
+  const [prixAutre, setPrixAutre] = useState(parametres.prix_autre?.toString() ?? "0.01");
   const [prixArgent, setPrixArgent] = useState(parametres.prix_argent.toString());
   const [prixPlatine, setPrixPlatine] = useState(parametres.prix_platine.toString());
   // Les cours ne passent plus par `useSaveParametres` (écriture directe en
@@ -126,6 +130,7 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
   const [coefficient, setCoefficient] = useState(parametres.coefficient_rachat.toString());
   const [coefficientVente, setCoefficientVente] = useState(parametres.coefficient_vente.toString());
   const { saving: savingCoeff, save: saveCoeff } = useSaveParametres("Coefficients mis à jour");
+  const { save: saveTarifs } = useSaveParametres("Tarifs fixes mis à jour");
 
   const initialPrix = useRef({ prixOr: parametres.prix_or.toString(), prixArgent: parametres.prix_argent.toString(), prixPlatine: parametres.prix_platine.toString() });
   const initialCoeff = useRef({ coefficient: parametres.coefficient_rachat.toString(), coefficientVente: parametres.coefficient_vente.toString() });
@@ -229,9 +234,23 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
       return false;
     };
 
-    const [r1, r2] = await Promise.all([
+    // Les tarifs fixes passent par l'ecriture directe : ils ne suivent aucun
+    // cours, donc rien a comparer, et le controle de vraisemblance ne les
+    // concerne pas.
+    const tarifs = {
+      prix_plaque_or: parseFloat(prixPlaqueOr),
+      prix_plaque_argent: parseFloat(prixPlaqueArgent),
+      prix_autre: parseFloat(prixAutre),
+    };
+    if (Object.values(tarifs).some((v) => isNaN(v) || v < 0)) {
+      toast.error("Les tarifs fixes doivent être des nombres positifs.");
+      return false;
+    }
+
+    const [r1, r2, r3] = await Promise.all([
       enregistrerCours(false),
       saveCoeff({ coefficient_rachat: coeff, coefficient_vente: coeffV }),
+      saveTarifs(tarifs),
     ]);
 
     if (r1) {
@@ -241,8 +260,8 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
     }
     if (r2) initialCoeff.current = { coefficient, coefficientVente };
 
-    return r1 && r2;
-  }, [prixOr, prixArgent, prixPlatine, coefficient, coefficientVente, saveCoeff]);
+    return r1 && r2 && r3;
+  }, [prixOr, prixArgent, prixPlatine, prixPlaqueOr, prixPlaqueArgent, prixAutre, coefficient, coefficientVente, saveCoeff, saveTarifs]);
 
   // Keep the prix save registered when prix is the active section
   if (activeSection === "prix") {
@@ -414,6 +433,71 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
                           onChange={(e) => setPrixPlatine(e.target.value)}
                           className="pr-10"
                           required
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">€/g</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Matieres a tarif fixe. Separees des cours a dessein : elles ne
+                  suivent aucun marche, rien ne les releve, et le controle de
+                  vraisemblance qui protege les cours ne s'y applique pas. */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Scales size={20} weight="duotone" />
+                    Matières à tarif fixe
+                  </CardTitle>
+                  <CardDescription>
+                    Tarifs de reprise au gramme, décidés par la boutique. Le titrage
+                    n&apos;entre pas en compte et aucun coefficient ne s&apos;y applique.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4 pb-6">
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="prix_plaque_or">Plaqué or</Label>
+                      <div className="relative">
+                        <Input
+                          id="prix_plaque_or"
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={prixPlaqueOr}
+                          onChange={(e) => setPrixPlaqueOr(e.target.value)}
+                          className="pr-10"
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">€/g</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="prix_plaque_argent">Plaqué argent</Label>
+                      <div className="relative">
+                        <Input
+                          id="prix_plaque_argent"
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={prixPlaqueArgent}
+                          onChange={(e) => setPrixPlaqueArgent(e.target.value)}
+                          className="pr-10"
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">€/g</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="prix_autre">Autre (non précieux)</Label>
+                      <div className="relative">
+                        <Input
+                          id="prix_autre"
+                          type="number"
+                          step="0.001"
+                          min="0"
+                          value={prixAutre}
+                          onChange={(e) => setPrixAutre(e.target.value)}
+                          className="pr-10"
                         />
                         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">€/g</span>
                       </div>

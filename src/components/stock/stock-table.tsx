@@ -107,7 +107,17 @@ export function StockTable({
               <Diamond size={16} weight="duotone" className="text-muted-foreground" />
             </div>
           )}
-          <span className="font-medium">{item.nom}</span>
+          <div className="min-w-0">
+            <span className="font-medium">{item.nom}</span>
+            {/* Reference de l'article — « numero du lot / rang », ou reference du
+                fournisseur pour un achat grossiste. C'est elle qui relie le
+                rayon au document d'origine. */}
+            {(item.reference ?? item.reference_fournisseur) && (
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {item.reference ?? item.reference_fournisseur}
+              </p>
+            )}
+          </div>
         </div>
       ),
     },

@@ -48,6 +48,22 @@ export function OrInvestissementTable({ data, totalItems }: OrInvestissementTabl
     },
     { cle: "titre", titre: "Titre", triable: true, cellule: (o) => o.titre ?? "—" },
     {
+      cle: "coefficients",
+      titre: "Coefficients",
+      headClassName: "text-right",
+      className: "text-right tabular-nums",
+      // « Général » dit que la piece suit les coefficients des parametres — a
+      // distinguer d'une valeur propre, qui est une decision commerciale.
+      cellule: (o) =>
+        o.coefficient_achat == null && o.coefficient_vente == null ? (
+          <span className="text-xs text-muted-foreground">Général</span>
+        ) : (
+          <span className="text-xs">
+            A {o.coefficient_achat ?? "—"} · V {o.coefficient_vente ?? "—"}
+          </span>
+        ),
+    },
+    {
       cle: "poids",
       titre: "Poids",
       triable: true,

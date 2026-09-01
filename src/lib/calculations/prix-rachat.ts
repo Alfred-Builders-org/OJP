@@ -1,8 +1,23 @@
+import { estMetalPrixFixe } from "@/lib/validations/lot";
+
 /** Returns 0 for NaN, Infinity, or negative numbers. */
 function safeNum(n: number): number {
   if (!Number.isFinite(n) || n < 0) return 0;
   return n;
 }
+
+/** Tarifs au gramme des matieres qui ne suivent aucun cours. */
+export interface TarifsFixes {
+  plaqueOr: number;
+  plaqueArgent: number;
+  autre: number;
+}
+
+export const TARIFS_FIXES_DEFAUT: TarifsFixes = {
+  plaqueOr: 0.07,
+  plaqueArgent: 0.01,
+  autre: 0.01,
+};
 
 /**
  * Calcul du prix de rachat pour les bijoux.
@@ -24,6 +39,66 @@ export function calculerPrixRachatBijoux(
 }
 
 /**
+ * Prix d'une matiere a tarif fixe : tarif au gramme × poids.
+ *
+ * Ni titrage ni coefficient n'entrent en jeu. Le titrage n'a pas de sens sur du
+ * plaque — c'est une couche de metal precieux sur un support qui n'en est pas —
+ * et le tarif que la boutique affiche est deja son prix de reprise : lui
+ * appliquer en plus le coefficient de rachat le diviserait une seconde fois.
+ */
+export function calculerPrixMatiereFixe(
+  tarifGramme: number,
+  poids: number
+): number {
+  return Math.round(safeNum(tarifGramme) * safeNum(poids) * 100) / 100;
+}
+
+/** Tarif au gramme applicable a une matiere sans cours. */
+export function tarifFixePourMetal(
+  metal: string | null | undefined,
+  tarifs: TarifsFixes
+): number {
+  switch (metal) {
+    case "Plaque or":
+      return tarifs.plaqueOr;
+    case "Plaque argent":
+      return tarifs.plaqueArgent;
+    case "Autre":
+      return tarifs.autre;
+    default:
+      return 0;
+  }
+}
+
+/**
+ * Prix de reprise d'un bijou, quelle que soit sa matiere.
+ *
+ * Aiguille vers le calcul au cours ou vers le tarif fixe : c'est le seul point
+ * ou la distinction doit etre faite, pour que les formulaires n'aient pas a la
+ * refaire chacun de leur cote.
+ */
+export function calculerPrixBijou({
+  metal,
+  coursMetalGramme,
+  qualite,
+  poids,
+  coefficient,
+  tarifs,
+}: {
+  metal: string | null | undefined;
+  coursMetalGramme: number;
+  qualite: number;
+  poids: number;
+  coefficient: number;
+  tarifs: TarifsFixes;
+}): number {
+  if (estMetalPrixFixe(metal)) {
+    return calculerPrixMatiereFixe(tarifFixePourMetal(metal, tarifs), poids);
+  }
+  return calculerPrixRachatBijoux(coursMetalGramme, qualite, poids, coefficient);
+}
+
+/**
  * Calcul du prix de rachat pour l'or investissement.
  *
  * Formule : cours_metal × poids × coefficient
@@ -42,9 +117,12 @@ export function calculerPrixRachatOrInvest(
 
 /**
  * Retourne le cours du métal approprié depuis les snapshots du lot.
+ *
+ * Les matieres a tarif fixe n'ont pas de cours : elles renvoient 0, et leur prix
+ * passe par `calculerPrixMatiereFixe`.
  */
 export function getCoursMetalFromSnapshot(
-  metal: "Or" | "Argent" | "Platine",
+  metal: string,
   coursOrSnapshot: number,
   coursArgentSnapshot: number,
   coursPlatineSnapshot: number
@@ -56,5 +134,7 @@ export function getCoursMetalFromSnapshot(
       return coursArgentSnapshot;
     case "Platine":
       return coursPlatineSnapshot;
+    default:
+      return 0;
   }
 }

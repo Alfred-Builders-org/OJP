@@ -17,6 +17,7 @@ import {
   CaretUpDown,
   Lightning,
   FileText,
+  Plus,
 } from "@phosphor-icons/react";
 import { parse } from "date-fns";
 import { toast } from "sonner";
@@ -48,6 +49,7 @@ import {
   isTPVEligible,
   regimeFiscalOptimal,
 } from "@/lib/calculations/taxes";
+import { PieceCreateDialog } from "@/components/or-investissement/piece-create-dialog";
 import type { OrInvestissement } from "@/types/or-investissement";
 import { formatCurrency, formatDateISO } from "@/lib/format";
 import type { LotReference } from "@/types/lot";
@@ -122,40 +124,57 @@ export function ReferenceFormOrInvest({
   const [selectedId, setSelectedId] = useState(editData?.or_investissement_id ?? "");
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
+  const [creationOuverte, setCreationOuverte] = useState(false);
+  // Les pieces creees a la volee s'ajoutent au catalogue recu, sans attendre un
+  // rechargement de la page.
+  const [catalogueLocal, setCatalogueLocal] = useState<OrInvestissement[]>([]);
   const [isScelle, setIsScelle] = useState(editData?.is_scelle ?? false);
   const [hasFacture, setHasFacture] = useState(editData?.has_facture ?? false);
   const [dateAcquisition, setDateAcquisition] = useState(editData?.date_acquisition ?? "");
   const [prixAcquisition, setPrixAcquisition] = useState(editData?.prix_acquisition?.toString() ?? "");
   const [quantite, setQuantite] = useState(editData?.quantite?.toString() ?? "1");
 
-  const selectedItem = catalog.find((c) => c.id === selectedId);
+  const catalogueComplet = useMemo(
+    () => [...catalogueLocal, ...catalog],
+    [catalogueLocal, catalog]
+  );
+
+  const selectedItem = catalogueComplet.find((c) => c.id === selectedId);
 
   const filteredCatalog = useMemo(() => {
-    if (!catalogSearch) return catalog;
+    if (!catalogSearch) return catalogueComplet;
     const q = catalogSearch.toLowerCase();
-    return catalog.filter(
+    return catalogueComplet.filter(
       (item) =>
         item.designation.toLowerCase().includes(q) ||
         item.metal?.toLowerCase().includes(q) ||
         item.pays?.toLowerCase().includes(q)
     );
-  }, [catalog, catalogSearch]);
+  }, [catalogueComplet, catalogSearch]);
 
   const metal = selectedItem?.metal as "Or" | "Argent" | "Platine" | null;
   const poids = selectedItem?.poids ?? 0;
+
+  // Une piece peut porter ses propres coefficients : un napoleon et un lingot
+  // n'ont ni la meme prime ni la meme liquidite. Sans valeur propre, elle suit
+  // les coefficients generaux.
+  const coeffAchat = selectedItem?.coefficient_achat ?? liveCoeffRachat;
+  const coeffVente = selectedItem?.coefficient_vente ?? liveCoeffVente;
+  const coeffPropre =
+    selectedItem?.coefficient_achat != null || selectedItem?.coefficient_vente != null;
 
   const qty = parseInt(quantite) || 1;
 
   const prixRachat = (() => {
     if (!metal || !poids) return null;
     const cours = getCoursMetalFromSnapshot(metal, liveCoursOr, liveCoursArgent, liveCoursPlatine);
-    return Math.round(calculerPrixRachatOrInvest(cours, poids, liveCoeffRachat) * qty * 100) / 100;
+    return Math.round(calculerPrixRachatOrInvest(cours, poids, coeffAchat) * qty * 100) / 100;
   })();
 
   const prixVente = (() => {
     if (!metal || !poids) return null;
     const cours = getCoursMetalFromSnapshot(metal, liveCoursOr, liveCoursArgent, liveCoursPlatine);
-    return Math.round(calculerPrixRachatOrInvest(cours, poids, liveCoeffVente) * qty * 100) / 100;
+    return Math.round(calculerPrixRachatOrInvest(cours, poids, coeffVente) * qty * 100) / 100;
   })();
 
   const tpvEligible = isTPVEligible(
@@ -203,7 +222,7 @@ export function ReferenceFormOrInvest({
       prix_acquisition: prixAcquisition ? parseFloat(prixAcquisition) : null,
       quantite: parseInt(quantite) || 1,
       cours_metal_utilise: cours,
-      coefficient_utilise: liveCoeffRachat,
+      coefficient_utilise: coeffAchat,
       prix_achat: prixRachat !== null ? prixRachat / qty : null,
       prix_revente_estime: prixVente !== null ? prixVente / qty : null,
       tpv_eligible: tpvEligible,
@@ -273,6 +292,17 @@ export function ReferenceFormOrInvest({
             </button>
           </div>
 
+          <PieceCreateDialog
+            open={creationOuverte}
+            onOpenChange={setCreationOuverte}
+            designationInitiale={catalogSearch}
+            onCreated={(piece) => {
+              setCatalogueLocal((prev) => [piece, ...prev]);
+              setSelectedId(piece.id);
+              setCatalogSearch("");
+            }}
+          />
+
           {/* Catalog selection with search */}
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
             <div className="space-y-2 md:col-span-2">
@@ -311,6 +341,21 @@ export function ReferenceFormOrInvest({
                     </div>
                   </div>
                   <div className="max-h-60 overflow-y-auto p-1">
+                    {/* Toujours en tete : c'est quand la piece manque au
+                        catalogue qu'on en a besoin, et c'est justement le moment
+                        ou la liste est vide. */}
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full rounded px-2 py-1.5 text-sm font-medium hover:bg-muted cursor-pointer text-left"
+                      onClick={() => {
+                        setCatalogOpen(false);
+                        setCreationOuverte(true);
+                      }}
+                    >
+                      <Plus size={14} weight="bold" />
+                      Nouvelle pièce au catalogue
+                    </button>
+                    <div className="my-1 h-px bg-border" />
                     {filteredCatalog.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-4">
                         Aucun résultat.

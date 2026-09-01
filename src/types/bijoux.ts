@@ -18,6 +18,8 @@ export interface BijouxStock {
   grossiste_id: string | null;
   achat_grossiste_id: string | null;
   reference_fournisseur: string | null;
+  /** Reference de l'article, heritee de la reference du lot d'origine. */
+  reference: string | null;
   date_creation: string;
   created_at: string;
   updated_at: string;

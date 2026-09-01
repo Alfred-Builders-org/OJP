@@ -53,6 +53,7 @@ import { ReferenceFormOrInvest } from "@/components/lots/reference-form-or-inves
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { ReglementsCard } from "@/components/reglements/reglements-card";
 import { detectPaymentsDue } from "@/lib/reglements/detect-payments-due";
+import { TARIFS_FIXES_DEFAUT, type TarifsFixes } from "@/lib/calculations/prix-rachat";
 import { getAvailableActions } from "@/lib/actions/action-registry";
 import { executeAction } from "@/lib/actions/action-executor";
 import type { ActionContext } from "@/lib/actions/action-types";
@@ -97,6 +98,8 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
   const [retractationMs, setRetractationMs] = useState(48 * 3600_000);
   const [acomptePct, setAcomptePct] = useState(10);
   const [commissionDvPct, setCommissionDvPct] = useState(40);
+  // Tarifs des matieres sans cours, lus une fois pour les formulaires.
+  const [tarifs, setTarifs] = useState<TarifsFixes>(TARIFS_FIXES_DEFAUT);
 
   // Track latest values in refs for cleanup on navigation away
   const refsCountRef = useRef(lot.references.length);
@@ -138,6 +141,21 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
         if (rules.commission_dv_pct) setCommissionDvPct(rules.commission_dv_pct);
       }
     });
+
+    const supabase = createClient();
+    supabase
+      .from("parametres")
+      .select("prix_plaque_or, prix_plaque_argent, prix_autre")
+      .eq("id", 1)
+      .single()
+      .then(({ data }) => {
+        if (!data) return;
+        setTarifs({
+          plaqueOr: Number(data.prix_plaque_or) || TARIFS_FIXES_DEFAUT.plaqueOr,
+          plaqueArgent: Number(data.prix_plaque_argent) || TARIFS_FIXES_DEFAUT.plaqueArgent,
+          autre: Number(data.prix_autre) || TARIFS_FIXES_DEFAUT.autre,
+        });
+      });
   }, []);
 
   const supabase = createClient();
@@ -436,6 +454,7 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
                 onClose={() => setShowFormBijoux(false)}
                 lotType={isDepotVente ? "depot_vente" : "rachat"}
                 commissionDvPct={commissionDvPct}
+                tarifs={tarifs}
               />
             )}
             {showFormOrInvest && (
@@ -470,6 +489,7 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
                       editData={ref}
                       lotType={isDepotVente ? "depot_vente" : "rachat"}
                       commissionDvPct={commissionDvPct}
+                      tarifs={tarifs}
                     />
                   ) : (
                     <ReferenceFormOrInvest

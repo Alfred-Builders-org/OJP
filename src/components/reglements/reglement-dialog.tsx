@@ -184,7 +184,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
         // Récupérer toutes les refs en attente de paiement
         const { data: pendingRefs } = await supabase
           .from("lot_references")
-          .select("id, categorie, or_investissement_id, quantite, designation, metal, qualite, poids, poids_brut, poids_net, prix_achat, prix_revente_estime, destination")
+          .select("id, numero, categorie, or_investissement_id, quantite, designation, metal, qualite, poids, poids_brut, poids_net, prix_achat, prix_revente_estime, destination")
           .in("id", refIds)
           .eq("status", "en_attente_paiement");
 
@@ -206,6 +206,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
               poids: ref.poids_net ?? ref.poids, poids_brut: ref.poids_brut, poids_net: ref.poids_net,
               prix_achat: ref.prix_achat, prix_revente: ref.prix_revente_estime, quantite: ref.quantite,
               statut: statutsPourDestination(ref.destination, false).stock,
+              reference: ref.numero ?? null,
             }).select("id").single();
 
             if (stockEntry) {

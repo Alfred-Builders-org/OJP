@@ -70,6 +70,8 @@ export interface Lot {
 
 export interface LotReference {
   id: string;
+  /** « numero du lot / rang », ex. RAC-2026-0004/002. */
+  numero: string | null;
   lot_id: string;
   categorie: ReferenceCategorie;
   designation: string;

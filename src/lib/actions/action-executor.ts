@@ -71,6 +71,7 @@ export async function executeAction(params: {
               prix_revente: ref.prix_revente_estime,
               quantite: ref.quantite,
               statut: "en_depot_vente",
+              reference: ref.numero ?? null,
               depot_vente_lot_id: ctx.lot.id,
               deposant_client_id: clientId,
             })

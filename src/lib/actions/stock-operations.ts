@@ -32,6 +32,9 @@ export async function createBijouxStockEntry({
     prix_revente: ref.prix_revente_estime,
     quantite: ref.quantite,
     statut: statuts.stock,
+    // L'article garde la reference de la reference du lot : c'est ce qui relie
+    // le rayon au contrat d'origine.
+    reference: ref.numero ?? null,
   };
 
   if (isDepotVente) {

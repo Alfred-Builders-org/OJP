@@ -11,7 +11,7 @@ import type { BijouxStock, BijouxStockWithOrigin } from "@/types/bijoux";
 import type { UserRole } from "@/types/auth";
 
 const OPTIONS: OptionsRequete = {
-  colonnesRecherche: ["nom", "description", "metaux", "qualite"],
+  colonnesRecherche: ["nom", "description", "metaux", "qualite", "reference", "reference_fournisseur"],
   colonnesFiltres: { statut: "statut", metal: "metaux" },
   colonnesTri: {
     nom: "nom",
