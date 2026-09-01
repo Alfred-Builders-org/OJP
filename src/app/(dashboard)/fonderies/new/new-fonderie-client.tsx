@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -84,7 +86,7 @@ export function NewFonderieClient() {
 
       <div className="flex-1 p-6 space-y-6">
         {error && (
-          <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>
+          <FieldError>{error}</FieldError>
         )}
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -97,7 +99,7 @@ export function NewFonderieClient() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
-                <Label>Nom *</Label>
+                <Label required>Nom</Label>
                 <Input value={nom} onChange={(e) => setNom(e.target.value)} placeholder="CPoR Devises" />
               </div>
               <div className="space-y-1.5">

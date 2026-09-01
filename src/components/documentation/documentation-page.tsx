@@ -74,7 +74,10 @@ export function DocumentationPage() {
                   <button
                     onClick={() => scrollTo(section.id)}
                     className={cn(
-                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors",
+                      // `text-left` explicite : un bouton hérite du centrage de
+                      // la feuille de style du navigateur, et les titres qui
+                      // passent sur deux lignes se centraient.
+                      "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-left transition-colors",
                       isCurrent
                         ? "bg-muted font-medium text-foreground"
                         : isSectionActive

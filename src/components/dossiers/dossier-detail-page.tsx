@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
+import { RichText } from "@/components/ui/rich-text";
+
+// Tiptap n'est charge qu'a l'ouverture de l'editeur.
+const RichTextEditor = dynamic(
+  () => import("@/components/ui/rich-text-editor").then((m) => m.RichTextEditor),
+  { ssr: false }
+);
 import { CopyableText } from "@/components/ui/copyable-text";
 import Link from "next/link";
 import { PreviewLink } from "@/components/preview/preview-link";
@@ -27,6 +35,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Card,
@@ -39,6 +48,7 @@ import { DOSSIER_STATUS_OPTIONS } from "@/lib/validations/dossier";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { DossierRecapFinancier } from "@/components/dossiers/dossier-recap-financier";
 import { DossierLotsSection } from "@/components/dossiers/dossier-lots-section";
+import { FinalisationDialog } from "@/components/dossiers/finalisation-dialog";
 import { ActionDashboard } from "@/components/actions/action-dashboard";
 import { finaliserDossierAction } from "@/lib/actions/finalize-actions";
 import type { DossierWithClient, DossierStatus } from "@/types/dossier";
@@ -120,6 +130,7 @@ export function DossierDetailPage({
   // Lots that can be finalized (brouillon)
   const brouillonLots = lots.filter((l) => l.status === "brouillon");
   const canFinalize = brouillonLots.length > 0;
+  const [confirmFinalisation, setConfirmFinalisation] = useState(false);
 
   // Build LotWithReferences for ActionDashboard
   const lotsWithRefs: LotWithReferences[] = lots.map((lot) => ({
@@ -242,6 +253,7 @@ export function DossierDetailPage({
     try {
       const result = await finaliserDossierAction(dossier.id);
       setProcessing(false);
+      setConfirmFinalisation(false);
       if (result.success) {
         toast.success("Dossier finalisé");
         router.refresh();
@@ -289,7 +301,7 @@ export function DossierDetailPage({
           {editing && status !== "finalise" && (
             <Select value={status} onValueChange={(val) => { if (val) setStatus(val as DossierStatus); }}>
               <SelectTrigger className="w-40">
-                <SelectValue />
+                <SelectValue items={selectItems(DOSSIER_STATUS_OPTIONS)} />
               </SelectTrigger>
               <SelectContent>
                 {DOSSIER_STATUS_OPTIONS
@@ -319,7 +331,7 @@ export function DossierDetailPage({
             </Button>
           )}
           {canFinalize && (
-            <Button size="sm" disabled={processing} onClick={handleFinaliserDossier}>
+            <Button size="sm" disabled={processing} onClick={() => setConfirmFinalisation(true)}>
               <CheckCircle size={16} weight="duotone" />
               {processing ? "Traitement..." : "Finaliser le dossier"}
             </Button>
@@ -399,6 +411,15 @@ export function DossierDetailPage({
             <DocumentsTable documents={documents ?? []} />
           </div>
 
+          <FinalisationDialog
+            open={confirmFinalisation}
+            onOpenChange={setConfirmFinalisation}
+            onConfirm={handleFinaliserDossier}
+            processing={processing}
+            lots={brouillonLots}
+            lotReferences={lotReferences}
+          />
+
           {/* Récapitulatif financier — masqué temporairement */}
           {/* <DossierRecapFinancier
             lots={lots}
@@ -430,16 +451,16 @@ export function DossierDetailPage({
             </CardHeader>
             <CardContent>
               {editing || editingNotes ? (
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                <RichTextEditor
+                  // Le composant ne resynchronise pas son contenu apres montage :
+                  // la cle le remonte a chaque entree en edition.
+                  key={`notes-${dossier.id}`}
+                  content={notes}
+                  onChange={setNotes}
                   placeholder="Notes sur le dossier..."
-                  className="min-h-[150px] resize-none"
                 />
               ) : (
-                <p className="text-sm whitespace-pre-wrap">
-                  {dossier.notes ?? "Aucune note."}
-                </p>
+                <RichText html={dossier.notes} fallback="Aucune note." />
               )}
             </CardContent>
           </Card>

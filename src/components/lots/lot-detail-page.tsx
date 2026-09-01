@@ -19,6 +19,8 @@ import {
   Coins,
   Receipt,
   Warning,
+  CheckCircle,
+  XCircle,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
@@ -153,6 +155,17 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
     acompte_pct: acomptePct,
   });
 
+  // Délai de rétractation en cours : on retient l'échéance la plus tardive parmi
+  // les références concernées — c'est elle qui commande la finalisation du lot.
+  const refsEnRetractation = lot.references.filter(
+    (r) => r.status === "en_retractation" && r.date_fin_delai
+  );
+  const retractationDelai = refsEnRetractation.length
+    ? refsEnRetractation.reduce((tardive, r) =>
+        new Date(r.date_fin_delai!) > new Date(tardive.date_fin_delai!) ? r : tardive
+      )
+    : null;
+
   // ── Action context (used by ActionList) ─────────────────────
   const actionCtx: ActionContext = {
     lot,
@@ -170,6 +183,12 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
   async function handleRefAction(actionId: "ref.valider_rachat" | "ref.retracter" | "ref.accepter_devis" | "ref.refuser_devis" | "ref.restituer", refId: string) {
     const supabase = createClient();
     await executeAction({ actionId, supabase, ctx: actionCtx, referenceId: refId });
+    router.refresh();
+  }
+
+  async function handleLotAction(actionId: "lot.accepter_devis" | "lot.refuser_devis") {
+    const supabase = createClient();
+    await executeAction({ actionId, supabase, ctx: actionCtx });
     router.refresh();
   }
 
@@ -264,12 +283,6 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
               {lot.date_finalisation && (
                 <DetailRow label="Date de finalisation" value={formatDate(lot.date_finalisation)} />
               )}
-              <CoursAppliques
-                or={lot.cours_or_snapshot}
-                argent={lot.cours_argent_snapshot}
-                platine={lot.cours_platine_snapshot}
-                coefficient={lot.coefficient_rachat_snapshot}
-              />
             </CardContent>
           </Card>
 
@@ -304,6 +317,29 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
               <DetailRow label="Ville" value={lot.dossier.client.city ?? "—"} />
             </CardContent>
           </Card>
+
+          {/* Cours appliqués — carte à part, sous les informations client.
+              Noyés parmi les dates du lot, ils étaient illisibles alors que ce
+              sont eux qui expliquent chaque montant de la fiche. */}
+          <Card className="md:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Coins size={20} weight="duotone" />
+                Cours appliqués
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">
+                figés à la création du lot
+              </span>
+            </CardHeader>
+            <CardContent>
+              <CoursAppliques
+                or={lot.cours_or_snapshot}
+                argent={lot.cours_argent_snapshot}
+                platine={lot.cours_platine_snapshot}
+                coefficient={lot.coefficient_rachat_snapshot}
+              />
+            </CardContent>
+          </Card>
         </div>
 
         {/* Stepper */}
@@ -318,8 +354,21 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
           referenceStatuses={lot.references.map((r) => r.status)}
         />
 
-        {/* Destination des articles — modifiable tant que le lot n'est pas soldé */}
-        {!isTerminal && lot.references.length > 0 && (
+        {/* Délai de rétractation — barre de progression et compte à rebours.
+            Branché sur les références et non sur le lot : `date_fin_retractation`
+            n'est renseignée que dans le parcours devis, jamais en rachat direct,
+            où le délai court pourtant bel et bien. */}
+        {retractationDelai && (
+          <RetractationTimer
+            startDate={retractationDelai.date_envoi}
+            endDate={retractationDelai.date_fin_delai}
+          />
+        )}
+
+        {/* Destination des articles — modifiable tant que le lot n'est pas soldé.
+            Un lot de dépôt-vente n'est pas concerné : sa marchandise part chez
+            le déposant, pas en stock ni en fonderie. */}
+        {!isTerminal && lot.type !== "depot_vente" && lot.references.length > 0 && (
           <DestinationSelector lot={lot} />
         )}
 
@@ -549,8 +598,32 @@ export function LotDetailPage({ lot, orInvestCatalog, typeLabel, documents = [],
           </CardContent>
         </Card>
 
-        {/* Documents */}
-        <DocumentsTable documents={documents} />
+        {/* Documents — la ligne du devis porte ses deux décisions. Le tableau
+            prévoyait ce point d'extension depuis l'origine ; aucun appelant ne
+            s'en servait, si bien qu'Accepter et Refuser n'existaient que dans la
+            carte des actions en attente. */}
+        <DocumentsTable
+          documents={documents}
+          rowActions={(doc) =>
+            doc.type === "devis_rachat" &&
+            doc.status === "en_attente" &&
+            lot.references.some((r) => r.status === "devis_envoye") ? (
+              <>
+                <DropdownMenuItem onClick={() => handleLotAction("lot.accepter_devis")}>
+                  <CheckCircle size={16} weight="duotone" />
+                  Accepter le devis
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => handleLotAction("lot.refuser_devis")}
+                >
+                  <XCircle size={16} weight="duotone" />
+                  Refuser le devis
+                </DropdownMenuItem>
+              </>
+            ) : null
+          }
+        />
 
         {/* Reglements */}
         {(lot.type === "rachat" || lot.type === "depot_vente") && lot.status !== "brouillon" && (
@@ -646,26 +719,17 @@ function CoursAppliques({
   }
 
   return (
-    // Pas de bordure ici : la ligne précédente fournit déjà le séparateur.
-    <div className="space-y-2 pt-1">
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">Cours appliqués</span>
-        <span className="text-xs text-muted-foreground">
-          figés à la création
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {metaux.map((m) => (
-          <Badge key={m.label} variant="outline" className="font-normal tabular-nums">
-            {m.label} {formatCoursGramme(m.valeur as number)}
-          </Badge>
-        ))}
-        {coefficient != null && coefficient > 0 && (
-          <Badge variant="outline" className="font-normal tabular-nums">
-            Coefficient &times;{formatNombre(coefficient)}
-          </Badge>
-        )}
-      </div>
+    <div className="flex flex-wrap gap-1.5">
+      {metaux.map((m) => (
+        <Badge key={m.label} variant="outline" className="font-normal tabular-nums">
+          {m.label} {formatCoursGramme(m.valeur as number)}
+        </Badge>
+      ))}
+      {coefficient != null && coefficient > 0 && (
+        <Badge variant="outline" className="font-normal tabular-nums">
+          Coefficient &times;{formatNombre(coefficient)}
+        </Badge>
+      )}
     </div>
   );
 }

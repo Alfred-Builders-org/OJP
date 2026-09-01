@@ -1,6 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { FieldError } from "@/components/ui/field";
+import dynamic from "next/dynamic";
+import { RichText } from "@/components/ui/rich-text";
+
+// Tiptap ne sert que sur ouverture de l'editeur : on evite de l'embarquer dans
+// le bundle initial de la fiche client.
+const RichTextEditor = dynamic(
+  () => import("@/components/ui/rich-text-editor").then((m) => m.RichTextEditor),
+  { ssr: false }
+);
 import { CopyableText } from "@/components/ui/copyable-text";
 import { PreviewLink } from "@/components/preview/preview-link";
 import { usePreviewDrawer } from "@/hooks/use-preview-drawer";
@@ -31,6 +41,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Card,
@@ -47,8 +58,9 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Header } from "@/components/dashboard/header";
-import { clientSchema, LEAD_SOURCE_OPTIONS } from "@/lib/validations/client";
+import { clientSchema, LEAD_SOURCE_OPTIONS, CIVILITY_OPTIONS } from "@/lib/validations/client";
 import { CountrySelect } from "@/components/ui/country-select";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { IdentityDocumentSection } from "@/components/clients/identity-document-form";
 import type { Client, ClientIdentityDocument } from "@/types/client";
 import type { Dossier } from "@/types/dossier";
@@ -270,19 +282,22 @@ export function ClientDetailPage({
                 editContent={
                   <Select value={civility} onValueChange={(val) => { if (val) setCivility(val as "M" | "Mme"); }}>
                     <SelectTrigger className="w-48">
-                      <SelectValue />
+                      <SelectValue items={selectItems(CIVILITY_OPTIONS)} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="M">Monsieur</SelectItem>
-                      <SelectItem value="Mme">Madame</SelectItem>
+                      {CIVILITY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 }
               />
               <DetailRow label="Prénom" value={client.first_name} editing={editing} editValue={firstName} onEditChange={setFirstName} />
-              {errors.first_name && editing && <p className="text-sm text-destructive text-right -mt-1 mb-1 animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.first_name}</p>}
+              {errors.first_name && editing && <FieldError className="text-right -mt-1 mb-1 ">{errors.first_name}</FieldError>}
               <DetailRow label="Nom" value={client.last_name} editing={editing} editValue={lastName} onEditChange={setLastName} />
-              {errors.last_name && editing && <p className="text-sm text-destructive text-right -mt-1 mb-1 animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.last_name}</p>}
+              {errors.last_name && editing && <FieldError className="text-right -mt-1 mb-1 ">{errors.last_name}</FieldError>}
               <DetailRow label="Nom de jeune fille" value={client.maiden_name ?? "—"} editing={editing} editValue={maidenName} onEditChange={setMaidenName} />
               <DetailRow
                 label="Email"
@@ -292,13 +307,13 @@ export function ClientDetailPage({
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 }
               />
-              {errors.email && editing && <p className="text-sm text-destructive text-right -mt-1 mb-1 animate-in fade-in-0 slide-in-from-top-1 duration-150">{errors.email}</p>}
+              {errors.email && editing && <FieldError className="text-right -mt-1 mb-1 ">{errors.email}</FieldError>}
               <DetailRow
                 label="Téléphone"
                 value={client.phone ? <CopyableText value={client.phone} /> : "—"}
                 editing={editing}
                 editContent={
-                  <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <PhoneInput value={phone} onValueChange={setPhone} />
                 }
               />
             </CardContent>
@@ -456,16 +471,16 @@ export function ClientDetailPage({
             </CardHeader>
             <CardContent>
               {editingNotes ? (
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+                <RichTextEditor
+                  // Le composant ne resynchronise pas son contenu après montage :
+                  // la clé le remonte à chaque entrée en édition.
+                  key={`notes-${client.id}`}
+                  content={notes}
+                  onChange={setNotes}
                   placeholder="Notes sur le client..."
-                  className="min-h-[150px] resize-none"
                 />
               ) : (
-                <p className="text-sm whitespace-pre-wrap">
-                  {client.notes ?? "Aucune note."}
-                </p>
+                <RichText html={client.notes} fallback="Aucune note." />
               )}
             </CardContent>
           </Card>

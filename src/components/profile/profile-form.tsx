@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import {
   UserCircle,
   ShieldCheck,
@@ -40,8 +40,14 @@ const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "raccourcis", label: "Raccourcis", icon: <Keyboard size={16} weight="duotone" /> },
 ];
 
+const SECTION_KEYS = NAV_ITEMS.map((item) => item.key) as readonly Section[];
+
 export function ProfileForm({ profile, email, preferences }: ProfileFormProps) {
-  const [activeSection, setActiveSection] = useState<Section>("info");
+  const [activeSection, setActiveSection] = useUrlTab<Section>(
+    "section",
+    "info",
+    SECTION_KEYS
+  );
 
   return (
     <div className="flex flex-1 min-h-0 -m-6">

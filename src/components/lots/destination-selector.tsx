@@ -10,6 +10,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Card,
@@ -17,7 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DESTINATION_OPTIONS } from "@/lib/validations/lot";
+import { DESTINATION_OPTIONS, DESTINATION_NON_DEFINIE } from "@/lib/validations/lot";
 import type { LotWithReferences, ReferenceDestination } from "@/types/lot";
 
 interface DestinationSelectorProps {
@@ -29,10 +30,17 @@ export function DestinationSelector({ lot }: DestinationSelectorProps) {
   const supabase = createClient();
 
   async function handleDestinationChange(refId: string, destination: string) {
+    // « Non définie » remet la colonne à NULL : on doit pouvoir revenir sur un
+    // choix tant que le délai court.
+    const valeur =
+      destination === DESTINATION_NON_DEFINIE
+        ? null
+        : (destination as ReferenceDestination);
+
     const { error } = await mutate(
       supabase
         .from("lot_references")
-        .update({ destination: destination as ReferenceDestination })
+        .update({ destination: valeur })
         .eq("id", refId),
       "Erreur lors de la mise à jour de la destination",
       "Destination mise à jour"
@@ -64,11 +72,14 @@ export function DestinationSelector({ lot }: DestinationSelectorProps) {
               </p>
             </div>
             <Select
-              value={ref.destination ?? ""}
+              value={ref.destination ?? DESTINATION_NON_DEFINIE}
               onValueChange={(v) => { if (v) handleDestinationChange(ref.id, v); }}
             >
               <SelectTrigger className="w-48">
-                <SelectValue placeholder="Destination" />
+                <SelectValue
+                  placeholder="Destination"
+                  items={selectItems(DESTINATION_OPTIONS)}
+                />
               </SelectTrigger>
               <SelectContent>
                 {DESTINATION_OPTIONS.map((opt) => (

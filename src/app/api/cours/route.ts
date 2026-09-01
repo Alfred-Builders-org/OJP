@@ -78,3 +78,84 @@ export async function POST(request: NextRequest) {
     actualise_le: new Date().toISOString(),
   });
 }
+
+/**
+ * Enregistre des cours saisis à la main.
+ *
+ * La page Paramètres écrivait jusqu'ici directement dans la table `parametres`.
+ * Le contrôle de vraisemblance posé par la migration 136 vit dans la fonction
+ * `appliquer_cours` : en la contournant, la saisie manuelle — précisément celle
+ * qui peut porter une virgule mal placée — n'était soumise à aucun garde-fou.
+ * Un argent à 45 €/g passait sans un mot.
+ *
+ * `forcer` laisse le propriétaire enregistrer un écart réel, après que le
+ * message d'erreur le lui a signalé.
+ */
+export async function PUT(request: NextRequest) {
+  const { success } = await sensitiveApiLimiter.limit(getClientIp(request));
+  if (!success) return rateLimitResponse();
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Non authentifié" }, { status: 401 });
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "proprietaire" && profile?.role !== "super_admin") {
+    return NextResponse.json(
+      { error: "Seul un propriétaire peut modifier les cours." },
+      { status: 403 }
+    );
+  }
+
+  let body: { prix_or?: unknown; prix_argent?: unknown; prix_platine?: unknown; forcer?: unknown };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Requête invalide." }, { status: 400 });
+  }
+
+  const or = Number(body.prix_or);
+  const argent = Number(body.prix_argent);
+  const platine = Number(body.prix_platine);
+
+  if (![or, argent, platine].every((v) => Number.isFinite(v) && v > 0)) {
+    return NextResponse.json(
+      { error: "Les trois cours doivent être des nombres strictement positifs." },
+      { status: 400 }
+    );
+  }
+
+  const { error } = await supabase.rpc("appliquer_cours", {
+    p_or: or,
+    p_argent: argent,
+    p_platine: platine,
+    p_forcer: body.forcer === true,
+  });
+
+  if (error) {
+    const estRejetVraisemblance = error.message.includes("invraisemblable");
+    return NextResponse.json(
+      {
+        error: estRejetVraisemblance
+          ? error.message
+          : "Les cours n'ont pas pu être enregistrés.",
+        // Permet à l'interface de proposer de forcer, plutôt que de laisser
+        // l'utilisateur devant un refus sans issue.
+        peut_forcer: estRejetVraisemblance,
+      },
+      { status: estRejetVraisemblance ? 409 : 500 }
+    );
+  }
+
+  return NextResponse.json({ actualise_le: new Date().toISOString() });
+}

@@ -2,7 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W, fmt } from "./shared-styles";
-import { SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne } from "./blocks";
+import { SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne, recapitulatifTitrage } from "./blocks";
 
 export interface RemboursementRetractationData {
   numero: string;
@@ -75,7 +75,9 @@ function Doc({ data }: { data: RemboursementRetractationData }) {
     // Bas de page : mentions + montant remboursé
     h(View, { style: s.bottom },
       h(View, { style: s.bottomLeft },
-        h(Text, { style: s.sectionLabel }, "RÉTRACTATION"),
+        h(Text, { style: s.sectionLabel }, "R\u00C9CAPITULATIF"),
+        h(Text, { style: s.recapText }, recapitulatifTitrage(references)),
+        h(Text, { style: s.sectionLabel }, "R\u00C9TRACTATION"),
         h(Text, { style: s.condText }, TEXTE_RETRACTATION)),
       h(View, { style: s.bottomRight },
         h(View, { style: s.totGoldLine }),

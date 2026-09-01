@@ -1,4 +1,5 @@
 import { mutate } from "@/lib/supabase/mutation";
+import { statutsPourDestination } from "@/lib/stock/destination";
 import type { LotReference } from "@/types/lot";
 import type { SupabaseClient } from "./action-types";
 
@@ -18,6 +19,8 @@ export async function createBijouxStockEntry({
   isDepotVente?: boolean;
   clientId?: string;
 }): Promise<{ stockId: string | null; error: boolean }> {
+  const statuts = statutsPourDestination(ref.destination, isDepotVente);
+
   const stockPayload: Record<string, unknown> = {
     nom: ref.designation,
     metaux: ref.metal,
@@ -28,7 +31,7 @@ export async function createBijouxStockEntry({
     prix_achat: ref.prix_achat,
     prix_revente: ref.prix_revente_estime,
     quantite: ref.quantite,
-    statut: isDepotVente ? "en_depot_vente" : "a_fondre",
+    statut: statuts.stock,
   };
 
   if (isDepotVente) {
@@ -47,11 +50,13 @@ export async function createBijouxStockEntry({
   if (stockError) return { stockId: null, error: true };
 
   // Link stock entry to reference
-  const newStatus = isDepotVente ? "en_depot_vente" : "route_fonderie";
   const { error: refError } = await mutate(
     supabase
       .from("lot_references")
-      .update({ status: newStatus, destination_stock_id: stockEntry?.id ?? null })
+      .update({
+        status: statuts.reference,
+        destination_stock_id: stockEntry?.id ?? null,
+      })
       .eq("id", ref.id),
     "Erreur lors de la mise à jour de la référence"
   );

@@ -9,31 +9,26 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+// Cette liste ne contient que des raccourcis reellement actifs. Elle annoncait
+// auparavant Ctrl+N, « / », les fleches de pagination et Entree, qui n'ont
+// jamais ete implementes : un raccourci affiche et inerte se lit comme une panne.
 const SHORTCUTS = [
   {
     category: "Navigation",
     items: [
       { keys: ["Alt", "D"], description: "Aller au tableau de bord" },
-      { keys: ["Alt", "L"], description: "Aller aux lots" },
       { keys: ["Alt", "S"], description: "Aller au stock" },
-      { keys: ["Alt", "V"], description: "Aller aux ventes" },
       { keys: ["Alt", "C"], description: "Aller aux clients" },
+      { keys: ["Alt", "O"], description: "Aller aux dossiers" },
     ],
   },
   {
     category: "Actions rapides",
     items: [
       { keys: ["Ctrl", "K"], description: "Recherche globale" },
-      { keys: ["Ctrl", "N"], description: "Nouveau dossier" },
-      { keys: ["/"], description: "Focus sur la recherche" },
+      { keys: ["Alt", "N"], description: "Nouveau dossier" },
+      { keys: ["Ctrl", "B"], description: "Replier la barre laterale" },
       { keys: ["Escape"], description: "Fermer le dialog / popover" },
-    ],
-  },
-  {
-    category: "Tableaux",
-    items: [
-      { keys: ["←", "→"], description: "Page precedente / suivante" },
-      { keys: ["Enter"], description: "Ouvrir l'element selectionne" },
     ],
   },
 ];

@@ -1,4 +1,5 @@
 import { generateDocument } from "@/lib/pdf/pdf-actions";
+import { tauxLigne, libelleTotalTaxe } from "@/lib/pdf/taxes-labels";
 import { formatDate, formatTime } from "@/lib/format";
 import type { ClientInfo, DossierInfo, ReferenceLigne, TotauxInfo } from "@/lib/pdf";
 import type { LotReference } from "@/types/lot";
@@ -31,23 +32,16 @@ function buildRefLignes(refs: LotReference[]): ReferenceLigne[] {
     titrage: r.qualite ?? "—",
     poids: r.poids_net ?? r.poids ?? 0,
     quantite: r.quantite,
-    taxe: r.montant_taxe > 0 ? (r.regime_fiscal === "TFOP" ? "6.5%" : r.regime_fiscal === "TPV" ? "TPV" : "11.5%") : "0%",
+    taxe: tauxLigne(r.regime_fiscal, r.montant_taxe),
     prixUnitaire: r.prix_achat,
     prixTotal: r.prix_achat * r.quantite,
   }));
 }
 
-function getTaxeLabel(refs: LotReference[]): string {
-  const regime = refs.find((r) => r.regime_fiscal)?.regime_fiscal;
-  if (regime === "TFOP") return "Taxe (TFOP+CRDS)";
-  if (regime === "TPV") return "Taxe (Plus-Value)";
-  return "Taxe (TMP+CRDS)";
-}
-
 function buildTotaux(refs: LotReference[]): TotauxInfo {
   const brut = refs.reduce((s, r) => s + r.prix_achat * r.quantite, 0);
   const taxe = refs.reduce((s, r) => s + r.montant_taxe * r.quantite, 0);
-  return { totalBrut: brut, taxe, netAPayer: brut - taxe, taxeLabel: getTaxeLabel(refs) };
+  return { totalBrut: brut, taxe, netAPayer: brut - taxe, taxeLabel: libelleTotalTaxe(refs) };
 }
 
 /**
@@ -99,7 +93,7 @@ export async function generateQuittanceSingleRef(
       totalBrut: ref.prix_achat * ref.quantite,
       taxe: ref.montant_taxe * ref.quantite,
       netAPayer: (ref.prix_achat - ref.montant_taxe) * ref.quantite,
-      taxeLabel: getTaxeLabel([ref]),
+      taxeLabel: libelleTotalTaxe([ref]),
     },
   });
 }
@@ -132,9 +126,12 @@ export async function generateContratRachat(
 }
 
 /**
- * Génère le reçu de remboursement émis quand un client se rétracte après avoir
- * déjà été payé. Atteste que les sommes versées sont revenues à la société et
- * solde l'opération.
+ * Génère le reçu émis quand un client se rétracte : il atteste la rétractation
+ * et, le cas échéant, la somme qu'il doit restituer.
+ *
+ * Le montant peut valoir zéro — c'est même le cas le plus fréquent, le client
+ * n'ayant rien reçu. Le document était auparavant conditionné à un versement
+ * préalable, si bien qu'une rétractation ordinaire ne laissait aucune trace.
  */
 export async function generateRemboursementRetractation(
   ctx: ActionContext,
@@ -142,7 +139,7 @@ export async function generateRemboursementRetractation(
   montantRembourse: number,
   numeroContrat: string
 ): Promise<string | null> {
-  if (refs.length === 0 || montantRembourse <= 0) return null;
+  if (refs.length === 0) return null;
   const now = new Date();
   try {
     return await generateDocument({

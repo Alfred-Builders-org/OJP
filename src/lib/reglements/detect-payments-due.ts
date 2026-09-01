@@ -26,10 +26,34 @@ export interface PaymentDue {
   pre_fill: PaymentDuePreFill;
 }
 
-function sumReglements(reglements: Reglement[], type: ReglementType): number {
+/**
+ * Somme des reglements d'un type, dans un sens donne.
+ *
+ * Le sens n'etait pas filtre : sur un lot retracte, le remboursement rentre par
+ * le client annulait arithmetiquement le versement initial, le « deja paye »
+ * retombait a zero et la dette reapparaissait entiere.
+ */
+function sumReglements(
+  reglements: Reglement[],
+  type: ReglementType,
+  sens?: ReglementSens
+): number {
   return reglements
-    .filter((r) => r.type === type)
+    .filter((r) => r.type === type && (sens === undefined || r.sens === sens))
     .reduce((sum, r) => sum + r.montant, 0);
+}
+
+/**
+ * Une operation close ne doit plus rien : ni au client, ni de sa part.
+ *
+ * La base refuse deja d'enregistrer un versement sur un lot sans suite
+ * (migration 135). Sans ce garde-fou cote lecture, l'interface reclamait
+ * pourtant le paiement, et le clic se soldait par une erreur PostgreSQL.
+ */
+const OUTCOMES_SANS_SUITE = ["retracte", "refuse", "annule"];
+
+function estSansSuite(lot: Lot): boolean {
+  return lot.outcome !== null && OUTCOMES_SANS_SUITE.includes(lot.outcome);
 }
 
 const DOC_TYPE_MAP: Record<string, string> = {
@@ -172,9 +196,12 @@ export function detectPaymentsDue({
   }
 
   // --- RACHAT : on paie le client ---
-  if (lot.type === "rachat" && lot.status === "finalise") {
+  // Un lot retracte, refuse ou annule est marque « finalise » comme un lot mene
+  // a terme : seul `outcome` les distingue. Sans ce test, la fiche reclamait un
+  // versement sur une operation close.
+  if (lot.type === "rachat" && lot.status === "finalise" && !estSansSuite(lot)) {
     const attendu = lot.montant_net;
-    const dejaPaye = sumReglements(reglements, "rachat");
+    const dejaPaye = sumReglements(reglements, "rachat", "sortant");
     const restant = Math.round(Math.max(0, attendu - dejaPaye) * 100) / 100;
     payments.push({
       type: "rachat",
@@ -193,6 +220,38 @@ export function detectPaymentsDue({
         document_id: findDocumentId(documents, lot.id, "rachat"),
       },
     });
+  }
+
+  // --- RACHAT sans suite : le client nous rembourse ---
+  // Cas courant en boutique : le client est reparti avec son argent le jour
+  // meme, puis s'est retracte. La somme versee doit revenir. Elle n'etait
+  // saisissable nulle part — seul un reglement negatif automatique existait,
+  // invisible dans l'interface.
+  if (lot.type === "rachat" && estSansSuite(lot)) {
+    const verse = sumReglements(reglements, "rachat", "sortant");
+    const rembourse = sumReglements(reglements, "rachat", "entrant");
+    const restant = Math.round(Math.max(0, verse - rembourse) * 100) / 100;
+
+    if (verse > 0.01) {
+      payments.push({
+        type: "rachat",
+        sens: "entrant",
+        label: "Rachat rétracté | Remboursement à encaisser",
+        description:
+          "Somme versée au client avant sa rétractation, qu'il doit restituer",
+        montant_attendu: verse,
+        montant_deja_paye: rembourse,
+        montant_restant: restant,
+        is_fully_paid: restant < 0.01,
+        pre_fill: {
+          type: "rachat",
+          sens: "entrant",
+          montant: restant,
+          client_id: clientId,
+          document_id: findDocumentId(documents, lot.id, "rachat"),
+        },
+      });
+    }
   }
 
   // --- VENTE ---

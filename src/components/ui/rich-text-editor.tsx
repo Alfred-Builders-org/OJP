@@ -6,6 +6,9 @@ import Placeholder from "@tiptap/extension-placeholder";
 import {
   TextB,
   TextItalic,
+  TextStrikethrough,
+  TextHOne,
+  TextHTwo,
   ListBullets,
   ListNumbers,
   ArrowCounterClockwise,
@@ -68,6 +71,30 @@ export function RichTextEditor({
           title="Italique"
         >
           <TextItalic size={16} weight="bold" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor.isActive("strike")}
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+          title="Barré"
+        >
+          <TextStrikethrough size={16} weight="bold" />
+        </ToolbarButton>
+        <div className="mx-1 h-4 w-px bg-border" />
+        {/* Les notes servent souvent de compte rendu : quelques niveaux de
+            titre suffisent à les structurer sans en faire un traitement de texte. */}
+        <ToolbarButton
+          active={editor.isActive("heading", { level: 2 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+          title="Titre"
+        >
+          <TextHOne size={16} weight="bold" />
+        </ToolbarButton>
+        <ToolbarButton
+          active={editor.isActive("heading", { level: 3 })}
+          onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+          title="Sous-titre"
+        >
+          <TextHTwo size={16} weight="bold" />
         </ToolbarButton>
         <div className="mx-1 h-4 w-px bg-border" />
         <ToolbarButton

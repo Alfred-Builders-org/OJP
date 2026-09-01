@@ -212,7 +212,7 @@ export async function executeRetracterLot(
   );
   if (e1) return { success: false };
 
-  await rembourserSiDejaPaye(supabase, ctx, refsRetractees);
+  await tracerRetractation(supabase, ctx, refsRetractees);
 
   triggerEmail({
     notification_type: "interne_retractation",
@@ -227,14 +227,20 @@ export async function executeRetracterLot(
 }
 
 /**
- * Le règlement d'un rachat étant possible pendant le délai de rétractation, un
- * client peut s'être fait payer avant de changer d'avis. Dans ce cas il rend la
- * somme, et ce mouvement doit laisser une trace : un reçu de remboursement et
- * un règlement négatif qui ramène le solde du lot à zéro.
+ * Trace documentaire d'une rétractation.
  *
- * Sans effet si rien n'a été versé — le cas le plus courant.
+ * Deux choses arrivaient auparavant à ne jamais se produire, parce qu'elles
+ * étaient enfermées derrière un `return` conditionné à un versement préalable :
+ * le contrat de rachat restait « en attente » à vie, et aucun reçu n'était émis.
+ * Or le cas courant est justement celui où le client n'a rien reçu — la
+ * rétractation ne laissait alors aucune trace.
+ *
+ * Le remboursement lui-même n'est plus enregistré ici. Un client ne rend pas
+ * l'argent au moment où il annonce sa rétractation : la somme apparaît désormais
+ * dans les règlements dus, en mouvement entrant, et se saisit quand elle rentre
+ * réellement.
  */
-async function rembourserSiDejaPaye(
+async function tracerRetractation(
   supabase: SupabaseClient,
   ctx: ActionContext,
   refsRetractees: LotReference[]
@@ -242,13 +248,16 @@ async function rembourserSiDejaPaye(
   try {
     const { data: reglements } = await supabase
       .from("reglements")
-      .select("montant, mode")
+      .select("montant, sens")
       .eq("lot_id", ctx.lot.id)
       .eq("type", "rachat");
 
-    const verse = (reglements ?? []).reduce((sum, r) => sum + r.montant, 0);
-    const montantRembourse = Math.round(verse * 100) / 100;
-    if (montantRembourse < 0.01) return;
+    // Seuls les versements au client comptent : un éventuel mouvement entrant
+    // est un remboursement déjà encaissé, pas une somme à réclamer.
+    const verse = (reglements ?? [])
+      .filter((r) => r.sens === "sortant")
+      .reduce((sum, r) => sum + r.montant, 0);
+    const montantRembourse = Math.round(Math.max(0, verse) * 100) / 100;
 
     const { data: contrat } = await supabase
       .from("documents")
@@ -259,41 +268,25 @@ async function rembourserSiDejaPaye(
       .limit(1)
       .maybeSingle();
 
-    const documentId = await generateRemboursementRetractation(
+    // Le reçu est émis dans tous les cas : il matérialise la rétractation, que
+    // de l'argent ait circulé ou non.
+    await generateRemboursementRetractation(
       ctx,
       refsRetractees,
       montantRembourse,
       contrat?.numero ?? ""
     );
 
-    // Le remboursement est un règlement négatif : la somme des règlements du
-    // lot retombe à zéro sans qu'aucun calcul existant n'ait à gérer les sens.
-    await supabase.from("reglements").insert({
-      lot_id: ctx.lot.id,
-      document_id: documentId,
-      client_id: ctx.dossier.client.id,
-      sens: "sortant",
-      type: "rachat",
-      montant: -montantRembourse,
-      // On reprend le mode du dernier versement : le remboursement se fait en
-      // pratique par le même canal.
-      mode: reglements?.[reglements.length - 1]?.mode ?? "especes",
-      date_reglement: new Date().toISOString(),
-      notes: contrat?.numero
-        ? `Remboursement suite à rétractation du client (contrat ${contrat.numero})`
-        : "Remboursement suite à rétractation du client",
-    });
-
     // Le contrat de rachat n'a plus lieu d'être.
     if (contrat?.id) {
       await supabase
         .from("documents")
-        .update({ status: "annule" })
+        .update({ status: "retracte" })
         .eq("id", contrat.id);
     }
   } catch (err) {
     // Un échec ici ne doit pas empêcher la rétractation elle-même, qui est
     // l'acte juridique attendu par le client.
-    console.error("[RETRACTATION] Remboursement non enregistré :", err);
+    console.error("[RETRACTATION] Trace documentaire non enregistrée :", err);
   }
 }

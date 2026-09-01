@@ -44,7 +44,13 @@ import { StockLifecycleStepper } from "@/components/stock/stock-lifecycle-steppe
 import { EnvoiReparationDialog } from "@/components/stock/envoi-reparation-dialog";
 import { RetourReparationDialog } from "@/components/stock/retour-reparation-dialog";
 import { formatDate, formatCurrency } from "@/lib/format";
-import type { BijouxStock, Reparation, StockOrigin, StockSale } from "@/types/bijoux";
+import type {
+  BijouxStock,
+  Reparation,
+  StockOrigin,
+  StockOriginGrossiste,
+  StockSale,
+} from "@/types/bijoux";
 
 const statutConfig: Record<
   BijouxStock["statut"],
@@ -128,6 +134,7 @@ export function StockDetailPage({
   bijou,
   canEdit = true,
   origin,
+  originGrossiste = null,
   sale,
   reparations = [],
   activeReparation = null,
@@ -136,6 +143,7 @@ export function StockDetailPage({
   bijou: BijouxStock;
   canEdit?: boolean;
   origin?: StockOrigin | null;
+  originGrossiste?: StockOriginGrossiste | null;
   sale?: StockSale | null;
   reparations?: Reparation[];
   activeReparation?: Reparation | null;
@@ -448,6 +456,45 @@ export function StockDetailPage({
                     )}
                   </>
                 )
+              ) : originGrossiste ? (
+                <>
+                  <LinkedRow
+                    label="Grossiste"
+                    value={originGrossiste.grossiste.nom}
+                    href={`/grossistes/${originGrossiste.grossiste.id}`}
+                  />
+                  {originGrossiste.achat && (
+                    <>
+                      <LinkedRow
+                        label="Achat"
+                        value={originGrossiste.achat.numero}
+                        href={`/achats/${originGrossiste.achat.id}`}
+                      />
+                      <LinkedRow
+                        label="Date d'entrée en stock"
+                        value={formatDate(originGrossiste.achat.date_achat)}
+                      />
+                      {originGrossiste.achat.numero_facture && (
+                        <LinkedRow
+                          label="Facture du grossiste"
+                          value={originGrossiste.achat.numero_facture}
+                        />
+                      )}
+                    </>
+                  )}
+                  {bijou.reference_fournisseur && (
+                    <LinkedRow
+                      label="Référence du grossiste"
+                      value={bijou.reference_fournisseur}
+                    />
+                  )}
+                  {bijou.prix_achat != null && (
+                    <LinkedRow
+                      label="Prix d'achat"
+                      value={formatCurrency(bijou.prix_achat)}
+                    />
+                  )}
+                </>
               ) : (
                 <div className="flex items-center gap-2 py-4 text-muted-foreground">
                   <PhPackage size={20} weight="duotone" />

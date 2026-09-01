@@ -31,6 +31,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  selectItems,
 } from "@/components/ui/select";
 import {
   Tooltip,
@@ -223,7 +224,7 @@ export function NotificationsTab({ settings, onRegisterSave }: NotificationsTabP
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue items={selectItems(CRON_OPTIONS)} />
                   </SelectTrigger>
                   <SelectContent>
                     {CRON_OPTIONS.map((opt) => (
@@ -246,7 +247,7 @@ export function NotificationsTab({ settings, onRegisterSave }: NotificationsTabP
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue items={selectItems(CRON_OPTIONS)} />
                   </SelectTrigger>
                   <SelectContent>
                     {CRON_OPTIONS.map((opt) => (

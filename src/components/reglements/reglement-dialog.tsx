@@ -1,10 +1,13 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CurrencyEur, CreditCard, Bank, Money, Check, FloppyDisk, ArrowDown, ArrowUp } from "@phosphor-icons/react";
+import { CurrencyEur, CreditCard, Bank, Money, Check, FloppyDisk, ArrowDown, ArrowUp, Plus, Trash } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { statutsPourDestination } from "@/lib/stock/destination";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -44,10 +47,20 @@ interface ReglementDialogProps {
   lotId: string;
 }
 
+/** Une ligne de règlement : un montant, un moyen de paiement. */
+interface LigneReglement {
+  montant: string;
+  mode: ModeReglement | "";
+}
+
 export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: ReglementDialogProps) {
   const router = useRouter();
-  const [montant, setMontant] = useState(paymentDue.pre_fill.montant.toString());
-  const [mode, setMode] = useState<ModeReglement | "">("");
+  // Un règlement se fait souvent en plusieurs fois et par plusieurs canaux —
+  // tant en carte, tant en espèces, le reste par chèque. Le dialogue n'acceptait
+  // qu'un montant et un mode, obligeant à le rouvrir autant de fois.
+  const [lignes, setLignes] = useState<LigneReglement[]>([
+    { montant: paymentDue.pre_fill.montant.toString(), mode: "" },
+  ]);
   const [date, setDate] = useState<Date>(new Date());
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -55,37 +68,70 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
 
   const isSortant = paymentDue.sens === "sortant";
 
+  const totalSaisi = lignes.reduce(
+    (sum, l) => sum + (parseFloat(l.montant) || 0),
+    0
+  );
+
+  function majLigne(index: number, patch: Partial<LigneReglement>) {
+    setLignes((prev) =>
+      prev.map((l, i) => (i === index ? { ...l, ...patch } : l))
+    );
+  }
+
+  function ajouterLigne() {
+    // La nouvelle ligne est pré-remplie avec ce qu'il reste à couvrir.
+    const reste = Math.round((paymentDue.montant_restant - totalSaisi) * 100) / 100;
+    setLignes((prev) => [
+      ...prev,
+      { montant: reste > 0 ? reste.toString() : "", mode: "" },
+    ]);
+  }
+
+  function retirerLigne(index: number) {
+    setLignes((prev) => prev.filter((_, i) => i !== index));
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    if (!mode) {
-      setError("Le mode de règlement est requis.");
+    if (lignes.some((l) => !l.mode)) {
+      setError("Chaque ligne doit porter un moyen de paiement.");
       return;
     }
 
-    const montantNum = parseFloat(montant);
-    if (!montantNum || montantNum <= 0) {
-      setError("Le montant doit être positif.");
+    if (lignes.some((l) => !(parseFloat(l.montant) > 0))) {
+      setError("Chaque montant doit être positif.");
       return;
     }
+
+    const montantNum = Math.round(totalSaisi * 100) / 100;
+
+    // `lots.mode_reglement` ne retient qu'un moyen. Sur un paiement fractionné,
+    // on garde celui qui porte la plus grosse part — le plus représentatif.
+    const modePrincipal = [...lignes].sort(
+      (a, b) => (parseFloat(b.montant) || 0) - (parseFloat(a.montant) || 0)
+    )[0].mode as ModeReglement;
 
     setSaving(true);
     const supabase = createClient();
 
-    const { error: insertError } = await supabase.from("reglements").insert({
-      lot_id: lotId,
-      bon_commande_id: paymentDue.pre_fill.bon_commande_id ?? null,
-      document_id: paymentDue.pre_fill.document_id ?? null,
-      sens: paymentDue.sens,
-      type: paymentDue.type,
-      montant: montantNum,
-      mode,
-      date_reglement: date.toISOString(),
-      client_id: paymentDue.pre_fill.client_id ?? null,
-      fonderie_id: paymentDue.pre_fill.fonderie_id ?? null,
-      notes: notes || null,
-    });
+    const { error: insertError } = await supabase.from("reglements").insert(
+      lignes.map((l) => ({
+        lot_id: lotId,
+        bon_commande_id: paymentDue.pre_fill.bon_commande_id ?? null,
+        document_id: paymentDue.pre_fill.document_id ?? null,
+        sens: paymentDue.sens,
+        type: paymentDue.type,
+        montant: Math.round(parseFloat(l.montant) * 100) / 100,
+        mode: l.mode,
+        date_reglement: date.toISOString(),
+        client_id: paymentDue.pre_fill.client_id ?? null,
+        fonderie_id: paymentDue.pre_fill.fonderie_id ?? null,
+        notes: notes || null,
+      }))
+    );
 
     if (insertError) {
       // Le garde-fou de la base (migration 135) refuse de payer un client sur
@@ -138,7 +184,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
         // Récupérer toutes les refs en attente de paiement
         const { data: pendingRefs } = await supabase
           .from("lot_references")
-          .select("id, categorie, or_investissement_id, quantite, designation, metal, qualite, poids, poids_brut, poids_net, prix_achat, prix_revente_estime")
+          .select("id, categorie, or_investissement_id, quantite, designation, metal, qualite, poids, poids_brut, poids_net, prix_achat, prix_revente_estime, destination")
           .in("id", refIds)
           .eq("status", "en_attente_paiement");
 
@@ -151,13 +197,15 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
             });
           }
 
-          // Bijoux: créer l'entrée stock (a_fondre par défaut → dispatch depuis page envois)
+          // Bijoux: créer l'entrée stock selon la destination choisie sur le lot.
+          // Elle valait « a_fondre » quel que soit le choix de l'utilisateur, et
+          // la page Stock excluait précisément ce statut.
           if (ref.categorie === "bijoux") {
             const { data: stockEntry } = await supabase.from("bijoux_stock").insert({
               nom: ref.designation, metaux: ref.metal, qualite: ref.qualite,
               poids: ref.poids_net ?? ref.poids, poids_brut: ref.poids_brut, poids_net: ref.poids_net,
               prix_achat: ref.prix_achat, prix_revente: ref.prix_revente_estime, quantite: ref.quantite,
-              statut: "a_fondre",
+              statut: statutsPourDestination(ref.destination, false).stock,
             }).select("id").single();
 
             if (stockEntry) {
@@ -399,7 +447,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
             date_reglement: new Date().toISOString(),
             solde_paye: true,
             date_solde: new Date().toISOString(),
-            mode_reglement: mode,
+            mode_reglement: modePrincipal,
           }).eq("id", lotId);
 
           // Check finalisation lots DPV source
@@ -467,7 +515,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>}
+          {error && <FieldError>{error}</FieldError>}
 
           {/* Info box */}
           <div className="rounded-lg bg-muted px-3 py-2 text-sm">
@@ -490,46 +538,75 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
             </div>
           </div>
 
-          {/* Montant */}
+          {/* Montants et moyens de paiement — une ligne par canal */}
           <div className="space-y-2">
-            <Label>Montant</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0.01"
-              value={montant}
-              onChange={(e) => setMontant(e.target.value)}
-              required
-            />
-          </div>
+            <div className="flex items-center justify-between">
+              <Label>Montant et moyen de paiement</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={ajouterLigne}>
+                <Plus size={14} weight="regular" />
+                Ajouter un moyen
+              </Button>
+            </div>
 
-          {/* Mode de règlement */}
-          <div className="space-y-2">
-            <Label>Mode de règlement</Label>
-            <Select value={mode} onValueChange={(v) => setMode(v as ModeReglement)}>
-              <SelectTrigger>
-                {mode ? (
-                  <span className="flex items-center gap-2">
-                    {(() => { const opt = MODE_OPTIONS.find(o => o.value === mode); if (!opt) return null; const Icon = opt.icon; return <><Icon size={14} weight="duotone" />{opt.label}</>; })()}
-                  </span>
-                ) : (
-                  <SelectValue placeholder="Choisir un mode" />
+            {lignes.map((ligne, index) => (
+              <div key={index} className="flex items-start gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  className="w-32"
+                  value={ligne.montant}
+                  onChange={(e) => majLigne(index, { montant: e.target.value })}
+                  aria-label={`Montant ${index + 1}`}
+                  required
+                />
+                <Select
+                  value={ligne.mode}
+                  onValueChange={(v) => majLigne(index, { mode: v as ModeReglement })}
+                >
+                  <SelectTrigger className="flex-1">
+                    {ligne.mode ? (
+                      <span className="flex items-center gap-2">
+                        {(() => { const opt = MODE_OPTIONS.find(o => o.value === ligne.mode); if (!opt) return null; const Icon = opt.icon; return <><Icon size={14} weight="duotone" />{opt.label}</>; })()}
+                      </span>
+                    ) : (
+                      <SelectValue placeholder="Choisir un moyen" />
+                    )}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MODE_OPTIONS.map((opt) => {
+                      const Icon = opt.icon;
+                      return (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          <div className="flex items-center gap-2">
+                            <Icon size={14} weight="duotone" />
+                            {opt.label}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                {lignes.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Retirer la ligne ${index + 1}`}
+                    onClick={() => retirerLigne(index)}
+                  >
+                    <Trash size={14} weight="regular" />
+                  </Button>
                 )}
-              </SelectTrigger>
-              <SelectContent>
-                {MODE_OPTIONS.map((opt) => {
-                  const Icon = opt.icon;
-                  return (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      <div className="flex items-center gap-2">
-                        <Icon size={14} weight="duotone" />
-                        {opt.label}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+              </div>
+            ))}
+
+            {lignes.length > 1 && (
+              <div className="flex items-center justify-between text-sm pt-1">
+                <span className="text-muted-foreground">Total saisi</span>
+                <span className="font-medium">{formatCurrency(totalSaisi)}</span>
+              </div>
+            )}
           </div>
 
           {/* Date */}
@@ -553,7 +630,7 @@ export function ReglementDialog({ open, onOpenChange, paymentDue, lotId }: Regle
             <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Annuler
             </Button>
-            <Button type="submit" size="sm" disabled={saving || !mode}>
+            <Button type="submit" size="sm" disabled={saving || lignes.some((l) => !l.mode)}>
               <FloppyDisk size={16} weight="duotone" />
               {saving ? "Enregistrement..." : "Enregistrer"}
             </Button>

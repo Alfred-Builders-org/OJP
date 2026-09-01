@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { generateAndStoreDocument } from "@/lib/pdf/generate-and-store";
+import { tauxLigne, libelleTotalTaxe } from "@/lib/pdf/taxes-labels";
 import { getSettingServer } from "@/lib/settings-server";
 import { formatDate, formatDateTime, formatTime } from "@/lib/format";
 import type {
@@ -160,7 +161,7 @@ export async function autoProcessExpiredRetractation(dossierId: string): Promise
             titrage: r.qualite ?? "—",
             poids: r.poids_net ?? r.poids ?? 0,
             quantite: r.quantite,
-            taxe: r.montant_taxe > 0 ? (r.regime_fiscal === "TFOP" ? "6.5%" : r.regime_fiscal === "TPV" ? "TPV" : "11.5%") : "0%",
+            taxe: tauxLigne(r.regime_fiscal, r.montant_taxe),
             prixUnitaire: r.prix_achat,
             prixTotal: r.prix_achat * r.quantite,
           }));
@@ -306,7 +307,7 @@ export async function finaliserDossierAction(dossierId: string): Promise<Finalis
 
 /* ──────────────────────── HELPERS ──────────────────────── */
 
-function buildClientInfo(dossier: { client: { civility: string; first_name: string; last_name: string; address: string | null; postal_code: string | null; city: string | null } }): ClientInfo {
+function buildClientInfo(dossier: { client: { civility: string; first_name: string; last_name: string; address: string | null; postal_code: string | null; city: string | null; phone?: string | null; email?: string | null } }): ClientInfo {
   return {
     civilite: dossier.client.civility === "M" ? "M." : "Mme",
     nom: dossier.client.last_name,
@@ -314,6 +315,9 @@ function buildClientInfo(dossier: { client: { civility: string; first_name: stri
     adresse: dossier.client.address ?? undefined,
     codePostal: dossier.client.postal_code ?? undefined,
     ville: dossier.client.city ?? undefined,
+    // Rappelees en tete de l'annexe du contrat de depot-vente.
+    telephone: dossier.client.phone ?? undefined,
+    email: dossier.client.email ?? undefined,
   };
 }
 
@@ -333,23 +337,16 @@ function buildRefLignes(refList: Ref[]): ReferenceLigne[] {
     titrage: r.qualite ?? "—",
     poids: r.poids_net ?? r.poids ?? 0,
     quantite: r.quantite,
-    taxe: r.montant_taxe > 0 ? (r.regime_fiscal === "TFOP" ? "6.5%" : r.regime_fiscal === "TPV" ? "TPV" : "11.5%") : "0%",
+    taxe: tauxLigne(r.regime_fiscal, r.montant_taxe),
     prixUnitaire: r.prix_achat,
     prixTotal: r.prix_achat * r.quantite,
   }));
 }
 
-function getTaxeLabel(refList: Ref[]): string {
-  const regime = refList.find((r: Ref) => r.regime_fiscal)?.regime_fiscal;
-  if (regime === "TFOP") return "Taxe (TFOP+CRDS)";
-  if (regime === "TPV") return "Taxe (Plus-Value)";
-  return "Taxe (TMP+CRDS)";
-}
-
 function buildTotaux(refList: Ref[]): TotauxInfo {
   const brut = refList.reduce((s: number, r: Ref) => s + r.prix_achat * r.quantite, 0);
   const taxe = refList.reduce((s: number, r: Ref) => s + r.montant_taxe * r.quantite, 0);
-  return { totalBrut: brut, taxe, netAPayer: brut - taxe, taxeLabel: getTaxeLabel(refList) };
+  return { totalBrut: brut, taxe, netAPayer: brut - taxe, taxeLabel: libelleTotalTaxe(refList) };
 }
 
 async function genDoc(params: Parameters<typeof generateAndStoreDocument>[0], label: string): Promise<{ path: string | null; numero?: string; error?: string }> {
@@ -531,10 +528,20 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
     clientInfo.documentNumber = idDoc.document_number;
   }
 
+  // Le contrat annonce le taux reellement applique, et non un 40 % ecrit en dur.
+  const reglesDv = await getSettingServer("business_rules");
+  const commissionPct = reglesDv?.commission_dv_pct ?? 40;
+
   const dossierInfo = buildDossierInfo(dossier, lot, now);
   const dvRefs: DepotVenteReferenceLigne[] = allDvRefs.map((r: Ref) => ({
     designation: r.designation,
     description: [r.metal, r.qualite].filter(Boolean).join(" ") || "—",
+    // Le poids ne remontait pas jusqu'au template : le contrat engageait la
+    // boutique sur de la marchandise dont il ne disait pas la masse.
+    poids: r.poids_net ?? r.poids ?? 0,
+    quantite: r.quantite ?? 1,
+    metal: r.metal ?? "",
+    titrage: r.qualite ?? "",
     prixNetDeposant: r.prix_achat,
     prixAffichePublic: r.prix_revente_estime ?? 0,
   }));
@@ -544,6 +551,7 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
   const contratRes = await genDoc({
     type: "contrat_depot_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id,
     client: clientInfo, dossier: dossierInfo, depotVenteReferences: dvRefs, numeroLot: lot.numero,
+    commissionPct,
     references: [], totaux: { totalBrut: 0, taxe: 0, netAPayer: 0 },
     lotReferenceIds: allDvRefs.map((r: Ref) => r.id),
   }, "contrat_depot_vente");

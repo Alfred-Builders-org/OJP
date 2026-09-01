@@ -1,16 +1,20 @@
 "use client";
 
+import { Field, FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   FolderPlus,
   User as PhUser,
   Plus,
+  MagnifyingGlass,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -42,12 +46,26 @@ export function DossierCreateDialog({ open, onOpenChange, validClients: initialC
   const [error, setError] = useState("");
   const [clients, setClients] = useState(initialClients);
   const [showClientCreate, setShowClientCreate] = useState(false);
+  const [rechercheClient, setRechercheClient] = useState("");
+  const [notes, setNotes] = useState("");
 
   const selectedClient = clients.find((c) => c.id === clientId) ?? null;
+
+  const clientsFiltres = rechercheClient.trim()
+    ? clients.filter((c) =>
+        [c.first_name, c.last_name, c.email, c.phone, c.city]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(rechercheClient.trim().toLowerCase())
+      )
+    : clients;
 
   function handleClose() {
     setClientId("");
     setError("");
+    setRechercheClient("");
+    setNotes("");
     onOpenChange(false);
   }
 
@@ -72,6 +90,7 @@ export function DossierCreateDialog({ open, onOpenChange, validClients: initialC
       .insert({
         numero: "",
         client_id: clientId,
+        notes: notes || null,
         created_by: user?.id ?? "",
       })
       .select()
@@ -104,7 +123,7 @@ export function DossierCreateDialog({ open, onOpenChange, validClients: initialC
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
-              <Label>Client *</Label>
+              <Label required>Client</Label>
               <p className="text-xs text-muted-foreground">
                 Seuls les clients avec une pièce d&apos;identité valide sont affichés.
               </p>
@@ -114,7 +133,19 @@ export function DossierCreateDialog({ open, onOpenChange, validClients: initialC
                     ? <span className="truncate">{`${selectedClient.civility === "M" ? "M." : "Mme"} ${selectedClient.first_name} ${selectedClient.last_name}`}</span>
                     : <SelectValue placeholder="Sélectionner un client" />}
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-72">
+                  {/* La boutique compte plusieurs centaines de clients : sans
+                      recherche, la selection devient un defilement interminable. */}
+                  <div className="flex items-center gap-2 px-2 pb-2 sticky top-0 bg-popover z-10">
+                    <MagnifyingGlass size={14} className="shrink-0 text-muted-foreground" />
+                    <input
+                      className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                      placeholder="Rechercher un client..."
+                      value={rechercheClient}
+                      onChange={(e) => setRechercheClient(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </div>
                   <button
                     type="button"
                     className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm font-medium text-foreground hover:bg-accent cursor-pointer"
@@ -128,12 +159,14 @@ export function DossierCreateDialog({ open, onOpenChange, validClients: initialC
                     Nouveau client
                   </button>
                   <div className="my-1 h-px bg-border" />
-                  {clients.length === 0 ? (
+                  {clientsFiltres.length === 0 ? (
                     <div className="px-2 py-4 text-center text-sm text-muted-foreground">
-                      Aucun client valide disponible.
+                      {clients.length === 0
+                        ? "Aucun client valide disponible."
+                        : "Aucun client ne correspond."}
                     </div>
                   ) : (
-                    clients.map((client) => (
+                    clientsFiltres.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
                         {`${client.civility === "M" ? "M." : "Mme"} ${client.first_name} ${client.last_name}`}
                       </SelectItem>
@@ -141,8 +174,17 @@ export function DossierCreateDialog({ open, onOpenChange, validClients: initialC
                   )}
                 </SelectContent>
               </Select>
-              {error && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>}
+              {error && <FieldError>{error}</FieldError>}
             </div>
+            <Field label="Notes">
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Contexte, demande particuliere du client..."
+                className="min-h-[80px] resize-none"
+              />
+            </Field>
+
             {selectedClient && (
               <div className="rounded-lg border p-3 space-y-1">
                 <div className="flex items-center gap-2 text-sm font-medium mb-2">

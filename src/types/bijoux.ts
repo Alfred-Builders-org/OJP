@@ -9,12 +9,15 @@ export interface BijouxStock {
   poids_net: number | null;
   quantite: number | null;
   titrage: string | null;
-  metaux: "Or" | "Platine" | "Argent" | null;
+  metaux: "Or" | "Platine" | "Argent" | "Autre" | null;
   qualite: "333" | "375" | "585" | "750" | "999" | null;
   prix_achat: number | null;
   prix_revente: number | null;
   depot_vente_lot_id: string | null;
   deposant_client_id: string | null;
+  grossiste_id: string | null;
+  achat_grossiste_id: string | null;
+  reference_fournisseur: string | null;
   date_creation: string;
   created_at: string;
   updated_at: string;
@@ -35,8 +38,9 @@ export interface Reparation {
 }
 
 export interface BijouxStockWithOrigin extends BijouxStock {
+  /** Le vendeur pour un rachat ou un depot-vente, le grossiste pour un achat. */
   origin_client_name: string | null;
-  origin_type: "rachat" | "depot_vente" | null;
+  origin_type: "rachat" | "depot_vente" | "grossiste" | null;
 }
 
 export interface StockOrigin {
@@ -65,6 +69,12 @@ export interface StockOrigin {
     first_name: string;
     last_name: string;
   };
+}
+
+/** La provenance d'un bijou neuf : l'achat par lequel il est entre en boutique. */
+export interface StockOriginGrossiste {
+  grossiste: { id: string; nom: string };
+  achat: { id: string; numero: string; date_achat: string; numero_facture: string | null } | null;
 }
 
 export interface StockSale {

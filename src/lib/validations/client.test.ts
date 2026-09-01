@@ -5,15 +5,32 @@ import { clientSchema, identityDocumentSchema } from "./client";
 // clientSchema
 // ============================================================
 describe("clientSchema", () => {
+  // L'adresse complete est exigee : elle figure sur les contrats. L'email ne
+  // l'est pas — une bijouterie compte des clients qui n'en ont pas.
   const validClient = {
     civility: "M" as const,
     first_name: "Jean",
     last_name: "Dupont",
+    email: "jean@example.com",
+    address: "1 rue de la Paix",
+    city: "Paris",
+    postal_code: "75001",
+    country: "France",
   };
 
   it("valide un client minimal (champs obligatoires)", () => {
     const result = clientSchema.safeParse(validClient);
     expect(result.success).toBe(true);
+  });
+
+  it("accepte un email absent", () => {
+    const { email: _email, ...sansEmail } = validClient;
+    expect(clientSchema.safeParse(sansEmail).success).toBe(true);
+  });
+
+  it("rejette une adresse absente", () => {
+    const { address: _address, ...sansAdresse } = validClient;
+    expect(clientSchema.safeParse(sansAdresse).success).toBe(false);
   });
 
   it("valide un client complet", () => {
@@ -63,7 +80,7 @@ describe("clientSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepte un email vide (optionnel)", () => {
+  it("accepte un email vide", () => {
     const result = clientSchema.safeParse({ ...validClient, email: "" });
     expect(result.success).toBe(true);
   });
@@ -105,9 +122,14 @@ describe("clientSchema", () => {
 // identityDocumentSchema
 // ============================================================
 describe("identityDocumentSchema", () => {
+  // Tous les champs sont requis : une piece d'identite conditionne l'ouverture
+  // d'un dossier, on ne peut pas en enregistrer une a moitie renseignee.
   const validDoc = {
     document_type: "cni" as const,
     document_number: "1234567890",
+    issue_date: "2020-01-15",
+    expiry_date: "2035-01-15",
+    nationality: "Française",
   };
 
   it("valide un document minimal", () => {
@@ -116,6 +138,27 @@ describe("identityDocumentSchema", () => {
     if (result.success) {
       expect(result.data.is_primary).toBe(true); // default
     }
+  });
+
+  it("rejette une nationalite absente", () => {
+    const { nationality: _n, ...sansNationalite } = validDoc;
+    expect(identityDocumentSchema.safeParse(sansNationalite).success).toBe(false);
+  });
+
+  it("rejette une piece deja expiree", () => {
+    const result = identityDocumentSchema.safeParse({
+      ...validDoc,
+      expiry_date: "2020-06-30",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejette une emission posterieure a l'expiration", () => {
+    const result = identityDocumentSchema.safeParse({
+      ...validDoc,
+      issue_date: "2036-01-15",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("valide un document complet", () => {

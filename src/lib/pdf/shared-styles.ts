@@ -102,7 +102,7 @@ export const W = {
 
 // CDV column widths (page 2 table)
 export const W_CDV = {
-  des: "25%", desc: "35%", prixNet: "20%", prixPublic: "20%",
+  des: "23%", desc: "27%", poids: "12%", prixNet: "19%", prixPublic: "19%",
 };
 
 // CONF column widths

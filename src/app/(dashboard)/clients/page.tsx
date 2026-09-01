@@ -4,30 +4,50 @@ import { createClient } from "@/lib/supabase/server";
 import { PageWrapper } from "@/components/dashboard/page-wrapper";
 import { ClientTable } from "@/components/clients/client-table";
 import { Button } from "@/components/ui/button";
+import {
+  lireParams,
+  appliquerFiltres,
+  type ParamsTableau,
+  type OptionsRequete,
+} from "@/lib/data-grid/query";
 import type { Client } from "@/types/client";
+
+/**
+ * Recherche, filtres et tri sont appliqués ici, dans la requête, et non plus en
+ * mémoire sur la page affichée : chercher un client absent de la première page
+ * ne renvoyait rien, et le compteur de pagination annonçait le total de la base
+ * pendant que le tableau montrait un sous-ensemble filtré.
+ */
+const OPTIONS: OptionsRequete = {
+  colonnesRecherche: ["first_name", "last_name", "maiden_name", "email", "phone", "city"],
+  colonnesFiltres: { source: "lead_source" },
+  colonnesTri: { nom: "last_name", ville: "city", date: "created_at" },
+  triParDefaut: { colonne: "created_at", ascendant: false },
+};
 
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; size?: string }>;
+  searchParams: Promise<ParamsTableau>;
 }) {
   const params = await searchParams;
-  const page = Math.max(0, parseInt(params.page ?? "0"));
-  const size = Math.max(1, parseInt(params.size ?? "20"));
-  const from = page * size;
-  const to = from + size - 1;
+  const etat = lireParams(params);
 
   const supabase = await createClient();
 
-  const { count } = await supabase
-    .from("clients")
-    .select("*", { count: "exact", head: true });
-
-  const { data } = await supabase
-    .from("clients")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .range(from, to);
+  // Le compteur porte les mêmes filtres que les données : c'est ce qui rend le
+  // « 1–20 sur N » honnête.
+  const [{ count }, { data }] = await Promise.all([
+    appliquerFiltres(
+      supabase.from("clients").select("*", { count: "exact", head: true }),
+      etat,
+      { ...OPTIONS, triParDefaut: undefined }
+    ),
+    appliquerFiltres(supabase.from("clients").select("*"), etat, OPTIONS).range(
+      etat.from,
+      etat.to
+    ),
+  ]);
 
   const clients = (data ?? []) as Client[];
 
@@ -44,7 +64,7 @@ export default async function ClientsPage({
         </Link>
       }
     >
-      <ClientTable data={clients} totalItems={count ?? 0} page={page} pageSize={size} />
+      <ClientTable data={clients} totalItems={count ?? 0} />
     </PageWrapper>
   );
 }

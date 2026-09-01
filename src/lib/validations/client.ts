@@ -292,12 +292,21 @@ export const DOCUMENT_TYPE_OPTIONS = [
   { value: "permis_conduire", label: "Permis de conduire" },
 ] as const;
 
+export const CIVILITY_OPTIONS = [
+  { value: "M", label: "Monsieur" },
+  { value: "Mme", label: "Madame" },
+] as const;
+
 export const clientSchema = z.object({
   civility: z.enum(["M", "Mme"], { message: "La civilité est requise" }),
   first_name: z.string().min(1, "Le prénom est requis").max(100, "100 caractères maximum"),
   last_name: z.string().min(1, "Le nom est requis").max(100, "100 caractères maximum"),
   maiden_name: z.string().max(100).optional().or(z.literal("")),
-  email: z.string().min(1, "L'email est requis").email("Format email invalide"),
+  // Optionnel : une bijouterie compte des clients qui n'ont pas d'adresse
+  // electronique. L'exiger rendrait leur fiche impossible a enregistrer — 67 des
+  // 538 clients repris en production sont dans ce cas. Le format reste verifie
+  // des lors qu'une adresse est saisie.
+  email: z.string().email("Format email invalide").optional().or(z.literal("")),
   phone: z.string().max(20).optional().or(z.literal("")),
   address: z.string().min(1, "L'adresse est requise").max(255, "255 caractères maximum"),
   city: z.string().min(1, "La ville est requise").max(100, "100 caractères maximum"),
@@ -309,15 +318,51 @@ export const clientSchema = z.object({
 
 export type ClientFormData = z.infer<typeof clientSchema>;
 
-export const identityDocumentSchema = z.object({
-  document_type: z.enum(["cni", "passeport", "titre_sejour", "permis_conduire"], {
-    message: "Le type de document est requis",
-  }),
-  document_number: z.string().min(1, "Le numéro est requis").max(50, "50 caractères maximum"),
-  issue_date: z.string().optional().or(z.literal("")),
-  expiry_date: z.string().optional().or(z.literal("")),
-  nationality: z.string().optional().or(z.literal("")),
-  is_primary: z.boolean().default(true),
-});
+/**
+ * Une pièce d'identité est le fondement du dossier client : elle conditionne la
+ * possibilité même d'ouvrir un dossier. Tous ses champs sont donc requis — les
+ * dates et la nationalité étaient optionnelles, et n'avaient d'ailleurs aucun
+ * message d'erreur à afficher.
+ *
+ * Une pièce déjà expirée est refusée à la saisie. L'expiration était jusqu'ici
+ * détectée après coup, signalée par un badge et bloquante pour la création d'un
+ * dossier — mais rien n'empêchait de l'enregistrer.
+ */
+export const identityDocumentSchema = z
+  .object({
+    document_type: z.enum(["cni", "passeport", "titre_sejour", "permis_conduire"], {
+      message: "Le type de document est requis",
+    }),
+    document_number: z.string().min(1, "Le numéro est requis").max(50, "50 caractères maximum"),
+    issue_date: z.string().min(1, "La date d'émission est requise"),
+    expiry_date: z.string().min(1, "La date d'expiration est requise"),
+    nationality: z.string().min(1, "La nationalité est requise"),
+    is_primary: z.boolean().default(true),
+  })
+  .refine(
+    (data) => {
+      const expiration = new Date(data.expiry_date);
+      if (Number.isNaN(expiration.getTime())) return false;
+      // Comparaison au jour près : une pièce qui expire aujourd'hui est encore
+      // valable aujourd'hui.
+      const aujourdhui = new Date();
+      aujourdhui.setHours(0, 0, 0, 0);
+      return expiration >= aujourdhui;
+    },
+    {
+      message: "Cette pièce est expirée : elle ne peut pas être enregistrée",
+      path: ["expiry_date"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (!data.issue_date) return true;
+      return new Date(data.issue_date) <= new Date(data.expiry_date);
+    },
+    {
+      message: "La date d'émission doit précéder la date d'expiration",
+      path: ["issue_date"],
+    }
+  );
 
 export type IdentityDocumentFormData = z.infer<typeof identityDocumentSchema>;

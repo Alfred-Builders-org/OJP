@@ -20,10 +20,25 @@ export const REFERENCE_CATEGORIE_OPTIONS = [
   { value: "or_investissement", label: "Or Investissement" },
 ] as const;
 
+/**
+ * Les metaux qu'on rachete au poids, et dont le cours pilote le prix.
+ * Un rachat ne peut porter que sur l'un d'eux.
+ */
 export const METAL_OPTIONS = [
   { value: "Or", label: "Or" },
   { value: "Argent", label: "Argent" },
   { value: "Platine", label: "Platine" },
+] as const;
+
+/**
+ * Ce que le stock peut contenir, rachat ou achat chez un grossiste. « Autre »
+ * couvre ce qui n'est fait d'aucun metal precieux — bijou fantaisie, cuir,
+ * acier — et qu'on ne valorise donc pas au cours. Sans cette valeur, un metal
+ * vide voulait dire deux choses a la fois : non precieux, ou pas renseigne.
+ */
+export const METAL_STOCK_OPTIONS = [
+  ...METAL_OPTIONS,
+  { value: "Autre", label: "Autre (non précieux)" },
 ] as const;
 
 export const QUALITE_OPTIONS = [
@@ -34,10 +49,20 @@ export const QUALITE_OPTIONS = [
   { value: "999", label: "999 (24k)" },
 ] as const;
 
+/**
+ * Le depot-vente n'est pas une destination de reference : il suppose un lot de
+ * depot-vente a part entiere, avec son contrat et son deposant. Une reference de
+ * rachat part donc en stock ou en fonderie, rien d'autre.
+ *
+ * « Non defini » est une valeur a part entiere : sans elle, le premier choix
+ * etait definitif, le selecteur ignorant la valeur vide.
+ */
+export const DESTINATION_NON_DEFINIE = "non_definie";
+
 export const DESTINATION_OPTIONS = [
+  { value: DESTINATION_NON_DEFINIE, label: "Non définie" },
   { value: "stock_boutique", label: "Stock boutique" },
   { value: "fonderie", label: "Fonderie" },
-  { value: "depot_vente", label: "Dépôt-vente" },
 ] as const;
 
 // ============================================================

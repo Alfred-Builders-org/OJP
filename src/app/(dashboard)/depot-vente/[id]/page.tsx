@@ -49,7 +49,7 @@ export default async function DepotVenteDetailPage({ params }: { params: Promise
       lot={lotWithRefs}
       orInvestCatalog={[]}
       typeLabel="Dépôt-vente"
-      backHref="/depot-vente"
+      backHref="/dossiers"
       documents={(documents ?? []) as DocumentRecord[]}
       reglements={(reglements ?? []) as Reglement[]}
     />

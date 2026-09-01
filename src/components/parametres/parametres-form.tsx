@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import {
   CurrencyEur,
   FloppyDisk,
@@ -84,8 +85,14 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
   },
 };
 
+const SECTION_KEYS = NAV_ITEMS.map((item) => item.key) as readonly Section[];
+
 export function ParametresForm({ parametres, emailTemplates, settings }: ParametresFormProps) {
-  const [activeSection, setActiveSection] = useState<Section>("societe");
+  const [activeSection, setActiveSection] = useUrlTab<Section>(
+    "section",
+    "societe",
+    SECTION_KEYS
+  );
   const [globalSaving, setGlobalSaving] = useState(false);
 
   // Save function registered by the active tab
@@ -99,7 +106,9 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
   const [prixOr, setPrixOr] = useState(parametres.prix_or.toString());
   const [prixArgent, setPrixArgent] = useState(parametres.prix_argent.toString());
   const [prixPlatine, setPrixPlatine] = useState(parametres.prix_platine.toString());
-  const { saving: savingPrix, save: savePrix } = useSaveParametres("Prix du cours mis à jour");
+  // Les cours ne passent plus par `useSaveParametres` (écriture directe en
+  // table) mais par la route qui traverse `appliquer_cours` — voir `prixSaveFn`.
+  const [savingPrix, setSavingPrix] = useState(false);
   const [actualisation, setActualisation] = useState(false);
   const [releveLe, setReleveLe] = useState<string | null>(parametres.cours_maj_le);
 
@@ -177,16 +186,63 @@ export function ParametresForm({ parametres, emailTemplates, settings }: Paramet
       return false;
     }
 
+    // Les cours passent par `appliquer_cours`, seul endroit ou vit le controle
+    // de vraisemblance. La page ecrivait auparavant en direct dans la table :
+    // un argent a 45 EUR/g etait accepte sans un mot, alors que le cours reel
+    // avoisine 1,80 EUR/g.
+    const enregistrerCours = async (forcer: boolean): Promise<boolean> => {
+      setSavingPrix(true);
+      try {
+        return await appelerCours(forcer);
+      } finally {
+        setSavingPrix(false);
+      }
+    };
+
+    const appelerCours = async (forcer: boolean): Promise<boolean> => {
+      const res = await fetch("/api/cours", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prix_or: or,
+          prix_argent: argent,
+          prix_platine: platine,
+          forcer,
+        }),
+      });
+
+      if (res.ok) return true;
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.status === 409 && data.peut_forcer && !forcer) {
+        // Un ecart de plus de 30 % est le plus souvent une faute de frappe,
+        // mais parfois un mouvement reel. On explique, puis on laisse trancher.
+        const accepte = window.confirm(
+          `${data.error}\n\nEnregistrer quand même cette valeur ?`
+        );
+        if (!accepte) return false;
+        return enregistrerCours(true);
+      }
+
+      toast.error(data.error ?? "Les cours n'ont pas pu être enregistrés.");
+      return false;
+    };
+
     const [r1, r2] = await Promise.all([
-      savePrix({ prix_or: or, prix_argent: argent, prix_platine: platine }),
+      enregistrerCours(false),
       saveCoeff({ coefficient_rachat: coeff, coefficient_vente: coeffV }),
     ]);
 
-    if (r1) initialPrix.current = { prixOr, prixArgent, prixPlatine };
+    if (r1) {
+      initialPrix.current = { prixOr, prixArgent, prixPlatine };
+      setReleveLe(new Date().toISOString());
+      toast.success("Prix du cours mis à jour");
+    }
     if (r2) initialCoeff.current = { coefficient, coefficientVente };
 
     return r1 && r2;
-  }, [prixOr, prixArgent, prixPlatine, coefficient, coefficientVente, savePrix, saveCoeff]);
+  }, [prixOr, prixArgent, prixPlatine, coefficient, coefficientVente, saveCoeff]);
 
   // Keep the prix save registered when prix is the active section
   if (activeSection === "prix") {

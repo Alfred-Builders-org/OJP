@@ -18,13 +18,43 @@ function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   )
 }
 
-function SelectValue({ className, ...props }: SelectPrimitive.Value.Props) {
+/**
+ * Valeur selectionnee affichee dans le declencheur.
+ *
+ * Base UI rend la valeur BRUTE quand ni `children` ni `items` ne sont fournis —
+ * d'ou les selecteurs qui affichaient « M » au lieu de « Monsieur », ou un
+ * identifiant technique au lieu du libelle. La prop `items` prend une table
+ * valeur -> libelle et fait la traduction une fois pour toutes.
+ */
+function SelectValue({
+  className,
+  items,
+  placeholder,
+  children,
+  ...props
+}: SelectPrimitive.Value.Props & {
+  items?: Record<string, React.ReactNode>
+}) {
+  const render =
+    children ??
+    (items
+      ? (value: unknown) => {
+          if (value === null || value === undefined || value === "") {
+            return placeholder
+          }
+          return items[String(value)] ?? String(value)
+        }
+      : undefined)
+
   return (
     <SelectPrimitive.Value
       data-slot="select-value"
       className={cn("flex flex-1 text-left", className)}
+      placeholder={placeholder}
       {...props}
-    />
+    >
+      {render}
+    </SelectPrimitive.Value>
   )
 }
 
@@ -187,6 +217,17 @@ function SelectScrollDownButton({
   )
 }
 
+/**
+ * Convertit une liste d'options `{ value, label }` en table pour `SelectValue`.
+ * Les listes d'options du projet ont deja cette forme : autant les reutiliser
+ * plutot que de reecrire la correspondance a chaque declencheur.
+ */
+function selectItems(
+  options: ReadonlyArray<{ value: string; label: React.ReactNode }>
+): Record<string, React.ReactNode> {
+  return Object.fromEntries(options.map((o) => [o.value, o.label]))
+}
+
 export {
   Select,
   SelectContent,
@@ -198,4 +239,5 @@ export {
   SelectSeparator,
   SelectTrigger,
   SelectValue,
+  selectItems,
 }

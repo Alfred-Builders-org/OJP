@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { useUrlTab } from "@/hooks/use-url-tab";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CommandeRefTable } from "@/components/commandes/commande-ref-table";
@@ -19,7 +20,11 @@ export function RoutagePageClient({
   lignes,
   fonderies,
 }: RoutagePageClientProps) {
-  const [activeTab, setActiveTab] = useState("commandes");
+  const [activeTab, setActiveTab] = useUrlTab<"commandes" | "envois">(
+    "onglet",
+    "commandes",
+    ["commandes", "envois"]
+  );
   const [generateFn, setGenerateFn] = useState<(() => void) | null>(null);
   const [canGenerate, setCanGenerate] = useState(false);
   const [generating, setGenerating] = useState(false);

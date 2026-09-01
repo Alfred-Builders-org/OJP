@@ -1,10 +1,13 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -62,13 +65,12 @@ export function ResetPasswordForm() {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {error && (
-            <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>
+            <FieldError>{error}</FieldError>
           )}
           <div className="space-y-2">
             <Label htmlFor="password">Nouveau mot de passe</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               placeholder="Minimum 6 caractères"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -78,9 +80,8 @@ export function ResetPasswordForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
-            <Input
+            <PasswordInput
               id="confirmPassword"
-              type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               minLength={6}

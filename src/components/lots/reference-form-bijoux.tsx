@@ -1,5 +1,7 @@
 "use client";
 
+import { FieldError } from "@/components/ui/field";
+
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -39,12 +41,7 @@ import {
   calculerPrixRachatBijoux,
   getCoursMetalFromSnapshot,
 } from "@/lib/calculations/prix-rachat";
-import {
-  calculerTFOP,
-  calculerTPV,
-  isTPVEligible,
-  regimeFiscalOptimalBijoux,
-} from "@/lib/calculations/taxes";
+import { calculerTFOP } from "@/lib/calculations/taxes";
 import { formatCurrency, formatDateISO } from "@/lib/format";
 import type { LotReference } from "@/types/lot";
 
@@ -90,12 +87,6 @@ export function ReferenceFormBijoux({
   const [prixAchatManuel, setPrixAchatManuel] = useState(editData?.prix_achat?.toString() ?? "");
   const [prixReventeManuel, setPrixReventeManuel] = useState(editData?.prix_revente_estime?.toString() ?? "");
   const [commissionLocal, setCommissionLocal] = useState(commissionDvPct.toString());
-
-  // Champs fiscaux (rachat uniquement)
-  const [hasFacture, setHasFacture] = useState(editData?.has_facture ?? false);
-  const [isScelle, setIsScelle] = useState(editData?.is_scelle ?? false);
-  const [dateAcquisition, setDateAcquisition] = useState(editData?.date_acquisition ?? "");
-  const [prixAcquisitionStr, setPrixAcquisitionStr] = useState(editData?.prix_acquisition?.toString() ?? "");
 
   const prixCalcule = useMemo(() => {
     if (!metal || !qualite || !poidsNet) return null;
@@ -145,21 +136,9 @@ export function ReferenceFormBijoux({
     return Math.round(unitaire * qty * 100) / 100;
   })();
 
-  const tpvEligible = !isDepotVente && isTPVEligible(
-    hasFacture,
-    isScelle,
-    dateAcquisition || null,
-    prixAcquisitionStr ? parseFloat(prixAcquisitionStr) : null
-  );
-
+  // Taxe forfaitaire sur les objets precieux : 6 % + 0,5 % de CRDS au-dela de
+  // 5 000 EUR, appreciee par objet (prix unitaire x quantite de la ligne).
   const tfopMontant = !isDepotVente && prixAchatTotal !== null ? calculerTFOP(prixAchatTotal) : null;
-  const tpvMontant = tpvEligible && prixAchatTotal !== null && prixAcquisitionStr
-    ? calculerTPV(prixAchatTotal, parseFloat(prixAcquisitionStr), dateAcquisition)
-    : null;
-
-  const optimal = !isDepotVente && tfopMontant !== null
-    ? regimeFiscalOptimalBijoux(tpvMontant, tfopMontant)
-    : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -207,16 +186,18 @@ export function ReferenceFormBijoux({
       prix_achat: finalPrixAchat,
       prix_revente_estime: finalPrixRevente,
       type_rachat: typeRachat,
-      // Champs fiscaux
-      has_facture: isDepotVente ? false : hasFacture,
-      is_scelle: isDepotVente ? false : isScelle,
-      date_acquisition: isDepotVente ? null : (dateAcquisition || null),
-      prix_acquisition: isDepotVente ? null : (prixAcquisitionStr ? parseFloat(prixAcquisitionStr) : null),
-      tpv_eligible: isDepotVente ? false : tpvEligible,
-      tpv_montant: isDepotVente ? null : (tpvMontant !== null ? tpvMontant / qty : null),
-      tmp_montant: isDepotVente ? null : (tfopMontant !== null ? tfopMontant / qty : null),
-      regime_fiscal: isDepotVente ? null : (optimal?.regime ?? null),
-      montant_taxe: isDepotVente ? 0 : ((optimal?.montant ?? 0) / qty),
+      // Fiscalité : un bijou relève de la seule taxe forfaitaire sur les objets
+      // précieux. Les colonnes du régime des plus-values restent nulles — elles
+      // servent encore à l'or d'investissement, qui a bien le choix du régime.
+      has_facture: false,
+      is_scelle: false,
+      date_acquisition: null,
+      prix_acquisition: null,
+      tpv_eligible: false,
+      tpv_montant: null,
+      tmp_montant: null,
+      regime_fiscal: isDepotVente ? null : "TFOP",
+      montant_taxe: isDepotVente ? 0 : ((tfopMontant ?? 0) / qty),
     };
 
     const { error: dbError } = isEdit
@@ -249,7 +230,7 @@ export function ReferenceFormBijoux({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {error && <p className="text-sm text-destructive animate-in fade-in-0 slide-in-from-top-1 duration-150">{error}</p>}
+          {error && <FieldError>{error}</FieldError>}
 
           {!isDepotVente && (
             <div className="flex gap-2">
@@ -282,7 +263,7 @@ export function ReferenceFormBijoux({
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="designation">Désignation *</Label>
+              <Label htmlFor="designation" required>Désignation</Label>
               <Input
                 id="designation"
                 value={designation}
@@ -292,7 +273,7 @@ export function ReferenceFormBijoux({
               />
             </div>
             <div className="space-y-2">
-              <Label>Métal *</Label>
+              <Label required>Métal</Label>
               <Select value={metal} onValueChange={(v) => { if (v) setMetal(v as "Or" | "Argent" | "Platine"); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner" />
@@ -307,7 +288,7 @@ export function ReferenceFormBijoux({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Qualité *</Label>
+              <Label required>Qualité</Label>
               <Select value={qualite} onValueChange={(v) => { if (v) setQualite(v); }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner" />
@@ -325,7 +306,7 @@ export function ReferenceFormBijoux({
 
           <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
             <div className="space-y-2">
-              <Label htmlFor="poids_brut">Poids brut (g) *</Label>
+              <Label htmlFor="poids_brut" required>Poids brut (g)</Label>
               <Input
                 id="poids_brut"
                 type="number"
@@ -340,7 +321,7 @@ export function ReferenceFormBijoux({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="poids_net">Poids net (g) *</Label>
+              <Label htmlFor="poids_net" required>Poids net (g)</Label>
               <Input
                 id="poids_net"
                 type="number"
@@ -357,7 +338,7 @@ export function ReferenceFormBijoux({
               <p className="text-xs text-muted-foreground">Poids du métal seul</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="quantite">Quantité *</Label>
+              <Label htmlFor="quantite" required>Quantité</Label>
               <Input
                 id="quantite"
                 type="number"
@@ -369,7 +350,7 @@ export function ReferenceFormBijoux({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="prix_achat">Prix de rachat *</Label>
+              <Label htmlFor="prix_achat" required>Prix de rachat</Label>
               <Input
                 id="prix_achat"
                 type="number"
@@ -405,7 +386,7 @@ export function ReferenceFormBijoux({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label htmlFor="prix_revente">Prix de revente *</Label>
+                <Label htmlFor="prix_revente" required>Prix de revente</Label>
                 <Input
                   id="prix_revente"
                   type="number"
@@ -424,53 +405,16 @@ export function ReferenceFormBijoux({
             )}
           </div>
 
-          {/* Conditions fiscales (rachat uniquement) */}
-          {!isDepotVente && (
-            <div className="space-y-3 rounded-lg border p-4">
-              <p className="text-sm font-medium flex items-center gap-1.5">
-                <Info size={14} weight="duotone" />
-                Conditions fiscales — TFOP (6,5%)
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Taxe forfaitaire sur les objets précieux : 6% + 0,5% CRDS. Exonéré si cession ≤ 5 000 €.
-                Le vendeur peut opter pour le régime des plus-values s&apos;il dispose des justificatifs.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <Checkbox checked={hasFacture} onCheckedChange={(v) => setHasFacture(!!v)} />
-                  Facture au nom du client
-                </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <Checkbox checked={isScelle} onCheckedChange={(v) => setIsScelle(!!v)} />
-                  Justificatif d&apos;achat
-                </label>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Date d&apos;acquisition</Label>
-                  <DatePicker
-                    value={dateAcquisition ? parse(dateAcquisition, "yyyy-MM-dd", new Date()) : undefined}
-                    onChange={(d) => setDateAcquisition(d ? formatDateISO(d) : "")}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prix_acquisition_bijoux">Prix d&apos;acquisition (€)</Label>
-                  <Input
-                    id="prix_acquisition_bijoux"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={prixAcquisitionStr}
-                    onChange={(e) => setPrixAcquisitionStr(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
+          {/* La fiscalité des bijoux n'appelle aucune saisie.
+              Un bijou ne relève que de la taxe forfaitaire sur les objets
+              précieux : 6 % du prix, plus 0,5 % de CRDS, au-delà de 5 000 € par
+              objet. Le formulaire réclamait auparavant facture, justificatif,
+              date et prix d'acquisition pour un régime de plus-values qui ne
+              s'applique pas à cette catégorie. */}
 
           {/* Résultats fiscaux */}
           {!isDepotVente && prixAchatTotal !== null && (
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <CurrencyEur size={12} weight="duotone" />
@@ -483,41 +427,28 @@ export function ReferenceFormBijoux({
               <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <Receipt size={12} weight="duotone" />
-                  TFOP (6,5%)
+                  Taxe forfaitaire
                 </p>
-                <p className={`text-sm font-medium ${optimal?.regime === "TFOP" ? "text-emerald-600" : "text-muted-foreground"}`}>
-                  {tfopMontant !== null ? (tfopMontant === 0 ? "Exonéré (≤ 5 000 €)" : formatCurrency(tfopMontant)) : "—"}
-                  {optimal?.regime === "TFOP" && tfopMontant !== null && tfopMontant > 0 && " \u2713"}
+                <p className="text-sm font-medium">
+                  {tfopMontant === null
+                    ? "—"
+                    : tfopMontant === 0
+                      ? "Exonéré (≤ 5 000 €)"
+                      : formatCurrency(tfopMontant)}
                 </p>
-                {tpvEligible && tpvMontant !== null ? (
-                  <>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 mt-2">
-                      <Receipt size={12} weight="duotone" />
-                      TPV (plus-value)
-                    </p>
-                    <p className={`text-sm font-medium ${optimal?.regime === "TPV" ? "text-emerald-600" : "text-muted-foreground"}`}>
-                      {formatCurrency(tpvMontant)}
-                      {optimal?.regime === "TPV" && " \u2713"}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs text-muted-foreground mt-2">TPV</p>
-                    <p className="text-sm text-muted-foreground">Non éligible</p>
-                  </>
-                )}
+                <p className="text-xs text-muted-foreground">
+                  6 % + 0,5 % CRDS, au-delà de 5 000 € par objet
+                </p>
               </div>
-              {optimal && (
-                <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Wallet size={12} weight="duotone" />
-                    Montant net
-                  </p>
-                  <p className="text-lg font-bold">
-                    {formatCurrency(prixAchatTotal - optimal.montant)}
-                  </p>
-                </div>
-              )}
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Wallet size={12} weight="duotone" />
+                  Montant net
+                </p>
+                <p className="text-lg font-bold">
+                  {formatCurrency(prixAchatTotal - (tfopMontant ?? 0))}
+                </p>
+              </div>
             </div>
           )}
 
