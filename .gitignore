@@ -52,3 +52,7 @@ IDEES.md
 
 # Seed data (test only — never run in production)
 supabase/seed_*.sql
+
+# Bytecode des scripts de migration
+__pycache__/
+*.pyc
