@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import crypto from "crypto";
 import { render } from "@react-email/components";
 import React from "react";
-import { getResend } from "@/lib/email/resend";
+import { getResend, cleResend } from "@/lib/email/resend";
+import { LOGO_CID, pieceLogo } from "@/lib/email/logo";
 import { AuthEmail } from "@/lib/email/auth-email";
 import { gabaritPour } from "@/lib/email/auth-templates";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
   }
   // Dit clairement ce qui manque. Sans ce garde-fou, le constructeur de Resend
   // leve sur une cle vide et la trace ne parle que d'un appel a `new Resend`.
-  if (!process.env.RESEND_API_KEY) {
+  if (!cleResend()) {
     console.error("[auth-email] RESEND_API_KEY manquant : aucun courriel ne partira");
     return NextResponse.json({ error: "Expéditeur non configuré" }, { status: 500 });
   }
@@ -123,7 +124,6 @@ export async function POST(request: NextRequest) {
   // envoie est la source la plus fiable de sa propre adresse.
   const origine =
     process.env.NEXT_PUBLIC_APP_URL || donnees.site_url || "";
-  const logoUrl = `${origine}/logo-light.png`;
 
   const action = donnees.email_action_type;
   const gabarit = gabaritPour(action);
@@ -151,7 +151,9 @@ export async function POST(request: NextRequest) {
       libelleBouton: gabarit.libelleBouton,
       code: codeSeul ? donnees.token : undefined,
       validite: gabarit.validite,
-      logoUrl,
+      // Le logo voyage avec le message, comme sur les courriels metier : une
+      // image appelee a distance est bloquee par la plupart des messageries.
+      logoUrl: `cid:${LOGO_CID}`,
     })
   );
 
@@ -169,6 +171,7 @@ export async function POST(request: NextRequest) {
     to: destinataire,
     subject: gabarit.sujet,
     html,
+    attachments: [pieceLogo()],
   });
 
   // Journalise au meme endroit que les courriels metier : quand un utilisateur

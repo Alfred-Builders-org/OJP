@@ -2,6 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, C } from "./shared-styles";
+import { piedDePage } from "./entete";
 import {
   SOCIETE,
   formatCurrency,
@@ -36,21 +37,22 @@ function Doc({ data }: { data: BonLivraisonData }) {
       ),
     ),
 
-    // Info section
+    // Expediteur a gauche, destinataire a droite : c'est l'adresse de la
+    // fonderie que la fenetre de l'enveloppe doit montrer.
     h(View, { style: s.infoSection },
+      h(View, { style: s.docLeft },
+        h(Text, { style: s.label }, "EXP\u00C9DITEUR"),
+        h(Text, { style: { fontSize: 8, color: C.text, marginBottom: 2 } }, SOCIETE.nom),
+        h(Text, { style: { fontSize: 7, color: C.gray } }, SOCIETE.adresse),
+        h(Text, { style: { fontSize: 7, color: C.gray } }, `T\u00E9l : ${SOCIETE.telephoneFixe}`),
+      ),
       h(View, { style: s.clientBlock },
         h(Text, { style: s.label }, "DESTINATAIRE"),
         h(Text, { style: s.clientName }, fonderie.nom),
         fonderie.adresse ? h(Text, { style: s.clientLine }, fonderie.adresse) : null,
         fonderie.codePostal && fonderie.ville ? h(Text, { style: s.clientLine }, `${fonderie.codePostal} ${fonderie.ville}`) : null,
-        fonderie.telephone ? h(Text, { style: s.clientMuted }, `Tél : ${fonderie.telephone}`) : null,
+        fonderie.telephone ? h(Text, { style: s.clientMuted }, `T\u00E9l : ${fonderie.telephone}`) : null,
         fonderie.email ? h(Text, { style: s.clientMuted }, fonderie.email) : null,
-      ),
-      h(View, { style: s.docRight },
-        h(Text, { style: s.infoLabel }, "EXPÉDITEUR"),
-        h(Text, { style: { fontSize: 8, color: C.text, textAlign: "right" as const, marginBottom: 2 } }, SOCIETE.nom),
-        h(Text, { style: { fontSize: 7, color: C.gray, textAlign: "right" as const } }, SOCIETE.adresse),
-        h(Text, { style: { fontSize: 7, color: C.gray, textAlign: "right" as const } }, `Tél : ${SOCIETE.telephone}`),
       ),
     ),
 
@@ -68,7 +70,7 @@ function Doc({ data }: { data: BonLivraisonData }) {
       ...groupes.map((group, gi) => h(View, { key: gi },
         // Group header
         h(View, { style: { flexDirection: "row" as const, backgroundColor: "#F5F0E6", paddingVertical: 4, paddingHorizontal: 6, marginTop: gi > 0 ? 8 : 4 } },
-          h(Text, { style: { fontSize: 7, fontFamily: "Courier-Bold", color: C.gold } },
+          h(Text, { style: { fontSize: 7, fontWeight: 700, color: C.gold } },
             `${group.metal} ${group.titrage}`,
           ),
         ),
@@ -83,14 +85,14 @@ function Doc({ data }: { data: BonLivraisonData }) {
         ),
         // Subtotal
         h(View, { style: { flexDirection: "row" as const, paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: C.line } },
-          h(Text, { style: [{ fontSize: 7, fontFamily: "Courier-Bold", color: C.gray }, { width: "34%" }] },
+          h(Text, { style: [{ fontSize: 7, fontWeight: 700, color: C.gray }, { width: "34%" }] },
             `Sous-total : ${group.sousTotal.pieces} pce${group.sousTotal.pieces > 1 ? "s" : ""}`,
           ),
-          h(Text, { style: [{ fontSize: 7, fontFamily: "Courier-Bold", color: C.text, textAlign: "right" as const }, { width: "14%" }] },
+          h(Text, { style: [{ fontSize: 7, fontWeight: 700, color: C.text, textAlign: "right" as const }, { width: "14%" }] },
             `${group.sousTotal.poids.toFixed(2)}g`,
           ),
           h(Text, { style: { width: "18%" } }, ""),
-          h(Text, { style: [{ fontSize: 7, fontFamily: "Courier-Bold", color: C.text, textAlign: "right" as const }, { width: "18%" }] },
+          h(Text, { style: [{ fontSize: 7, fontWeight: 700, color: C.text, textAlign: "right" as const }, { width: "18%" }] },
             formatCurrency(group.sousTotal.valeur),
           ),
         ),
@@ -130,10 +132,7 @@ function Doc({ data }: { data: BonLivraisonData }) {
     ),
 
     // Footer
-    h(View, { style: { ...s.footer, position: "absolute" as const, bottom: 18, left: 45, right: 45 } },
-      h(Text, { style: s.footerText }, `${SOCIETE.nom} — ${SOCIETE.details}`),
-      h(Text, { style: s.footerText }, data.numero),
-    ),
+    piedDePage(data.numero),
   ));
 }
 

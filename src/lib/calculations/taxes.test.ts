@@ -3,10 +3,13 @@ import {
   calculerTMP,
   calculerTFOP,
   calculerTVAMarge,
+  calculerTaxeVente,
   isTPVEligible,
   calculerTPV,
   regimeFiscalOptimal,
   regimeFiscalOptimalBijoux,
+  regimeVenteEffectif,
+  tvaIncluse,
 } from "./taxes";
 
 // ============================================================
@@ -103,6 +106,128 @@ describe("calculerTVAMarge", () => {
     // safeNum(NaN) = 0, donc marge = 9000 TTC -> 9000 x 20/120 = 1500
     expect(calculerTVAMarge(9000, NaN)).toBe(1500);
     expect(calculerTVAMarge(9000, -1000)).toBe(1500);
+  });
+});
+
+// ============================================================
+// tvaIncluse
+// ============================================================
+describe("tvaIncluse", () => {
+  it("extrait la TVA d'un prix TTC, sans jamais l'y ajouter", () => {
+    expect(tvaIncluse(1200)).toBe(200);
+    expect(tvaIncluse(1000)).toBe(166.67);
+  });
+
+  it("accepte un autre taux que 20 %", () => {
+    expect(tvaIncluse(1050, 5.5)).toBe(54.74);
+  });
+
+  it("retourne 0 sur un prix nul, négatif ou un taux nul", () => {
+    expect(tvaIncluse(0)).toBe(0);
+    expect(tvaIncluse(-100)).toBe(0);
+    expect(tvaIncluse(1200, 0)).toBe(0);
+  });
+});
+
+// ============================================================
+// regimeVenteEffectif
+// ============================================================
+describe("regimeVenteEffectif", () => {
+  it("garde le régime de l'article par défaut", () => {
+    expect(regimeVenteEffectif("marge")).toBe("marge");
+    expect(regimeVenteEffectif("normal")).toBe("normal");
+  });
+
+  it("l'option de facturer sur le prix total fait sortir de la marge", () => {
+    expect(regimeVenteEffectif("marge", true)).toBe("normal");
+  });
+
+  it("l'option ne fait jamais entrer dans la marge un bien qui n'y a pas droit", () => {
+    expect(regimeVenteEffectif("normal", true)).toBe("normal");
+    expect(regimeVenteEffectif("normal", false)).toBe("normal");
+  });
+});
+
+// ============================================================
+// calculerTaxeVente
+// ============================================================
+describe("calculerTaxeVente", () => {
+  it("bijou racheté 600 et revendu 1000 : TVA sur la marge de 400", () => {
+    const t = calculerTaxeVente({
+      prixVenteTTC: 1000,
+      prixAchat: 600,
+      regimeArticle: "marge",
+    });
+    expect(t.regime).toBe("marge");
+    expect(t.typeTaxe).toBe("tva_marge");
+    expect(t.base).toBe(400);
+    expect(t.montantTVA).toBe(66.67);
+    // Ce que la boutique garde en HT : 1000 - 66,67
+    expect(t.prixTTC - t.montantTVA).toBeCloseTo(933.33, 2);
+  });
+
+  it("vente à perte : pas de TVA, et rien à compenser sur cette ligne", () => {
+    const t = calculerTaxeVente({
+      prixVenteTTC: 500,
+      prixAchat: 600,
+      regimeArticle: "marge",
+    });
+    expect(t.base).toBe(0);
+    expect(t.montantTVA).toBe(0);
+    expect(t.typeTaxe).toBeNull();
+  });
+
+  it("bijou acheté à un grossiste assujetti : TVA sur le prix total", () => {
+    const t = calculerTaxeVente({
+      prixVenteTTC: 1000,
+      prixAchat: 600,
+      regimeArticle: "normal",
+    });
+    expect(t.regime).toBe("normal");
+    expect(t.typeTaxe).toBe("tva_normale");
+    expect(t.base).toBe(1000);
+    expect(t.montantTVA).toBe(166.67);
+  });
+
+  it("renoncer à la marge fait porter la TVA sur le prix entier", () => {
+    const marge = calculerTaxeVente({
+      prixVenteTTC: 1000,
+      prixAchat: 600,
+      regimeArticle: "marge",
+    });
+    const renonce = calculerTaxeVente({
+      prixVenteTTC: 1000,
+      prixAchat: 600,
+      regimeArticle: "marge",
+      optionPrixTotal: true,
+    });
+    expect(renonce.montantTVA).toBe(166.67);
+    expect(renonce.montantTVA).toBeGreaterThan(marge.montantTVA);
+    // Le client paie le meme prix : c'est le vendeur qui y perd.
+    expect(renonce.prixTTC).toBe(marge.prixTTC);
+  });
+
+  it("le prix de vente reste TTC : la taxe ne s'y ajoute jamais", () => {
+    for (const regimeArticle of ["marge", "normal"] as const) {
+      const t = calculerTaxeVente({ prixVenteTTC: 1000, prixAchat: 600, regimeArticle });
+      expect(t.prixTTC).toBe(1000);
+    }
+  });
+
+  it("les frais de remise en état ne réduisent pas la marge taxable", () => {
+    // Polissage a 80 EUR : il gonfle le prix de vente, pas le prix d'achat.
+    const sansFrais = calculerTaxeVente({
+      prixVenteTTC: 1000,
+      prixAchat: 600,
+      regimeArticle: "marge",
+    });
+    const avecFrais = calculerTaxeVente({
+      prixVenteTTC: 1080,
+      prixAchat: 600,
+      regimeArticle: "marge",
+    });
+    expect(avecFrais.base).toBe(480);
+    expect(avecFrais.montantTVA).toBeGreaterThan(sansFrais.montantTVA);
   });
 });
 

@@ -263,7 +263,8 @@ export function SuiviTable({ data, fonderies }: SuiviTableProps) {
                       )}
                     </TableCell>
                     <TableCell className="text-right text-sm font-medium">
-                      {formatCurrency(row.montant)}
+                      {/* Une commande sans devis n'a pas de montant, elle l'attend. */}
+                      {row.montant > 0 ? formatCurrency(row.montant) : "—"}
                     </TableCell>
                     <TableCell className="text-center text-sm">
                       {row.nb_lignes}

@@ -1,5 +1,4 @@
 import { mutate } from "@/lib/supabase/mutation";
-import { triggerEmail } from "@/lib/email/trigger";
 import { createBijouxStockEntry, incrementOrInvestStock } from "./stock-operations";
 import { generateQuittanceRachat, generateContratRachat, generateQuittanceOrInvest, generateRemboursementRetractation } from "./document-operations";
 import { checkAndFinalizeLot } from "./reference-actions";
@@ -76,11 +75,6 @@ export async function executeAccepterDevisLot(
     .eq("lot_id", ctx.lot.id)
     .eq("type", "devis_rachat");
 
-  triggerEmail({
-    notification_type: "interne_devis_accepte",
-    lot_id: ctx.lot.id,
-    dossier_id: ctx.dossier.id,
-  });
 
   // Vérifier si le lot peut être finalisé (si toutes les refs or invest et pas de bijoux)
   await checkAndFinalizeLot(supabase, ctx.lot.id, ctx.dossier.id);
@@ -176,11 +170,6 @@ export async function executeFinaliserRachat(
     .eq("lot_id", ctx.lot.id)
     .in("type", ["contrat_rachat", "contrat_depot_vente", "confie_achat"]);
 
-  triggerEmail({
-    notification_type: "contrat_rachat_finalise",
-    lot_id: ctx.lot.id,
-    dossier_id: ctx.dossier.id,
-  });
 
   // Use checkAndFinalizeLot to respect refs still in en_attente_paiement
   await checkAndFinalizeLot(supabase, ctx.lot.id, ctx.dossier.id);
@@ -214,11 +203,6 @@ export async function executeRetracterLot(
 
   await tracerRetractation(supabase, ctx, refsRetractees);
 
-  triggerEmail({
-    notification_type: "interne_retractation",
-    lot_id: ctx.lot.id,
-    dossier_id: ctx.dossier.id,
-  });
 
   // Vérifier si le lot peut être finalisé
   await checkAndFinalizeLot(supabase, ctx.lot.id, ctx.dossier.id);

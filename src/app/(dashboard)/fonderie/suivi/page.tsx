@@ -31,7 +31,7 @@ export default async function SuiviPage() {
       fonderie_id: bdc.fonderie_id,
       fonderie_nom: bdc.fonderie?.nom ?? "Fonderie",
       statut: bdc.statut,
-      montant: bdc.montant_total,
+      montant: bdc.montant_fonderie,
       nb_lignes: bdc.lignes?.length ?? 0,
       date_creation: bdc.created_at,
       date_envoi: bdc.date_envoi,

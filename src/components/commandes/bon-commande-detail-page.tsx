@@ -8,12 +8,12 @@ import {
   Factory,
   Package,
   CheckCircle,
-  CurrencyEur,
   Coins,
   Check,
   Lightning,
   Money,
   Handshake,
+  Receipt,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/card";
 import { Header } from "@/components/dashboard/header";
 import { ReglementDialog } from "@/components/reglements/reglement-dialog";
+import { DevisFonderieCard, DEVIS_FONDERIE_ANCHOR } from "@/components/commandes/devis-fonderie-card";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { formatDate, formatCurrency } from "@/lib/format";
 import type { BonCommande } from "@/types/bon-commande";
@@ -54,8 +55,10 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
   const fonderieName = bdc.fonderie?.nom ?? "Fonderie";
   const lignes = bdc.lignes ?? [];
 
+  // Ce qu'on doit a la fonderie vient de son devis, pas du prix de vente.
   const dejaPaye = reglements.reduce((sum, r) => sum + r.montant, 0);
-  const restant = Math.max(0, bdc.montant_total - dejaPaye);
+  const restant = Math.max(0, bdc.montant_fonderie - dejaPaye);
+  const devisSaisi = bdc.montant_fonderie > 0;
 
   // Count received lines
   const nbRecu = lignes.filter((l) => l.fulfillment === "recu").length;
@@ -262,7 +265,7 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
     sens: "sortant",
     label: `Paiement fonderie — ${bdc.numero}`,
     description: `Bon de commande ${bdc.numero} (${fonderieName})`,
-    montant_attendu: bdc.montant_total,
+    montant_attendu: bdc.montant_fonderie,
     montant_deja_paye: dejaPaye,
     montant_restant: restant,
     is_fully_paid: restant <= 0,
@@ -314,8 +317,10 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
                 <span className="font-medium">{bdc.numero}</span>
               </div>
               <div className="flex items-center justify-between py-2 border-b">
-                <span className="text-muted-foreground">Montant total</span>
-                <span className="font-medium">{formatCurrency(bdc.montant_total)}</span>
+                <span className="text-muted-foreground">Articles</span>
+                <span className="font-medium">
+                  {lignes.length} référence{lignes.length > 1 ? "s" : ""}
+                </span>
               </div>
               {bdc.date_envoi && (
                 <div className="flex items-center justify-between py-2 border-b">
@@ -371,13 +376,36 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
         {bdc.statut !== "annule" && (() => {
           const actionRows: Array<{ icon: React.ElementType; label: string; badge?: string; btn: React.ReactNode }> = [];
 
-          if (restant > 0 && bdc.statut !== "brouillon") {
+          // Tant que le devis n'est pas saisi, on ne sait pas ce qu'on doit :
+          // c'est cette saisie qui manque, pas le paiement.
+          if (!devisSaisi && bdc.statut !== "brouillon") {
+            actionRows.push({
+              icon: Receipt,
+              label: "Devis fonderie | Saisir les prix reçus de la fonderie",
+              btn: (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() =>
+                    document
+                      .getElementById(DEVIS_FONDERIE_ANCHOR)
+                      ?.scrollIntoView({ behavior: "smooth", block: "start" })
+                  }
+                >
+                  <Receipt size={14} weight="duotone" />
+                  Saisir
+                </Button>
+              ),
+            });
+          }
+
+          if (devisSaisi && restant > 0 && bdc.statut !== "brouillon") {
             actionRows.push({
               icon: Money,
               label: `${bdc.numero} | Paiement fonderie à effectuer`,
               badge: formatCurrency(restant),
               btn: (
-                <Button size="sm" variant="outline" onClick={() => setShowPaiement(true)}>
+                <Button size="sm" variant="secondary" onClick={() => setShowPaiement(true)}>
                   <Money size={14} weight="duotone" />
                   Enregistrer
                 </Button>
@@ -392,7 +420,7 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
                 ? `Réception | ${nbRecu}/${lignes.length} article${nbRecu > 1 ? "s" : ""} reçu${nbRecu > 1 ? "s" : ""}`
                 : "Réception | Marquer les articles comme reçus",
               btn: (
-                <Button size="sm" variant="outline" disabled={loading} onClick={handleRecuTout}>
+                <Button size="sm" variant="secondary" disabled={loading} onClick={handleRecuTout}>
                   <CheckCircle size={14} weight="duotone" />
                   {loading ? "..." : "Tout recevoir"}
                 </Button>
@@ -407,7 +435,7 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
                 ? `Livraison | ${nbLivre}/${lignes.length} article${nbLivre > 1 ? "s" : ""} livré${nbLivre > 1 ? "s" : ""}`
                 : "Livraison | Remettre les articles au client",
               btn: (
-                <Button size="sm" variant="outline" disabled={loading} onClick={handleLivrerTout}>
+                <Button size="sm" variant="secondary" disabled={loading} onClick={handleLivrerTout}>
                   <Handshake size={14} weight="duotone" />
                   {loading ? "..." : "Tout livrer"}
                 </Button>
@@ -420,7 +448,7 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
               icon: Package,
               label: "Envoi | Marquer comme envoyé à la fonderie",
               btn: (
-                <Button size="sm" variant="outline" disabled={loading} onClick={handleEnvoyer}>
+                <Button size="sm" variant="secondary" disabled={loading} onClick={handleEnvoyer}>
                   <Package size={14} weight="duotone" />
                   {loading ? "..." : "Envoyer"}
                 </Button>
@@ -518,14 +546,10 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
                         {ligne.metal && <span>{ligne.metal}</span>}
                         {ligne.poids && <span>· {ligne.poids}g</span>}
                         <span>· x{ligne.quantite}</span>
-                        <span>· {formatCurrency(ligne.prix_unitaire)}/u</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <div className="text-right">
-                      <span className="text-sm font-bold">{formatCurrency(ligne.prix_total)}</span>
-                    </div>
                     {isLivre && (
                       <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                         Livré
@@ -560,37 +584,11 @@ export function BonCommandeDetailPage({ bdc, reglements, documents = [] }: BonCo
               );
             })}
 
-            {/* Récapitulatif paiement */}
-            <div className="rounded-lg border bg-muted/50 px-4 py-3 space-y-1">
-              <div className="flex items-center gap-2 mb-2">
-                <CurrencyEur size={16} weight="duotone" className="text-muted-foreground" />
-                <span className="text-sm font-medium text-muted-foreground">Récapitulatif</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-foreground">Montant total</span>
-                <span className="font-semibold text-foreground">{formatCurrency(bdc.montant_total)}</span>
-              </div>
-              {dejaPaye > 0 && (
-                <div className="mt-3 space-y-1">
-                  {reglements.map((r) => (
-                    <div key={r.id} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">{formatDate(r.date_reglement)} · {r.mode}</span>
-                      <span className="font-medium text-muted-foreground">− {formatCurrency(r.montant)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              <div className="mt-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold">Reste à payer</span>
-                  <span className={`text-lg font-bold ${restant <= 0 ? "text-emerald-600 dark:text-emerald-400" : ""}`}>
-                    {restant > 0 ? formatCurrency(restant) : "Soldé"}
-                  </span>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
+
+        {/* Devis fonderie — les prix arrivent après l'envoi de la commande */}
+        <DevisFonderieCard bdc={bdc} lignes={lignes} reglements={reglements} />
 
         {/* Documents */}
         {documents.length > 0 && (

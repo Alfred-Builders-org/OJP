@@ -200,15 +200,23 @@ otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Expediteur des courriels d'authentification.
+#
+# Le service integre de Supabase n'ecrit qu'aux membres de l'organisation du
+# projet : un mot de passe oublie demande par une cliente n'en partait jamais,
+# sans erreur ni journal — juste un message qui n'arrive pas. Les envois passent
+# donc par Resend, sur le domaine verifie `notif.oraujusteprix.fr`.
+#
+# La cle vient de l'environnement : elle ne se commite pas, et ce fichier sert
+# la production comme la branche de recette.
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "contact@notif.oraujusteprix.fr"
+sender_name = "L'Or au Juste Prix"
 
 # Gabarit du courriel de reinitialisation de mot de passe.
 # Le message par defaut de Supabase est un lien nu, sans en-tete ni signature :
@@ -242,6 +250,14 @@ max_frequency = "5s"
 # timebox = "24h"
 # Force log out if the user has been inactive longer than the specified duration.
 # inactivity_timeout = "8h"
+
+# Le « Send Email Hook » confierait ces envois a l'application. On lui prefere le
+# SMTP ci-dessus : un courriel de mot de passe oublie ne doit pas dependre de
+# l'application pour partir, et un secret de moins est un secret de moins.
+# [auth.hook.send_email]
+# enabled = true
+# uri = "env(SUPABASE_AUTH_HOOK_SEND_EMAIL_URI)"
+# secrets = "env(SEND_EMAIL_HOOK_SECRET)"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]

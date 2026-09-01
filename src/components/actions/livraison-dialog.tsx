@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Coins, Package, CheckCircle } from "@phosphor-icons/react";
+import { Coins, Package, CheckCircle, Handshake } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate } from "@/lib/format";
 
 interface LigneRow {
   id: string;
@@ -25,6 +25,8 @@ interface LigneRow {
   prix_total: number;
   fulfillment: string;
   is_livre: boolean;
+  date_reception: string | null;
+  bon_commande_id: string | null;
 }
 
 interface LivraisonDialogProps {
@@ -45,17 +47,77 @@ export function LivraisonDialog({ open, onOpenChange, lotId }: LivraisonDialogPr
       setLoading(true);
       const supabase = createClient();
       // Only show lines that are fulfilled (servi_stock or recu) — ready to hand to client
+      // Les lignes encore en commande entrent aussi dans la liste : c'est ici
+      // qu'on les receptionne. Elles en etaient exclues, donc invisibles tant
+      // que le bon de commande n'avait pas ete traite de son cote.
       const { data } = await supabase
         .from("vente_lignes")
-        .select("id, designation, metal, quantite, prix_total, fulfillment, is_livre")
+        .select("id, designation, metal, quantite, prix_total, fulfillment, is_livre, date_reception, bon_commande_id")
         .eq("lot_id", lotId)
-        .in("fulfillment", ["servi_stock", "recu"])
+        .in("fulfillment", ["servi_stock", "commande", "recu"])
         .order("created_at", { ascending: true });
       setLignes((data ?? []) as LigneRow[]);
       setLoading(false);
     }
     fetch();
   }, [open, lotId]);
+
+  /**
+   * Reception en boutique.
+   *
+   * Etape intermediaire entre « servi » ou « commande » et « remis au client » :
+   * la marchandise est arrivee, on la met de cote, et le client vient la
+   * chercher plus tard. Entre les deux, c'est la boutique qui detient le bien.
+   */
+  async function receptionner(ligne: LigneRow) {
+    setToggling(ligne.id);
+    const supabase = createClient();
+    const maintenant = new Date().toISOString();
+
+    const { error } = await mutate(
+      supabase
+        .from("vente_lignes")
+        .update({ fulfillment: "recu", date_reception: maintenant })
+        .eq("id", ligne.id),
+      "La réception n'a pas pu être enregistrée",
+      "Article reçu en boutique"
+    );
+    if (error) {
+      setToggling(null);
+      return;
+    }
+
+    setLignes((prev) =>
+      prev.map((l) =>
+        l.id === ligne.id ? { ...l, fulfillment: "recu", date_reception: maintenant } : l
+      )
+    );
+
+    // Une ligne rattachee a un bon de commande fait avancer ce bon des que
+    // toutes ses lignes sont arrivees — sans quoi le bon annoncerait encore
+    // « en attente de reception » alors que tout est la.
+    if (ligne.bon_commande_id) {
+      const { data: soeurs } = await supabase
+        .from("vente_lignes")
+        .select("id, fulfillment")
+        .eq("bon_commande_id", ligne.bon_commande_id);
+
+      const toutesRecues = (soeurs ?? []).every(
+        (l) => l.id === ligne.id || l.fulfillment === "recu"
+      );
+      if (toutesRecues) {
+        // On n'ecrase pas un bon deja paye : « paye » vaut plus que « recu ».
+        await supabase
+          .from("bons_commande")
+          .update({ statut: "recu" })
+          .eq("id", ligne.bon_commande_id)
+          .eq("statut", "envoye");
+      }
+    }
+
+    setToggling(null);
+    router.refresh();
+  }
 
   async function toggleLivre(ligne: LigneRow) {
     setToggling(ligne.id);
@@ -123,8 +185,8 @@ export function LivraisonDialog({ open, onOpenChange, lotId }: LivraisonDialogPr
     router.refresh();
   }
 
-  const nonLivre = lignes.filter((l) => !l.is_livre);
-  const livre = lignes.filter((l) => l.is_livre);
+  const aRecevoir = lignes.filter((l) => l.fulfillment !== "recu" && !l.is_livre);
+  const aLivrer = lignes.filter((l) => l.fulfillment === "recu" && !l.is_livre);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -135,9 +197,18 @@ export function LivraisonDialog({ open, onOpenChange, lotId }: LivraisonDialogPr
             Livraison au client
           </DialogTitle>
           <DialogDescription>
-            {nonLivre.length > 0
-              ? `${nonLivre.length} article${nonLivre.length > 1 ? "s" : ""} prêt${nonLivre.length > 1 ? "s" : ""} à livrer`
-              : "Tous les articles ont été livrés"}
+            {aRecevoir.length === 0 && aLivrer.length === 0
+              ? "Tous les articles ont été remis au client."
+              : [
+                  aRecevoir.length > 0
+                    ? `${aRecevoir.length} article${aRecevoir.length > 1 ? "s" : ""} à réceptionner`
+                    : null,
+                  aLivrer.length > 0
+                    ? `${aLivrer.length} prêt${aLivrer.length > 1 ? "s" : ""} à remettre au client`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
           </DialogDescription>
         </DialogHeader>
 
@@ -145,7 +216,7 @@ export function LivraisonDialog({ open, onOpenChange, lotId }: LivraisonDialogPr
           {loading ? (
             <p className="text-sm text-muted-foreground text-center py-4">Chargement...</p>
           ) : lignes.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">Aucun article à livrer.</p>
+            <p className="text-sm text-muted-foreground text-center py-4">Aucun article à traiter.</p>
           ) : (
             lignes.map((ligne) => (
               <div
@@ -158,8 +229,17 @@ export function LivraisonDialog({ open, onOpenChange, lotId }: LivraisonDialogPr
                   </div>
                   <div className="min-w-0">
                     <span className="text-sm font-medium block truncate">{ligne.designation}</span>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground block">
                       {ligne.metal ?? ""} · x{ligne.quantite} · {formatCurrency(ligne.prix_total)}
+                    </span>
+                    {/* Ou en est l'article : c'est ce qui explique le bouton
+                        propose en face. */}
+                    <span className="text-xs text-muted-foreground">
+                      {ligne.fulfillment === "recu"
+                        ? `Reçu${ligne.date_reception ? ` le ${formatDate(ligne.date_reception)}` : ""}`
+                        : ligne.fulfillment === "commande"
+                          ? "Commandé à la fonderie"
+                          : "Servi du stock"}
                     </span>
                   </div>
                 </div>
@@ -180,15 +260,25 @@ export function LivraisonDialog({ open, onOpenChange, lotId }: LivraisonDialogPr
                         {toggling === ligne.id ? "..." : "Annuler"}
                       </Button>
                     </div>
-                  ) : (
+                  ) : ligne.fulfillment === "recu" ? (
                     <Button
                       size="sm"
                       variant="outline"
                       disabled={toggling === ligne.id}
                       onClick={() => toggleLivre(ligne)}
                     >
+                      <Handshake size={14} weight="duotone" />
+                      {toggling === ligne.id ? "..." : "Livrer au client"}
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={toggling === ligne.id}
+                      onClick={() => receptionner(ligne)}
+                    >
                       <Package size={14} weight="duotone" />
-                      {toggling === ligne.id ? "..." : "Livrer"}
+                      {toggling === ligne.id ? "..." : "Marquer reçu"}
                     </Button>
                   )}
                 </div>

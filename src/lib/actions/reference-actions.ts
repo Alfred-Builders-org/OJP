@@ -1,4 +1,5 @@
 import { mutate } from "@/lib/supabase/mutation";
+import { notifierClotureDossier } from "./notifier-cloture";
 import { createBijouxStockEntry, incrementOrInvestStock, restituerReference } from "./stock-operations";
 import { generateQuittanceSingleRef } from "./document-operations";
 import type { ActionResult, ActionContext, SupabaseClient } from "./action-types";
@@ -52,6 +53,12 @@ export async function checkAndFinalizeLot(supabase: SupabaseClient, lotId: strin
         .eq("id", dossierId),
       "Erreur lors de la finalisation du dossier"
     );
+
+    // Le dossier vient de se clore par la derniere reference validee, sans
+    // passer par l'ecran de finalisation. Le recapitulatif part d'ici, sinon il
+    // attendrait le balayage horaire — et le client apprendrait la cloture de
+    // son dossier une heure apres etre sorti de la boutique.
+    await notifierClotureDossier(dossierId);
   }
 }
 

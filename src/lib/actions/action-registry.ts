@@ -218,15 +218,27 @@ function addVenteActions(
     });
   }
 
-  // Articles prêts à livrer (servis du stock OU reçus de la fonderie) mais pas encore remis au client
-  const pretsALivrer = lotLignes.filter(
-    (l) => (l.fulfillment === "servi_stock" || l.fulfillment === "recu") && !l.is_livre
+  // Deux etapes distinctes : receptionner en boutique, puis remettre au client.
+  // Le libelle disait « a livrer au client » y compris pour des articles qui
+  // n'etaient pas encore arrives — l'action reclamait donc un geste impossible.
+  const aReceptionner = lotLignes.filter(
+    (l) =>
+      l.or_investissement_id &&
+      (l.fulfillment === "servi_stock" || l.fulfillment === "commande") &&
+      !l.is_livre
   );
+  const aRemettre = lotLignes.filter((l) => l.fulfillment === "recu" && !l.is_livre);
+  const pretsALivrer = [...aReceptionner, ...aRemettre];
+
   if (pretsALivrer.length > 0) {
+    const reste =
+      aRemettre.length > 0
+        ? `${aRemettre.length} article${aRemettre.length > 1 ? "s" : ""} à remettre au client`
+        : `${aReceptionner.length} article${aReceptionner.length > 1 ? "s" : ""} à réceptionner`;
     actions.push({
       id: "vente.livrer_stock" as const,
-      label: `${lot.numero} | ${pretsALivrer.length} article${pretsALivrer.length > 1 ? "s" : ""} à livrer au client`,
-      description: "Articles en attente de remise au client",
+      label: `${lot.numero} | ${reste}`,
+      description: "Réception en boutique puis remise au client",
       category: "delivery",
       priority: "normal",
       icon: "Handshake",

@@ -3,9 +3,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { generateAndStoreDocument } from "@/lib/pdf/generate-and-store";
 import { tauxLigne, libelleTotalTaxe } from "@/lib/pdf/taxes-labels";
+import { ligneSousMarge, totauxFactureVente } from "@/lib/pdf/facture-vente-regime";
 import { calculerTFOP } from "@/lib/calculations/taxes";
 import { getSettingServer } from "@/lib/settings-server";
-import { formatDate, formatDateTime, formatTime } from "@/lib/format";
+import { formatDate, formatDateTime, formatTime, libelleModeReglement } from "@/lib/format";
 import type {
   ClientInfo,
   DossierInfo,
@@ -19,8 +20,18 @@ import type {
 
 const RETRACTATION_DELAY_MS = 48 * 60 * 60 * 1000;
 
-import { sendNotification } from "@/lib/email/send-notification";
-import type { EmailNotificationType } from "@/types/email";
+/**
+ * Repli du delai de reglement du solde, quand la boutique n'a rien regle.
+ *
+ * Il valait auparavant le delai de retractation, par emprunt de constante : les
+ * deux durent quarante-huit heures, mais l'une est un droit du client et
+ * l'autre une echeance de paiement. Les confondre revenait a ignorer le reglage
+ * `solde_delai_heures` de l'ecran des parametres — et le rappel de solde, qui
+ * tombe a la moitie de ce delai, n'aurait eu aucune duree fiable a diviser.
+ */
+const SOLDE_DELAI_DEFAUT_H = 48;
+
+import { envoyerRecapCloture } from "@/lib/email/recap-cloture";
 
 export interface FinaliseResult {
   success: boolean;
@@ -30,15 +41,6 @@ export interface FinaliseResult {
 interface InternalResult {
   success: boolean;
   error?: string;
-  emailTriggers?: EmailTrigger[];
-}
-
-interface EmailTrigger {
-  type: EmailNotificationType;
-  lotId: string;
-  dossierId: string;
-  clientId: string;
-  paths: string[];
 }
 
 type SB = Awaited<ReturnType<typeof createClient>>;
@@ -284,7 +286,6 @@ export async function finaliserDossierAction(dossierId: string): Promise<Finalis
 
     const now = new Date();
     const delai48h = new Date(now.getTime() + RETRACTATION_DELAY_MS);
-    const emailTriggers: EmailTrigger[] = [];
 
     for (const lot of brouillonLots) {
       let result: InternalResult;
@@ -300,7 +301,6 @@ export async function finaliserDossierAction(dossierId: string): Promise<Finalis
       }
 
       if (!result.success) return result;
-      if (result.emailTriggers) emailTriggers.push(...result.emailTriggers);
     }
 
     // Check if ALL lots are now finalized/terminated
@@ -323,17 +323,12 @@ export async function finaliserDossierAction(dossierId: string): Promise<Finalis
       return { success: false, error: `Erreur mise à jour statut dossier: ${statusErr.message}` };
     }
 
-    // Send emails server-side (fire-and-forget, don't block finalization)
-    for (const trigger of emailTriggers) {
-      sendNotification({
-        notification_type: trigger.type,
-        lot_id: trigger.lotId,
-        dossier_id: trigger.dossierId,
-        client_id: trigger.clientId,
-        attachment_paths: trigger.paths,
-      }).catch((err) => {
-        console.error(`[FINALIZE-ACTION] Email send error (${trigger.type}):`, err);
-      });
+    // Le client n'est ecrit qu'une fois, a la cloture, avec le recapitulatif de
+    // tout le dossier et ses pieces. Chaque etape envoyait auparavant son propre
+    // courriel — devis, contrat, facture d'acompte, facture de solde — et un
+    // dossier ordinaire en produisait quatre ou cinq le meme apres-midi.
+    if (allDone) {
+      await envoyerRecapCloture(dossierId);
     }
 
     return { success: true };
@@ -444,7 +439,6 @@ async function processRachatLot(supabase: SB, lot: Ref, dossier: Ref, now: Date,
   const { data: refs } = await supabase.from("lot_references").select("*").eq("lot_id", lot.id);
 
   let allImmediate = true;
-  const emailTriggers: EmailTrigger[] = [];
 
   for (const ref of refs ?? []) {
     if (ref.type_rachat === "devis") {
@@ -490,8 +484,6 @@ async function processRachatLot(supabase: SB, lot: Ref, dossier: Ref, now: Date,
   const devisRefs = allRefs.filter((r: Ref) => r.type_rachat === "devis");
   const docErrors: string[] = [];
 
-  const rachatPaths: string[] = [];
-
   if (bijouxDirect.length > 0) {
     const res = await genDoc({
       type: "contrat_rachat", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id,
@@ -499,7 +491,6 @@ async function processRachatLot(supabase: SB, lot: Ref, dossier: Ref, now: Date,
       lotReferenceIds: bijouxDirect.map((r: Ref) => r.id),
     }, "contrat_rachat");
     if (res.error) docErrors.push(res.error);
-    else if (res.path) rachatPaths.push(res.path);
   }
 
   if (orInvestDirect.length > 0) {
@@ -509,11 +500,6 @@ async function processRachatLot(supabase: SB, lot: Ref, dossier: Ref, now: Date,
       lotReferenceIds: orInvestDirect.map((r: Ref) => r.id),
     }, "quittance_rachat");
     if (res.error) docErrors.push(res.error);
-    else if (res.path) rachatPaths.push(res.path);
-  }
-
-  if (rachatPaths.length > 0) {
-    emailTriggers.push({ type: "contrat_rachat_finalise", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: rachatPaths });
   }
 
   if (devisRefs.length > 0) {
@@ -523,9 +509,6 @@ async function processRachatLot(supabase: SB, lot: Ref, dossier: Ref, now: Date,
       lotReferenceIds: devisRefs.map((r: Ref) => r.id),
     }, "devis_rachat");
     if (res.error) docErrors.push(res.error);
-    else if (res.path) {
-      emailTriggers.push({ type: "devis_envoye", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: [res.path] });
-    }
   }
 
   if (docErrors.length > 0) {
@@ -540,14 +523,13 @@ async function processRachatLot(supabase: SB, lot: Ref, dossier: Ref, now: Date,
   const { error: lotErr } = await supabase.from("lots").update(updateData).eq("id", lot.id);
   if (lotErr) return { success: false, error: `Erreur passage lot rachat: ${lotErr.message}` };
 
-  return { success: true, emailTriggers };
+  return { success: true };
 }
 
 /* ──────────────────────── DEPOT-VENTE ──────────────────────── */
 
 async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date): Promise<InternalResult> {
   const { data: refs } = await supabase.from("lot_references").select("*").eq("lot_id", lot.id);
-  const emailTriggers: EmailTrigger[] = [];
 
   // Les références restent en expertise jusqu'à la signature du contrat
   // C'est l'action doc.signer_contrat_dpv qui créera les entrées stock
@@ -596,9 +578,6 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
     lotReferenceIds: allDvRefs.map((r: Ref) => r.id),
   }, "contrat_depot_vente");
   if (contratRes.error) docErrors.push(contratRes.error);
-  else if (contratRes.path) {
-    emailTriggers.push({ type: "contrat_depot_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: [contratRes.path] });
-  }
 
   for (const ref of allDvRefs) {
     const confieRef: ConfieReferenceLigne = {
@@ -627,7 +606,7 @@ async function processDepotVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: D
   const { error: lotErr } = await supabase.from("lots").update({ status: "en_cours" }).eq("id", lot.id);
   if (lotErr) return { success: false, error: `Erreur passage lot DV en cours: ${lotErr.message}` };
 
-  return { success: true, emailTriggers };
+  return { success: true };
 }
 
 /* ──────────────────────── VENTE ──────────────────────── */
@@ -658,7 +637,6 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
   }
 
   const dossierInfo = buildDossierInfo(dossier, lot, now);
-  const emailTriggers: EmailTrigger[] = [];
   const docErrors: string[] = [];
 
   function buildFactureLignes(lines: VenteLigne[]): FactureVenteLigne[] {
@@ -669,6 +647,7 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
       quantite: l.quantite ?? 1,
       prixUnitaireHT: l.prix_unitaire ?? 0,
       totalHT: l.prix_total ?? 0,
+      sousMarge: ligneSousMarge(l),
     }));
   }
 
@@ -801,37 +780,48 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
     }
   }
 
-  // Phase 2: Facture de vente (bijoux)
-  if (bijouxLignes.length > 0) {
-    // Le prix affiche au client est TTC : la TVA sur marge y est deja incluse.
-    // Le calcul precedent l'ajoutait par-dessus — un bijou en vitrine a 1 000 EUR
-    // se facturait 1 050 EUR. Sous le regime de la marge, la facture ne ventile
-    // d'ailleurs ni HT ni TVA : elle porte le total et la mention 297 A.
-    const totalTTC = bijouxLignes.reduce((s: number, l: VenteLigne) => s + l.prix_total, 0);
-    const tva = bijouxLignes.reduce((s: number, l: VenteLigne) => s + l.montant_taxe, 0);
-    const totalHT = Math.round((totalTTC - tva) * 100) / 100;
+  // L'or d'investissement se regle en deux temps quand le comptoir demande un
+  // acompte, et en une seule fois sinon. Le choix se pose sur la vente avant
+  // qu'elle ne soit finalisee ; passe ce point, les pieces sont emises.
+  const avecAcompte = orInvestLignes.length > 0 && lot.avec_acompte !== false;
+
+  // Phase 2: Facture de vente
+  // Sans acompte, l'or d'investissement se facture avec le reste : le client
+  // repart avec une seule piece et n'a qu'un versement a honorer.
+  const lignesFacturees = avecAcompte ? bijouxLignes : lignes;
+  if (lignesFacturees.length > 0) {
+    // Le prix affiche au client est TTC : la TVA y est deja incluse. Le calcul
+    // precedent l'ajoutait par-dessus — un bijou en vitrine a 1 000 EUR se
+    // facturait 1 050 EUR. Ce que la facture ventile depend ensuite du regime :
+    // rien sous celui de la marge, tout pour un bijou achete avec TVA a un
+    // professionnel, et la seule TVA du second si la facture melange les deux.
+    const { totalTTC, totalHT, tva, tvaDue, regimeMarge, mentionMarge } =
+      totauxFactureVente(lignesFacturees);
 
     const res = await genDoc({
       type: "facture_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id,
       client: clientInfo, dossier: dossierInfo, references: [],
       totaux: { totalBrut: totalHT, taxe: tva, netAPayer: totalTTC },
-      factureVenteLignes: buildFactureLignes(bijouxLignes),
-      totalHT, tva, totalTTC, modeReglement: "—",
-      // Bien d'occasion acquis aupres d'un particulier : regime de la marge.
-      regimeMarge: true,
+      factureVenteLignes: buildFactureLignes(lignesFacturees),
+      totalHT, tva, totalTTC, modeReglement: libelleModeReglement(lot.mode_reglement),
+      regimeMarge, mentionMarge,
     }, "facture_vente");
     if (res.error) docErrors.push(res.error);
     else if (res.path) {
+      // La facture porte ce que le client voit ; le registre, ce que la
+      // boutique doit. Sous le regime de la marge les deux different : la TVA
+      // reste due, elle ne s'imprime simplement pas.
       await enregistrerFacture(supabase, {
         numero: res.numero, lotId: lot.id, clientId: dossier.client.id,
-        montantHT: totalHT, montantTaxe: tva, montantTTC: totalTTC,
+        montantHT: Math.round((totalTTC - tvaDue) * 100) / 100,
+        montantTaxe: tvaDue,
+        montantTTC: totalTTC,
       });
-      emailTriggers.push({ type: "facture_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: [res.path] });
     }
   }
 
   // Factures or investissement (acompte + solde)
-  if (orInvestLignes.length > 0) {
+  if (avecAcompte) {
     const rules = await getSettingServer("business_rules");
     const acomptePct = rules?.acompte_pct ?? 10;
 
@@ -840,7 +830,13 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
     const totalTTC = totalHT + tva;
     const montantAcompte = Math.round(totalTTC * (acomptePct / 100) * 100) / 100;
     const montantSolde = totalTTC - montantAcompte;
-    const dateLimite = new Date(now.getTime() + RETRACTATION_DELAY_MS);
+
+    // L'echeance du solde suit le reglage de la boutique, et non le delai de
+    // retractation dont elle empruntait la constante. Les deux valent
+    // quarante-huit heures par defaut, mais l'un est un droit du client et
+    // l'autre une date de paiement : c'est de celle-ci que le rappel se deduit.
+    const delaiSoldeH = rules?.solde_delai_heures ?? SOLDE_DELAI_DEFAUT_H;
+    const dateLimite = new Date(now.getTime() + delaiSoldeH * 60 * 60 * 1000);
 
     const acompteRes = await genDoc({
       type: "facture_acompte", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id,
@@ -858,7 +854,6 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
         numero: acompteRes.numero, lotId: lot.id, clientId: dossier.client.id,
         montantHT: montantAcompte, montantTaxe: 0, montantTTC: montantAcompte,
       });
-      emailTriggers.push({ type: "facture_acompte", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: [acompteRes.path] });
     }
 
     // Get acompte numero for solde reference
@@ -878,7 +873,7 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
       totaux: { totalBrut: totalHT, taxe: tva, netAPayer: montantSolde },
       factureVenteLignes: buildFactureLignes(orInvestLignes),
       totalHT, tva, totalTTC, montantAcompte, montantSolde, numeroAcompte,
-      modeReglement: "—", referenceNumero: numeroAcompte,
+      modeReglement: libelleModeReglement(lot.mode_reglement), referenceNumero: numeroAcompte,
     }, "facture_solde");
     if (soldeRes.error) docErrors.push(soldeRes.error);
     else if (soldeRes.path) {
@@ -886,7 +881,6 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
         numero: soldeRes.numero, lotId: lot.id, clientId: dossier.client.id,
         montantHT: totalHT - montantAcompte, montantTaxe: tva, montantTTC: montantSolde,
       });
-      emailTriggers.push({ type: "facture_vente", lotId: lot.id, dossierId: dossier.id, clientId: dossier.client.id, paths: [soldeRes.path] });
     }
 
     await supabase.from("lots").update({ acompte_montant: montantAcompte, date_limite_solde: dateLimite.toISOString() }).eq("id", lot.id);
@@ -922,5 +916,5 @@ async function processVenteLot(supabase: SB, lot: Ref, dossier: Ref, now: Date):
   const { error: lotErr } = await supabase.from("lots").update({ status: "en_cours" }).eq("id", lot.id);
   if (lotErr) return { success: false, error: `Erreur passage lot vente en cours: ${lotErr.message}` };
 
-  return { success: true, emailTriggers };
+  return { success: true };
 }

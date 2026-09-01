@@ -4,13 +4,19 @@ import type { AppNotificationType } from "./notification";
 // ── Company ──────────────────────────────────────────────────────
 export interface CompanySettings {
   nom: string;
+  /** Dénomination sociale — « SAS ORJP », distincte du nom commercial. */
+  denomination_sociale: string;
   adresse: string;
   code_postal: string;
   ville: string;
   telephone: string;
+  /** Ligne fixe de la boutique, imprimée au pied des documents à côté du portable. */
+  telephone_fixe: string;
   email: string;
   forme_juridique: string;
   siret_rcs: string;
+  /** Numéro de TVA intracommunautaire, mention obligatoire des factures. */
+  tva_intracom: string;
   tribunal: string;
   logo_url: string;
   email_expediteur: string;

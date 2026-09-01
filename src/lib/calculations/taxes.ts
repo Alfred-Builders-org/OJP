@@ -95,9 +95,30 @@ export function calculerTFOP(prixCession: number): number {
   return Math.round(prix * 0.065 * 100) / 100;
 }
 
+/** Taux de TVA de droit commun, en pourcentage. */
+export const TAUX_TVA_NORMAL = 20;
+
 /** Mention obligatoire sur une facture soumise au regime des biens d'occasion. */
 export const MENTION_TVA_MARGE =
   "Regime particulier des biens d'occasion - article 297 A du CGI. TVA non recuperable par l'acquereur.";
+
+/** Arrondi au centime, sur un montant deja valide. */
+function auCentime(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/**
+ * Extrait la TVA contenue dans un prix toutes taxes comprises.
+ *
+ * Un prix de vitrine est TTC : la taxe s'en retire, elle ne s'y ajoute pas.
+ * A 20 %, c'est 20/120 du prix, et non 20 % de celui-ci.
+ */
+export function tvaIncluse(prixTTC: number, taux: number = TAUX_TVA_NORMAL): number {
+  const prix = safeNum(prixTTC);
+  const t = safeNum(taux);
+  if (prix <= 0 || t <= 0) return 0;
+  return auCentime((prix * t) / (100 + t));
+}
 
 /**
  * TVA sur la marge (regime des biens d'occasion, art. 297 A du CGI).
@@ -107,12 +128,101 @@ export const MENTION_TVA_MARGE =
  * faisait le calcul precedent, qui surevaluait la TVA d'un cinquieme. Sur une
  * vente a 1 000 EUR pour un achat a 700 EUR : 300 x 20/120 = 50 EUR, et non 60.
  *
- * Marge nulle ou negative : pas de TVA.
+ * Marge nulle ou negative : pas de TVA. Et, en methode bijou par bijou, cette
+ * perte ne s'impute sur la marge d'aucun autre article : elle est simplement
+ * perdue. C'est ce que corrige la globalisation, voir construireRegistreMarge().
  */
-export function calculerTVAMarge(prixVente: number, prixAchat: number): number {
+export function calculerTVAMarge(
+  prixVente: number,
+  prixAchat: number,
+  taux: number = TAUX_TVA_NORMAL
+): number {
   const marge = safeNum(prixVente) - safeNum(prixAchat);
   if (marge <= 0) return 0;
-  return Math.round((marge * 20 / 120) * 100) / 100;
+  return tvaIncluse(marge, taux);
+}
+
+/**
+ * Le regime de TVA sous lequel un article se revend.
+ *
+ * - `marge` : achete a un particulier ou a un non-assujetti. La TVA ne porte que
+ *   sur la marge, la facture ne la ventile pas, le client ne recupere rien.
+ * - `normal` : achete a un professionnel assujetti qui a facture sa TVA. Elle
+ *   porte alors sur le prix total, et se deduit de celle de l'achat.
+ */
+export type RegimeTVARevente = "marge" | "normal";
+
+/**
+ * Le regime effectivement applique a une vente.
+ *
+ * Le regime de la marge n'est pas obligatoire : sur n'importe quelle vente, on
+ * peut y renoncer et facturer la TVA sur le prix entier (art. 297 C du CGI).
+ * Cela n'a d'interet que si l'acheteur est un professionnel qui veut la
+ * recuperer — le vendeur, lui, y perd. L'inverse n'existe pas : un bien qui
+ * n'a jamais releve de la marge ne peut pas y entrer.
+ */
+export function regimeVenteEffectif(
+  regimeArticle: RegimeTVARevente,
+  optionPrixTotal = false
+): RegimeTVARevente {
+  return optionPrixTotal ? "normal" : regimeArticle;
+}
+
+export interface TaxeLigneVente {
+  regime: RegimeTVARevente;
+  typeTaxe: "tva_marge" | "tva_normale" | null;
+  taux: number;
+  /** Ce sur quoi la TVA se calcule : la marge, ou le prix entier. */
+  base: number;
+  montantTVA: number;
+  /** Le prix affiche au client. La TVA y est comprise, jamais ajoutee. */
+  prixTTC: number;
+}
+
+/**
+ * La taxe d'une ligne de vente, quel que soit son regime.
+ *
+ * Point commun aux deux regimes : le prix de vente est celui de l'etiquette, et
+ * la TVA s'y trouve deja. Ce qui change, c'est l'assiette — la marge d'un cote,
+ * le prix entier de l'autre — et ce que la facture en montre.
+ *
+ * Les frais de remise en etat (polissage, fermoir) n'entrent pas ici : ils ne
+ * s'ajoutent pas au prix d'achat pour le calcul de la marge. Leur propre TVA se
+ * recupere a part, sur la facture du reparateur.
+ */
+export function calculerTaxeVente(params: {
+  prixVenteTTC: number;
+  prixAchat: number;
+  regimeArticle: RegimeTVARevente;
+  optionPrixTotal?: boolean;
+  taux?: number;
+}): TaxeLigneVente {
+  const taux = safeNum(params.taux ?? TAUX_TVA_NORMAL);
+  const prixTTC = safeNum(params.prixVenteTTC);
+  const regime = regimeVenteEffectif(params.regimeArticle, params.optionPrixTotal);
+
+  if (regime === "normal") {
+    const montantTVA = tvaIncluse(prixTTC, taux);
+    return {
+      regime,
+      typeTaxe: montantTVA > 0 ? "tva_normale" : null,
+      taux,
+      base: prixTTC,
+      montantTVA,
+      prixTTC,
+    };
+  }
+
+  const marge = Math.max(0, prixTTC - safeNum(params.prixAchat));
+  const montantTVA = tvaIncluse(marge, taux);
+  return {
+    regime,
+    typeTaxe: montantTVA > 0 ? "tva_marge" : null,
+    taux,
+    base: marge,
+    montantTVA,
+    prixTTC,
+  };
 }
 
 /**

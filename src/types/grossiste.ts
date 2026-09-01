@@ -19,7 +19,11 @@ export interface AchatGrossiste {
   grossiste_id: string;
   date_achat: string;
   numero_facture: string | null;
+  /** Total toutes taxes comprises : ce qui sort de la caisse. */
   montant_total: number;
+  montant_total_ht: number;
+  /** TVA deductible sur cet achat. */
+  montant_tva: number;
   montant_revente: number;
   notes: string | null;
   created_by: string | null;
@@ -41,6 +45,13 @@ export interface LigneAchatGrossiste {
   qualite: string;
   poids: string;
   quantite: string;
+  /** Prix hors taxe, tel qu'il figure sur la facture du grossiste. */
   prix_achat: string;
+  /**
+   * Taux de TVA de la facture d'achat, en pourcentage. La chaine vide vaut
+   * "aucune TVA" : le grossiste n'est pas assujetti, ou il vend lui-meme sous
+   * le regime de la marge. L'article reste alors revendable sous ce regime.
+   */
+  tva_taux: string;
   prix_revente: string;
 }

@@ -71,6 +71,22 @@ function findDocument(documents: DocumentRecord[], lotId: string, reglementType:
   return candidates.find((d) => d.status !== "regle") ?? candidates[0];
 }
 
+/**
+ * Le document qu'un remboursement de retractation solde est le recu emis a la
+ * retractation, et non la quittance de rachat — celle-ci atteste du versement
+ * inverse. Faute de le viser, le recu restait « en attente » a vie et le
+ * reglement encaisse n'etait rattache a aucune piece.
+ */
+function findRecuRetractation(
+  documents: DocumentRecord[],
+  lotId: string
+): DocumentRecord | undefined {
+  const candidates = documents.filter(
+    (d) => d.lot_id === lotId && d.type === "remboursement_retractation"
+  );
+  return candidates.find((d) => d.status !== "regle") ?? candidates[0];
+}
+
 function findDocumentId(documents: DocumentRecord[], lotId: string, reglementType: string): string | undefined {
   const docType = DOC_TYPE_MAP[reglementType];
   if (!docType) return undefined;
@@ -233,10 +249,13 @@ export function detectPaymentsDue({
     const restant = Math.round(Math.max(0, verse - rembourse) * 100) / 100;
 
     if (verse > 0.01) {
+      const recu = findRecuRetractation(documents, lot.id);
       payments.push({
         type: "rachat",
         sens: "entrant",
-        label: "Rachat rétracté | Remboursement à encaisser",
+        label: recu
+          ? `Reçu ${recu.numero} | Remboursement à encaisser`
+          : "Rachat rétracté | Remboursement à encaisser",
         description:
           "Somme versée au client avant sa rétractation, qu'il doit restituer",
         montant_attendu: verse,
@@ -248,7 +267,7 @@ export function detectPaymentsDue({
           sens: "entrant",
           montant: restant,
           client_id: clientId,
-          document_id: findDocumentId(documents, lot.id, "rachat"),
+          document_id: recu?.id,
         },
       });
     }
@@ -256,24 +275,45 @@ export function detectPaymentsDue({
 
   // --- VENTE ---
   if (lot.type === "vente" && lot.status === "en_cours") {
-    const hasOrInvest = lignes.some((l) => l.or_investissement_id);
     const bijouxLignes = lignes.filter((l) => !l.or_investissement_id);
     const orInvestLignes = lignes.filter((l) => l.or_investissement_id);
 
-    // Bijoux : paiement direct
-    if (bijouxLignes.length > 0) {
-      const totalBijoux = bijouxLignes.reduce(
-        (sum, l) => sum + l.prix_total + l.montant_taxe,
-        0
-      );
+    // L'or d'investissement n'attend un acompte que si le comptoir l'a demande
+    // sur cette vente-la. Sinon il se regle d'un seul versement, avec le reste
+    // du panier : une facture, un encaissement.
+    const avecAcompte = orInvestLignes.length > 0 && lot.avec_acompte !== false;
+
+    // Le prix d'un bijou est celui de l'etiquette, TVA comprise — qu'elle porte
+    // sur la marge ou sur le prix entier. L'ajouter au prix reviendrait a
+    // reclamer au client un cinquieme de plus que ce qu'il a vu en vitrine.
+    // Seule la TFOP des lignes anciennes s'ajoutait vraiment au prix.
+    const totalBijoux = bijouxLignes.reduce(
+      (sum, l) => sum + l.prix_total + (l.type_taxe === "tfop" ? l.montant_taxe : 0),
+      0
+    );
+    const totalOrInvest = orInvestLignes.reduce(
+      (sum, l) => sum + l.prix_total + l.montant_taxe,
+      0
+    );
+
+    // Paiement direct : les bijoux, et l'or d'investissement quand il n'a pas
+    // ete reserve contre un acompte.
+    const lignesDirectes = avecAcompte ? bijouxLignes : lignes;
+    if (lignesDirectes.length > 0) {
+      const totalDirect = Math.round(
+        (avecAcompte ? totalBijoux : totalBijoux + totalOrInvest) * 100
+      ) / 100;
       const dejaPaye = sumReglements(reglements, "vente");
-      const restant = Math.round(Math.max(0, totalBijoux - dejaPaye) * 100) / 100;
+      const restant = Math.round(Math.max(0, totalDirect - dejaPaye) * 100) / 100;
       payments.push({
         type: "vente",
         sens: "entrant",
         label: `Facture ${findDocument(documents, lot.id, "vente")?.numero ?? ""} | Encaissement client`.replace("  ", " "),
-        description: "Montant TTC de la vente bijoux",
-        montant_attendu: totalBijoux,
+        description:
+          orInvestLignes.length > 0 && !avecAcompte
+            ? "Montant TTC de la vente"
+            : "Montant TTC de la vente bijoux",
+        montant_attendu: totalDirect,
         montant_deja_paye: dejaPaye,
         montant_restant: restant,
         is_fully_paid: restant < 0.01,
@@ -288,11 +328,7 @@ export function detectPaymentsDue({
     }
 
     // Or investissement : acompte + solde
-    if (hasOrInvest && orInvestLignes.length > 0) {
-      const totalOrInvest = orInvestLignes.reduce(
-        (sum, l) => sum + l.prix_total + l.montant_taxe,
-        0
-      );
+    if (avecAcompte) {
       const acompteRate = acompte_pct / 100;
       const montantAcompte = Math.round(totalOrInvest * acompteRate * 100) / 100;
       const montantSolde = totalOrInvest - montantAcompte;
@@ -387,13 +423,16 @@ export function detectPaymentsDue({
   }
 
   // --- FONDERIE : paiement par bon de commande ---
+  // Ce qu'on doit vient du devis que la fonderie renvoie apres l'envoi de la
+  // commande, jamais du prix de vente au catalogue. Tant qu'il n'est pas saisi,
+  // il n'y a rien a payer : reclamer un montant serait reclamer le mauvais.
   for (const bdc of bonsCommande) {
     if (bdc.statut === "annule" || bdc.statut === "paye") continue;
 
     const dejaPaye = reglements
       .filter((r) => r.type === "fonderie" && r.bon_commande_id === bdc.id)
       .reduce((sum, r) => sum + r.montant, 0);
-    const restant = Math.round(Math.max(0, bdc.montant_total - dejaPaye) * 100) / 100;
+    const restant = Math.round(Math.max(0, bdc.montant_fonderie - dejaPaye) * 100) / 100;
 
     if (restant >= 0.01) {
       payments.push({
@@ -401,7 +440,7 @@ export function detectPaymentsDue({
         sens: "sortant",
         label: `Bon de commande ${bdc.numero} | Paiement fonderie à effectuer`,
         description: `Bon de commande ${bdc.numero}${bdc.fonderie?.nom ? ` (${bdc.fonderie.nom})` : ""}`,
-        montant_attendu: bdc.montant_total,
+        montant_attendu: bdc.montant_fonderie,
         montant_deja_paye: dejaPaye,
         montant_restant: restant,
         is_fully_paid: false,

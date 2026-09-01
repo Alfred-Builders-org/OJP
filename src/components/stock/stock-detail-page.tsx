@@ -44,8 +44,10 @@ import { StockLifecycleStepper } from "@/components/stock/stock-lifecycle-steppe
 import { EnvoiReparationDialog } from "@/components/stock/envoi-reparation-dialog";
 import { RetourReparationDialog } from "@/components/stock/retour-reparation-dialog";
 import { formatDate, formatCurrency } from "@/lib/format";
+import { calculerTVAMarge } from "@/lib/calculations/taxes";
 import type {
   BijouxStock,
+  RegimeTVARevente,
   Reparation,
   StockOrigin,
   StockOriginGrossiste,
@@ -164,6 +166,11 @@ export function StockDetailPage({
   const [quantite, setQuantite] = useState(bijou.quantite?.toString() ?? "");
   const [prixAchat, setPrixAchat] = useState(bijou.prix_achat?.toString() ?? "");
   const [prixRevente, setPrixRevente] = useState(bijou.prix_revente?.toString() ?? "");
+  // Le regime se determine a l'achat, mais reste corrigible : les articles
+  // entres avant qu'on le saisisse ont ete presumes achetes avec TVA.
+  const [regimeTVA, setRegimeTVA] = useState<RegimeTVARevente>(
+    bijou.regime_tva_revente ?? "marge"
+  );
 
   const statut = statutConfig[bijou.statut];
 
@@ -183,6 +190,7 @@ export function StockDetailPage({
           quantite: quantite ? parseInt(quantite) : null,
           prix_achat: prixAchat ? parseFloat(prixAchat) : null,
           prix_revente: prixRevente ? parseFloat(prixRevente) : null,
+          regime_tva_revente: regimeTVA,
           updated_at: new Date().toISOString(),
         })
         .eq("id", bijou.id),
@@ -376,9 +384,46 @@ export function StockDetailPage({
               </CardHeader>
               <CardContent>
                 <DetailRow label="Prix d'achat" value={formatCurrency(bijou.prix_achat)} editing={editing} editValue={prixAchat} onEditChange={setPrixAchat} type="number" />
+                {bijou.tva_achat_montant > 0 && !editing && (
+                  <DetailRow
+                    label="dont TVA déductible"
+                    value={`${formatCurrency(bijou.tva_achat_montant)}${bijou.tva_achat_taux ? ` (${bijou.tva_achat_taux} %)` : ""}`}
+                  />
+                )}
                 <DetailRow label="Prix de revente" value={formatCurrency(bijou.prix_revente)} editing={editing} editValue={prixRevente} onEditChange={setPrixRevente} type="number" />
                 {parsedPrixAchat && parsedPrixRevente && !editing && (
                   <DetailRow label="Marge" value={formatCurrency(parsedPrixRevente - parsedPrixAchat)} />
+                )}
+                {/* Ce que la revente coutera en TVA depend de qui a vendu le
+                    bijou a la boutique, pas du bijou lui-meme. */}
+                <DetailRow
+                  label="TVA à la revente"
+                  value={
+                    regimeTVA === "marge"
+                      ? "Sur la marge (art. 297 A du CGI)"
+                      : "Sur le prix total (régime normal)"
+                  }
+                  editing={editing}
+                  editContent={
+                    <Select
+                      value={regimeTVA}
+                      onValueChange={(v) => setRegimeTVA((v as RegimeTVARevente) || "marge")}
+                    >
+                      <SelectTrigger className="w-64">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="marge">Sur la marge (297 A)</SelectItem>
+                        <SelectItem value="normal">Sur le prix total</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  }
+                />
+                {regimeTVA === "marge" && parsedPrixAchat && parsedPrixRevente && !editing && (
+                  <DetailRow
+                    label="TVA sur marge à la revente"
+                    value={formatCurrency(calculerTVAMarge(parsedPrixRevente, parsedPrixAchat))}
+                  />
                 )}
               </CardContent>
             </Card>

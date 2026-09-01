@@ -140,7 +140,9 @@ export function BonsCommandeList({ bonsCommande, ungroupedByFonderie }: BonsComm
                         {bdc.date_envoi ? ` · ${formatDate(bdc.date_envoi)}` : ""}
                       </p>
                     </div>
-                    <span className="text-sm font-bold shrink-0">{formatCurrency(bdc.montant_total)}</span>
+                    <span className="text-sm font-bold shrink-0">
+                      {bdc.montant_fonderie > 0 ? formatCurrency(bdc.montant_fonderie) : "—"}
+                    </span>
                     <ArrowRight size={14} weight="regular" className="text-muted-foreground shrink-0" />
                   </Link>
                 );

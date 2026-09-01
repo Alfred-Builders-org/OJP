@@ -19,7 +19,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
-export function SignInForm() {
+interface SignInFormProps {
+  /** Le visiteur arrive d'un lien de courriel qui n'a pas pu etre verifie. */
+  lienInvalide?: boolean;
+}
+
+export function SignInForm({ lienInvalide = false }: SignInFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -57,6 +62,23 @@ export function SignInForm() {
       </CardHeader>
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
+          {/* Un lien d'invitation ne sert qu'une fois et vaut vingt-quatre
+              heures. Sans ce message, il ramene ici sans rien dire, et la
+              personne invitee cherche un mot de passe qu'elle n'a jamais eu. */}
+          {lienInvalide && (
+            <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">
+                Ce lien n&apos;est plus valable.
+              </p>
+              <p className="mt-1">
+                Il ne peut servir qu&apos;une fois. Demandez-en un nouveau depuis{" "}
+                <Link href="/forgot-password" className="text-link hover:underline">
+                  Mot de passe oublié
+                </Link>
+                , ou faites-vous renvoyer une invitation.
+              </p>
+            </div>
+          )}
           {error && (
             <FieldError>{error}</FieldError>
           )}

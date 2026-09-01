@@ -6,6 +6,8 @@ import {
   Text,
   Hr,
   Section,
+  Row,
+  Column,
   Img,
   Button,
   Link,
@@ -53,13 +55,20 @@ export function AuthEmail({
       <Head />
       <Body style={bodyStyle}>
         <Container style={containerStyle}>
+          {/* Meme en-tete que les courriels metier : la marque en petit, a
+              gauche. Le logo s'affichait auparavant en cent quatre-vingts
+              pixels centres sur un bandeau noir, ce qui donnait au courriel
+              l'allure d'une lettre d'information plutot que d'un message de
+              la boutique. */}
           <Section style={headerStyle}>
-            <Img
-              src={logoUrl}
-              width="180"
-              alt="L'Or au Juste Prix"
-              style={{ margin: "0 auto" }}
-            />
+            <Row>
+              <Column style={{ width: "36px", verticalAlign: "middle" }}>
+                <Img src={logoUrl} width="28" height="28" alt="" style={logoStyle} />
+              </Column>
+              <Column style={{ verticalAlign: "middle" }}>
+                <Text style={enseigneStyle}>L&apos;Or au Juste Prix</Text>
+              </Column>
+            </Row>
           </Section>
 
           <Section style={contentStyle}>
@@ -131,9 +140,22 @@ const containerStyle: React.CSSProperties = {
 };
 
 const headerStyle: React.CSSProperties = {
-  backgroundColor: "#18181b",
-  padding: "24px 32px",
-  textAlign: "center" as const,
+  padding: "20px 32px",
+  borderBottom: "1px solid #f4f4f5",
+};
+
+const logoStyle: React.CSSProperties = {
+  borderRadius: "7px",
+  display: "block",
+};
+
+const enseigneStyle: React.CSSProperties = {
+  color: "#18181b",
+  fontSize: "15px",
+  fontWeight: 600,
+  letterSpacing: "-0.2px",
+  margin: 0,
+  paddingLeft: "10px",
 };
 
 const contentStyle: React.CSSProperties = {

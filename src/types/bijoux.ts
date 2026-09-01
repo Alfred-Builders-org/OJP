@@ -1,3 +1,7 @@
+import type { RegimeTVARevente } from "@/lib/calculations/taxes";
+
+export type { RegimeTVARevente };
+
 export interface BijouxStock {
   id: string;
   nom: string;
@@ -11,7 +15,21 @@ export interface BijouxStock {
   titrage: string | null;
   metaux: "Or" | "Platine" | "Argent" | "Autre" | null;
   qualite: "333" | "375" | "585" | "750" | "999" | null;
+  /** Ce qui est sorti de la caisse pour l'acquerir, taxe comprise. */
   prix_achat: number | null;
+  /** Prix d'achat hors taxe, quand le vendeur etait assujetti. */
+  prix_achat_ht: number | null;
+  /** Taux porte par la facture d'achat, en pourcentage. NULL si elle n'en portait pas. */
+  tva_achat_taux: number | null;
+  /** TVA deductible sur l'achat. */
+  tva_achat_montant: number;
+  /**
+   * Le regime sous lequel l'article se revend. Il ne depend pas du bijou mais
+   * de qui l'a vendu a la boutique : marge pour un particulier ou un vendeur
+   * qui applique lui-meme le 297 A, normal pour un assujetti qui a facture
+   * sa TVA.
+   */
+  regime_tva_revente: RegimeTVARevente;
   prix_revente: number | null;
   depot_vente_lot_id: string | null;
   deposant_client_id: string | null;

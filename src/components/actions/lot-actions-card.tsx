@@ -205,8 +205,8 @@ function ActionRow({ row, ctx, onRestituer, onPayment }: {
             <ActionLabel label={row.label} />
           </div>
           <div className="flex items-center gap-1 shrink-0">
-            <ActionButton action={{ ...row.primary, label: "Accepter", variant: "outline" }} ctx={ctx} />
-            <ActionButton action={{ ...row.secondary, label: "Refuser", variant: "outline" }} ctx={ctx} />
+            <ActionButton action={{ ...row.primary, label: "Accepter", variant: "secondary" }} ctx={ctx} />
+            <ActionButton action={{ ...row.secondary, label: "Refuser", variant: "secondary" }} ctx={ctx} />
           </div>
         </div>
       );
@@ -229,7 +229,7 @@ function ActionRow({ row, ctx, onRestituer, onPayment }: {
             <ActionIcon type="restituer" />
             <ActionLabel label={row.label} />
           </div>
-          <Button size="sm" variant="outline" onClick={onRestituer}><HandCoins size={14} weight="duotone" />Restituer un article</Button>
+          <Button size="sm" variant="secondary" onClick={onRestituer}><HandCoins size={14} weight="duotone" />Restituer un article</Button>
         </div>
       );
 
@@ -240,7 +240,7 @@ function ActionRow({ row, ctx, onRestituer, onPayment }: {
             <ActionIcon type="signer_contrat" />
             <ActionLabel label={row.label} />
           </div>
-          <ActionButton action={{ ...row.action, label: "Marquer comme signé", variant: "outline", icon: "PenNib" }} ctx={ctx} />
+          <ActionButton action={{ ...row.action, label: "Marquer comme signé", variant: "secondary", icon: "PenNib" }} ctx={ctx} />
         </div>
       );
 
@@ -254,7 +254,7 @@ function ActionRow({ row, ctx, onRestituer, onPayment }: {
               {formatCurrency(row.amount)}
             </Badge>
           </div>
-          <Button size="sm" variant="outline" onClick={() => onPayment(row.payment)}>
+          <Button size="sm" variant="secondary" onClick={() => onPayment(row.payment)}>
             Enregistrer
           </Button>
         </div>
@@ -267,7 +267,7 @@ function ActionRow({ row, ctx, onRestituer, onPayment }: {
             <ActionIcon type="generic" />
             <ActionLabel label={row.label} />
           </div>
-          <ActionButton action={{ ...row.action, variant: "outline" }} ctx={ctx} />
+          <ActionButton action={{ ...row.action, variant: "secondary" }} ctx={ctx} />
         </div>
       );
   }

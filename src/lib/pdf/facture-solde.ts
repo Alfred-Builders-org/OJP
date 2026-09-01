@@ -2,9 +2,9 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W_FVE, C, fmt } from "./shared-styles";
+import { piedDePage, blocIdentiteFacture } from "./entete";
 import {
-  TEXTE_CGV_VENTE, SOCIETE,
-  type ClientInfo, type DossierInfo, type FactureVenteLigne,
+  TEXTE_CGV_VENTE, type ClientInfo, type DossierInfo, type FactureVenteLigne,
 } from "./blocks";
 
 export interface FactureSoldeData {
@@ -24,7 +24,6 @@ export interface FactureSoldeData {
 function Doc({ data }: { data: FactureSoldeData }) {
   const { client, dossier, lignes, totalHT, tva, totalTTC, montantAcompte, numeroAcompte, montantSolde, modeReglement } = data;
   const h = React.createElement;
-  const fullName = `${client.civilite} ${client.prenom} ${client.nom}`;
 
   return h(Document, null, h(Page, { size: "A4", style: s.page },
     // Header
@@ -34,23 +33,12 @@ function Doc({ data }: { data: FactureSoldeData }) {
         h(Text, { style: s.fveTitle }, "FACTURE DE SOLDE"),
         h(Text, { style: s.fveNumero }, `N\u00B0 ${data.numero}`))),
 
-    // Client box
-    h(View, { style: s.fveClientBox },
-      h(Text, { style: { fontSize: 6.5, fontFamily: "Courier-Bold", color: C.gray, marginBottom: 3, letterSpacing: 0.5 } }, "CLIENT"),
-      h(Text, { style: { fontSize: 10, fontFamily: "Courier-Bold", color: C.black, marginBottom: 1 } }, fullName),
-      client.adresse ? h(Text, { style: { fontSize: 8, color: C.gray, marginBottom: 1 } }, client.adresse) : null,
-      (client.codePostal || client.ville)
-        ? h(Text, { style: { fontSize: 8, color: C.gray, marginBottom: 1 } }, [client.codePostal, client.ville].filter(Boolean).join(" "))
-        : null,
-      client.documentType && client.documentNumber
-        ? h(Text, { style: { fontSize: 7, color: C.grayLight, marginTop: 2 } }, `${client.documentType} : ${client.documentNumber}`)
-        : null,
-      h(Text, { style: { fontSize: 7, color: C.grayLight, marginTop: 1 } }, `Dossier : ${dossier.numeroDossier}`)),
-
-    // Date / Heure / Reglement
-    h(View, { style: { alignItems: "flex-end", marginBottom: 20 } },
-      h(Text, { style: s.fveDateRow }, `Date : ${dossier.date} | Heure : ${dossier.heure}`),
-      h(Text, { style: { ...s.fveDateRow, marginTop: 2 } }, `R\u00E8glement : ${modeReglement}`)),
+    // Reperes a gauche, identite du client a droite.
+    h(View, { style: { flexDirection: "row" as const, justifyContent: "space-between" as const, alignItems: "flex-start" as const, marginBottom: 20 } },
+      h(View, null,
+        h(Text, { style: s.fveDateLeft }, `Date : ${dossier.date}  |  Heure : ${dossier.heure}`),
+        h(Text, { style: s.fveDateLeft }, `R\u00E8glement : ${modeReglement}`)),
+      blocIdentiteFacture(client, dossier)),
 
     // Table - items
     h(View, { style: s.tableWrap },
@@ -98,10 +86,7 @@ function Doc({ data }: { data: FactureSoldeData }) {
     h(View, { style: s.fveCutLine }),
 
     // Footer
-    h(View, { style: s.footer, fixed: true },
-      h(Text, { style: s.footerText }, `${SOCIETE.nom}`),
-      h(Text, { style: s.footerText }, `${SOCIETE.adresse}  \u00B7  ${SOCIETE.telephone}`),
-      h(Text, { style: s.footerText }, `${SOCIETE.details}`))));
+    piedDePage()));
 }
 
 export async function generateFactureSolde(data: FactureSoldeData): Promise<Blob> {

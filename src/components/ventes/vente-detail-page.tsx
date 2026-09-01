@@ -27,6 +27,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -92,6 +94,8 @@ export function VenteDetailPage({ lot, facture, orInvestStock = {}, fonderies = 
   const [savingNotes, setSavingNotes] = useState(false);
   const [saving, setSaving] = useState(false);
   const [acomptePct, setAcomptePct] = useState(10);
+  const [avecAcompte, setAvecAcompte] = useState(lot.avec_acompte !== false);
+  const [savingAcompte, setSavingAcompte] = useState(false);
 
   // Track latest values in refs for cleanup on navigation away
   const lignesCountRef = useRef(lot.lignes.length);
@@ -189,6 +193,28 @@ export function VenteDetailPage({ lot, facture, orInvestStock = {}, fonderies = 
 
     const { error } = await supabase.from("vente_lignes").delete().eq("id", ligneId);
     if (error) { toast.error("Erreur lors de la suppression de la ligne"); return; }
+    router.refresh();
+  }
+
+  /**
+   * Le choix de l'acompte se prend avant la finalisation, et se garde sur la
+   * vente : c'est lui qui decide, au moment de finaliser, si le client recoit
+   * deux factures et une echeance, ou une seule facture a regler d'un coup.
+   */
+  async function handleAvecAcompteChange(next: boolean) {
+    setAvecAcompte(next);
+    setSavingAcompte(true);
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("lots")
+      .update({ avec_acompte: next })
+      .eq("id", lot.id);
+    setSavingAcompte(false);
+    if (error) {
+      setAvecAcompte(!next);
+      toast.error("Erreur lors de l'enregistrement du mode de règlement");
+      return;
+    }
     router.refresh();
   }
 
@@ -460,18 +486,23 @@ export function VenteDetailPage({ lot, facture, orInvestStock = {}, fonderies = 
               )
             )}
 
-            {/* Récapitulatif prix */}
+            {/* Récapitulatif prix.
+                Le prix d'une ligne est celui de l'etiquette : la TVA y est
+                comprise, elle ne s'y ajoute pas. Le recapitulatif la detaille
+                donc en « dont », et non en « + ». Seule la TFOP des lignes
+                anciennes s'ajoutait au prix ; on la traite a part. */}
             {lot.lignes.length > 0 && (() => {
-              const totalHT = lot.lignes.reduce((sum, l) => sum + l.prix_total, 0);
-              const totalTVAMarge = lot.lignes
-                .filter((l) => l.type_taxe === "tva_marge" || (!l.type_taxe && l.montant_taxe > 0))
-                .reduce((sum, l) => sum + l.montant_taxe, 0);
-              const totalTFOP = lot.lignes
-                .filter((l) => l.type_taxe === "tfop")
-                .reduce((sum, l) => sum + l.montant_taxe, 0);
-              const totalTaxe = totalTVAMarge + totalTFOP;
-              const totalTTC = totalHT + totalTaxe;
-              const taxeLineCount = (totalTVAMarge > 0 ? 1 : 0) + (totalTFOP > 0 ? 1 : 0);
+              const sommeTaxe = (predicat: (l: typeof lot.lignes[number]) => boolean) =>
+                lot.lignes.filter(predicat).reduce((sum, l) => sum + l.montant_taxe, 0);
+
+              const totalArticles = lot.lignes.reduce((sum, l) => sum + l.prix_total, 0);
+              const tvaMarge = sommeTaxe(
+                (l) => l.type_taxe === "tva_marge" || (!l.type_taxe && l.montant_taxe > 0)
+              );
+              const tvaNormale = sommeTaxe((l) => l.type_taxe === "tva_normale");
+              const totalTFOP = sommeTaxe((l) => l.type_taxe === "tfop");
+              const tvaComprise = tvaMarge + tvaNormale;
+              const totalTTC = totalArticles + totalTFOP;
               return (
                 <div className="rounded-lg border bg-muted/50 px-4 py-3 space-y-1">
                   <div className="flex items-center gap-2 mb-2">
@@ -480,34 +511,84 @@ export function VenteDetailPage({ lot, facture, orInvestStock = {}, fonderies = 
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-semibold text-foreground">Total articles</span>
-                    <span className="font-semibold text-foreground">{formatCurrency(totalHT)} HT</span>
+                    <span className="font-semibold text-foreground">{formatCurrency(totalArticles)} TTC</span>
                   </div>
-                  {totalTaxe > 0 && (
+                  {tvaComprise > 0 && (
                     <div className="mt-3 space-y-1">
-                      {totalTVAMarge > 0 && (
+                      {tvaMarge > 0 && (
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">TVA sur marge (20 %)</span>
-                          <span className="font-medium text-muted-foreground">+ {formatCurrency(totalTVAMarge)}</span>
+                          <span className="text-muted-foreground">dont TVA sur marge (20 %)</span>
+                          <span className="font-medium text-muted-foreground">{formatCurrency(tvaMarge)}</span>
                         </div>
                       )}
-                      {totalTFOP > 0 && (
+                      {tvaNormale > 0 && (
                         <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">TFOP (6,5 %)</span>
-                          <span className="font-medium text-muted-foreground">+ {formatCurrency(totalTFOP)}</span>
+                          <span className="text-muted-foreground">dont TVA sur le prix total (20 %)</span>
+                          <span className="font-medium text-muted-foreground">{formatCurrency(tvaNormale)}</span>
                         </div>
                       )}
-                      <div className="border-t pt-1 mt-1 flex items-center justify-between text-sm">
-                        <span className="font-semibold text-foreground">Total taxes</span>
-                        <span className="font-semibold text-foreground">+ {formatCurrency(totalTaxe)}</span>
-                      </div>
+                    </div>
+                  )}
+                  {totalTFOP > 0 && (
+                    <div className="mt-3 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">TFOP (6,5 %)</span>
+                      <span className="font-medium text-muted-foreground">+ {formatCurrency(totalTFOP)}</span>
                     </div>
                   )}
                   <div className="mt-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold">Total TTC</span>
+                      <span className="text-sm font-semibold">Total à encaisser</span>
                       <span className="text-lg font-bold">{formatCurrency(totalTTC)} TTC</span>
                     </div>
                   </div>
+
+                  {/* Acompte ou paiement en une fois.
+                      Un client qui paie tout au comptoir n'a que faire d'une
+                      facture d'acompte et d'une echeance de solde ; celui qui
+                      reserve un lingot, si. Le choix se prend ici, tant que la
+                      vente est un brouillon — apres, les pieces sont emises. */}
+                  {hasOrInvest && (() => {
+                    const totalOrInvest = orInvestLignes.reduce(
+                      (sum, l) => sum + l.prix_total + l.montant_taxe,
+                      0
+                    );
+                    const montantAcompte =
+                      Math.round(totalOrInvest * (acomptePct / 100) * 100) / 100;
+
+                    return (
+                      <div className="mt-4 border-t pt-3">
+                        {isBrouillon ? (
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <Label htmlFor="avec-acompte">Facture d&apos;acompte</Label>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {avecAcompte
+                                  ? `Acompte de ${acomptePct} % (${formatCurrency(montantAcompte)}) à l'engagement, puis facture de solde de ${formatCurrency(totalOrInvest - montantAcompte)}.`
+                                  : "Une seule facture pour l'or d'investissement, réglée en une fois."}
+                              </p>
+                            </div>
+                            <Switch
+                              id="avec-acompte"
+                              checked={avecAcompte}
+                              disabled={savingAcompte}
+                              onCheckedChange={handleAvecAcompteChange}
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              Or d&apos;investissement
+                            </span>
+                            <span className="font-medium">
+                              {avecAcompte
+                                ? `Acompte de ${acomptePct} % puis solde`
+                                : "Payé en une fois"}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}

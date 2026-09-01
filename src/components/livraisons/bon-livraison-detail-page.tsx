@@ -342,7 +342,7 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
               btn: (
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="secondary"
                   disabled={savingEcarts || lignesSansMontant.length > 0}
                   onClick={handleSaveEcarts}
                 >
@@ -358,7 +358,7 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
               icon: Coins,
               label: "Règlement fonderie | Encaisser ce que la fonderie a versé",
               btn: (
-                <Button size="sm" variant="outline" onClick={() => setReglementOuvert(true)}>
+                <Button size="sm" variant="secondary" onClick={() => setReglementOuvert(true)}>
                   <Coins size={14} weight="duotone" />
                   Enregistrer
                 </Button>
@@ -371,7 +371,7 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
               icon: CheckCircle,
               label: "Réception | Confirmer la réception par la fonderie",
               btn: (
-                <Button size="sm" variant="outline" disabled={loading} onClick={handleRecu}>
+                <Button size="sm" variant="secondary" disabled={loading} onClick={handleRecu}>
                   <CheckCircle size={14} weight="duotone" />
                   {loading ? "..." : "Confirmer"}
                 </Button>
@@ -384,7 +384,7 @@ export function BonLivraisonDetailPage({ bdl, documents = [] }: BonLivraisonDeta
               icon: Package,
               label: "Envoi | Marquer comme envoyé à la fonderie",
               btn: (
-                <Button size="sm" variant="outline" disabled={loading} onClick={handleEnvoyer}>
+                <Button size="sm" variant="secondary" disabled={loading} onClick={handleEnvoyer}>
                   <Package size={14} weight="duotone" />
                   {loading ? "..." : "Envoyer"}
                 </Button>

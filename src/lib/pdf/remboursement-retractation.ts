@@ -2,6 +2,7 @@ import React from "react";
 import { Document, Page, View, Text, pdf, Image } from "@react-pdf/renderer";
 import { LOGO_BASE64 } from "./logo";
 import { styles as s, W, fmt } from "./shared-styles";
+import { piedDePage, enTeteDocument } from "./entete";
 import { SOCIETE, type ClientInfo, type DossierInfo, type ReferenceLigne, recapitulatifTitrage } from "./blocks";
 
 export interface RemboursementRetractationData {
@@ -24,7 +25,6 @@ const TEXTE_RETRACTATION =
 function Doc({ data }: { data: RemboursementRetractationData }) {
   const { client, dossier, references, montantRembourse, numeroContrat } = data;
   const h = React.createElement;
-  const fullName = `${client.civilite} ${client.prenom} ${client.nom}`;
 
   return h(Document, null, h(Page, { size: "A4", style: s.page },
     // En-tête
@@ -35,26 +35,11 @@ function Doc({ data }: { data: RemboursementRetractationData }) {
         h(Text, { style: s.companyLine }, SOCIETE.adresse),
         h(Text, { style: s.companyLine }, SOCIETE.telephone))),
     // Client + identification du document
-    h(View, { style: s.infoSection },
-      h(View, { style: s.clientBlock },
-        h(Text, { style: s.label }, "CLIENT"),
-        h(Text, { style: s.clientName }, fullName),
-        client.adresse ? h(Text, { style: s.clientLine }, client.adresse) : null,
-        (client.codePostal || client.ville)
-          ? h(Text, { style: s.clientLine }, [client.codePostal, client.ville].filter(Boolean).join(" "))
-          : null,
-        client.documentType && client.documentNumber
-          ? h(Text, { style: s.clientMuted }, `${client.documentType} : ${client.documentNumber}`)
-          : null,
-        h(Text, { style: s.clientMuted }, `Dossier : ${dossier.numeroDossier}`)),
-      h(View, { style: s.docRight },
-        h(Text, { style: s.docTitle }, "REMBOURSEMENT"),
-        h(Text, { style: s.infoLabel }, "NUMÉRO"),
-        h(Text, { style: s.infoValue }, data.numero),
-        h(Text, { style: s.infoLabel }, "DATE"),
-        h(Text, { style: s.infoValue }, `${dossier.date}   ${dossier.heure}`),
-        h(Text, { style: s.infoLabel }, "CONTRAT ANNULÉ"),
-        h(Text, { style: s.infoValue }, numeroContrat))),
+    enTeteDocument("REMBOURSEMENT", [
+      { label: "NUMÉRO", value: data.numero },
+      { label: "DATE", value: `${dossier.date}  ${dossier.heure}` },
+      { label: "CONTRAT ANNULÉ", value: numeroContrat },
+    ], client, dossier),
     // Articles restitués
     h(View, { style: s.tableWrap },
       h(View, { style: s.tableHead },
@@ -96,9 +81,7 @@ function Doc({ data }: { data: RemboursementRetractationData }) {
           h(Text, { style: s.sigLabel }, "Signature du client"),
           h(View, { style: s.sigLine })))),
     // Pied de page
-    h(View, { style: s.footer, fixed: true },
-      h(Text, { style: s.footerText }, `${SOCIETE.nom}  ·  ${SOCIETE.details}`),
-      h(Text, { style: s.footerText }, `${SOCIETE.adresse}  ·  ${SOCIETE.telephone}`))));
+    piedDePage()));
 }
 
 export async function generateRemboursementRetractation(

@@ -37,11 +37,35 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
+// Hoistes : la route d'invitation essaie l'envoi par courriel puis, s'il
+// echoue, fabrique un lien. Les deux appels doivent pouvoir etre pilotes test
+// par test.
+const { mockInviteUserByEmail, mockGenerateLink, mockEnvoyerInvitation } = vi.hoisted(
+  () => ({
+    mockInviteUserByEmail: vi.fn(),
+    mockGenerateLink: vi.fn(),
+    mockEnvoyerInvitation: vi.fn(),
+  })
+);
+
+vi.mock("@/lib/email/envoyer-invitation", () => ({
+  envoyerInvitation: mockEnvoyerInvitation,
+}));
+
+const { mockExecuterBalayage } = vi.hoisted(() => ({
+  mockExecuterBalayage: vi.fn(),
+}));
+
+vi.mock("@/lib/email/rappels", () => ({
+  executerBalayage: mockExecuterBalayage,
+}));
+
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn().mockReturnValue({
     auth: {
       admin: {
-        inviteUserByEmail: vi.fn().mockResolvedValue({ data: { user: { id: "new-1" } }, error: null }),
+        inviteUserByEmail: mockInviteUserByEmail,
+        generateLink: mockGenerateLink,
         createUser: vi.fn().mockResolvedValue({ data: { user: { id: "new-1" } }, error: null }),
         updateUserById: vi.fn().mockResolvedValue({ error: null }),
         deleteUser: vi.fn().mockResolvedValue({ error: null }),
@@ -69,6 +93,21 @@ vi.mock("@/lib/email/send-notification", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockInviteUserByEmail.mockResolvedValue({
+    data: { user: { id: "new-1" } },
+    error: null,
+  });
+  mockEnvoyerInvitation.mockResolvedValue({ envoye: true });
+  mockGenerateLink.mockResolvedValue({
+    data: {
+      user: { id: "new-1" },
+      properties: {
+        action_link:
+          "https://ref.supabase.co/auth/v1/verify?token=jeton-hache&type=invite&redirect_to=https://app.oraujusteprix.fr",
+      },
+    },
+    error: null,
+  });
   mockGetUser.mockResolvedValue({ data: { user: mockUser } });
   mockEqChain.mockReturnValue({
     single: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
@@ -166,6 +205,69 @@ describe("POST /api/users/invite", () => {
     expect(res.status).toBe(400);
   });
 
+  it("envoie l'invitation par courriel, vers l'écran de mot de passe", async () => {
+    const { POST } = await import("@/app/api/users/invite/route");
+    const req = makeNextRequest("POST", "http://localhost/api/users/invite", {
+      email: "vendeur@test.com",
+      firstName: "Test",
+      lastName: "User",
+      mode: "invite",
+    });
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(data.envoye).toBe(true);
+    // Le courriel porte le lien qui passe par le callback : c'est lui qui
+    // verifie le jeton avant de deposer sur le choix du mot de passe.
+    expect(mockEnvoyerInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destinataire: "vendeur@test.com",
+        lien: expect.stringContaining("/auth/callback?token_hash=jeton-hache"),
+      })
+    );
+    expect(data.inviteLink).toContain("next=/reset-password");
+  });
+
+  it("garde le lien à copier quand le courriel ne peut pas partir", async () => {
+    mockEnvoyerInvitation.mockResolvedValueOnce({
+      envoye: false,
+      motif: "The gmail.com domain is not verified",
+    });
+    const { POST } = await import("@/app/api/users/invite/route");
+    const req = makeNextRequest("POST", "http://localhost/api/users/invite", {
+      email: "vendeur@test.com",
+      firstName: "Test",
+      lastName: "User",
+      mode: "invite",
+    });
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.envoye).toBe(false);
+    expect(data.motifNonEnvoi).toContain("not verified");
+    expect(data.inviteLink).toContain("/auth/callback?token_hash=jeton-hache");
+  });
+
+  it("n'echoue pas si l'expéditeur lève une erreur inattendue", async () => {
+    // Sans le filet, une cle absente faisait lever le constructeur de Resend et
+    // la creation du vendeur repondait 500 — alors que le compte, lui, existait.
+    mockEnvoyerInvitation.mockRejectedValueOnce(new Error("Missing API key"));
+    const { POST } = await import("@/app/api/users/invite/route");
+    const req = makeNextRequest("POST", "http://localhost/api/users/invite", {
+      email: "vendeur@test.com",
+      firstName: "Test",
+      lastName: "User",
+      mode: "invite",
+    });
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.envoye).toBe(false);
+    expect(data.inviteLink).toContain("/auth/callback");
+  });
+
   it("retourne 400 si password < 6 chars en mode create", async () => {
     const { POST } = await import("@/app/api/users/invite/route");
     const req = makeNextRequest("POST", "http://localhost/api/users/invite", {
@@ -181,52 +283,89 @@ describe("POST /api/users/invite", () => {
 });
 
 // ============================================================
-// /api/email/send
+// /api/cron/emails
+//
+// Le balayage n'est appele par aucun utilisateur : c'est pg_cron qui frappe a
+// la porte. Seul un secret partage l'ouvre, et ces cas verifient qu'elle reste
+// fermee dans tous les autres.
 // ============================================================
-describe("POST /api/email/send", () => {
-  it("retourne 401 si non authentifié", async () => {
-    mockGetUser.mockResolvedValueOnce({ data: { user: null } });
-    const { POST } = await import("@/app/api/email/send/route");
-    const req = makeNextRequest("POST", "http://localhost/api/email/send", {
-      notification_type: "devis_envoye",
+describe("POST /api/cron/emails", () => {
+  const SECRET = "secret-de-balayage";
+
+  beforeEach(() => {
+    process.env.CRON_SECRET = SECRET;
+    mockExecuterBalayage.mockResolvedValue({
+      devis: 0,
+      commandes: 0,
+      soldes: 0,
+      clotures: 0,
+      echecs: 0,
     });
-    const res = await POST(req);
+  });
+
+  it("refuse tout quand aucun secret n'est configuré", async () => {
+    delete process.env.CRON_SECRET;
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const res = await POST(makeNextRequest("POST", "http://localhost/api/cron/emails"));
+
+    expect(res.status).toBe(503);
+    expect(mockExecuterBalayage).not.toHaveBeenCalled();
+  });
+
+  it("retourne 401 sans en-tête d'autorisation", async () => {
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const res = await POST(makeNextRequest("POST", "http://localhost/api/cron/emails"));
+
     expect(res.status).toBe(401);
+    expect(mockExecuterBalayage).not.toHaveBeenCalled();
   });
 
-  it("retourne 403 si pas propriétaire", async () => {
-    mockEqChain.mockReturnValueOnce({
-      single: vi.fn().mockResolvedValue({ data: { role: "vendeur" }, error: null }),
-      limit: mockLimit,
-    });
-    const { POST } = await import("@/app/api/email/send/route");
-    const req = makeNextRequest("POST", "http://localhost/api/email/send", {
-      notification_type: "devis_envoye",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(403);
-  });
-
-  it("retourne 400 si notification_type invalide", async () => {
-    const { POST } = await import("@/app/api/email/send/route");
-    const req = makeNextRequest("POST", "http://localhost/api/email/send", {
-      notification_type: "type_inexistant",
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(400);
-    const data = await res.json();
-    expect(data.error).toContain("Invalid notification_type");
-  });
-
-  it("retourne 400 si JSON invalide", async () => {
-    const { POST } = await import("@/app/api/email/send/route");
-    const req = new NextRequest(new URL("http://localhost/api/email/send"), {
+  it("retourne 401 sur un mauvais secret", async () => {
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const req = new NextRequest(new URL("http://localhost/api/cron/emails"), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: "not json{{{",
+      headers: { authorization: "Bearer mauvais-secret" },
     });
     const res = await POST(req);
-    expect(res.status).toBe(400);
+
+    expect(res.status).toBe(401);
+    expect(mockExecuterBalayage).not.toHaveBeenCalled();
+  });
+
+  it("balaye sur présentation du bon secret", async () => {
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const req = new NextRequest(new URL("http://localhost/api/cron/emails"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}` },
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(mockExecuterBalayage).toHaveBeenCalledOnce();
+  });
+
+  it("accepte aussi le secret en en-tête dédié", async () => {
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const req = new NextRequest(new URL("http://localhost/api/cron/emails"), {
+      method: "POST",
+      headers: { "x-cron-secret": SECRET },
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+  });
+
+  it("rend 500 quand le balayage échoue, sans masquer le motif", async () => {
+    mockExecuterBalayage.mockRejectedValueOnce(new Error("base injoignable"));
+    const { POST } = await import("@/app/api/cron/emails/route");
+    const req = new NextRequest(new URL("http://localhost/api/cron/emails"), {
+      method: "POST",
+      headers: { authorization: `Bearer ${SECRET}` },
+    });
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toBe("base injoignable");
   });
 });
 
