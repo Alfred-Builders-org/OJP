@@ -70,10 +70,20 @@ export function ReglementFonderieDialog({
     setErreur("");
     const supabase = createClient();
 
+    // Le bon de livraison est la piece que ce versement solde : le reglement
+    // s'y accroche, comme celui d'un rachat s'accroche a sa quittance.
+    const { data: piece } = await supabase
+      .from("documents")
+      .select("id")
+      .eq("bon_livraison_id", bdl.id)
+      .eq("type", "bon_livraison")
+      .maybeSingle();
+
     const { error } = await mutate(
       supabase.from("reglements").insert({
         bon_livraison_id: bdl.id,
         lot_id: null,
+        document_id: piece?.id ?? null,
         fonderie_id: bdl.fonderie_id,
         // La fonderie nous paie : l'argent entre.
         sens: "entrant",
@@ -90,6 +100,11 @@ export function ReglementFonderieDialog({
     if (error) {
       setSaving(false);
       return;
+    }
+
+    // Le document suit le sort de l'envoi : encaisse, il est regle.
+    if (piece?.id) {
+      await supabase.from("documents").update({ status: "regle" }).eq("id", piece.id);
     }
 
     const { error: statutError } = await mutate(
