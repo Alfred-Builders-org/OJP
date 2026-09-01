@@ -180,7 +180,7 @@ export function ClientCreatePage() {
               <Field label="Nom de jeune fille" error={errors.maiden_name}>
                 <Input value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />
               </Field>
-              <Field label="Email" required error={errors.email}>
+              <Field label="Email" error={errors.email}>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jean@exemple.fr" />
               </Field>
               <Field label="Téléphone" error={errors.phone}>

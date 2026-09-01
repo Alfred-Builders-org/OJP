@@ -302,7 +302,11 @@ export const clientSchema = z.object({
   first_name: z.string().min(1, "Le prénom est requis").max(100, "100 caractères maximum"),
   last_name: z.string().min(1, "Le nom est requis").max(100, "100 caractères maximum"),
   maiden_name: z.string().max(100).optional().or(z.literal("")),
-  email: z.string().min(1, "L'email est requis").email("Format email invalide"),
+  // Optionnel : une bijouterie compte des clients qui n'ont pas d'adresse
+  // electronique. L'exiger rendrait leur fiche impossible a enregistrer — 67 des
+  // 538 clients repris en production sont dans ce cas. Le format reste verifie
+  // des lors qu'une adresse est saisie.
+  email: z.string().email("Format email invalide").optional().or(z.literal("")),
   phone: z.string().max(20).optional().or(z.literal("")),
   address: z.string().min(1, "L'adresse est requise").max(255, "255 caractères maximum"),
   city: z.string().min(1, "La ville est requise").max(100, "100 caractères maximum"),

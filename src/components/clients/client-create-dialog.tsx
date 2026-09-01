@@ -241,7 +241,7 @@ export function ClientCreateDialog({ open, onOpenChange, onClientCreated }: Clie
               <Field label="Nom de jeune fille" error={clientErrors.maiden_name}>
                 <Input value={maidenName} onChange={(e) => setMaidenName(e.target.value)} />
               </Field>
-              <Field label="Email" required error={clientErrors.email}>
+              <Field label="Email" error={clientErrors.email}>
                 <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jean@exemple.fr" required />
               </Field>
               <Field label="Téléphone" error={clientErrors.phone}>
