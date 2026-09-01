@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
     .single();
   const societe = ligne?.value as CompanySettings | undefined;
   const from = societe?.email_expediteur || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
-  const nom = societe?.nom_expediteur || "Or au Juste Prix";
+  const nom = societe?.nom_expediteur || "L'Or au Juste Prix";
 
   const { data: envoi, error: erreur } = await getResend().emails.send({
     from: `${nom} <${from}>`,

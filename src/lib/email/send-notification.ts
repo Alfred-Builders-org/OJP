@@ -170,7 +170,7 @@ export async function sendNotification(
       .single();
     const company = companyRow?.value as CompanySettings | undefined;
     const fromEmail = company?.email_expediteur || process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev";
-    const fromName = company?.nom_expediteur || "Or au Juste Prix";
+    const fromName = company?.nom_expediteur || "L'Or au Juste Prix";
     const { data: sendData, error: sendError } = await getResend().emails.send({
       from: `${fromName} <${fromEmail}>`,
       to: recipientEmail,
