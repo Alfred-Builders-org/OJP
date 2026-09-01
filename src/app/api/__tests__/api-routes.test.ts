@@ -37,11 +37,27 @@ vi.mock("@/lib/supabase/server", () => ({
   }),
 }));
 
+// Hoistes : la route d'invitation essaie l'envoi par courriel puis, s'il
+// echoue, fabrique un lien. Les deux appels doivent pouvoir etre pilotes test
+// par test.
+const { mockInviteUserByEmail, mockGenerateLink, mockEnvoyerInvitation } = vi.hoisted(
+  () => ({
+    mockInviteUserByEmail: vi.fn(),
+    mockGenerateLink: vi.fn(),
+    mockEnvoyerInvitation: vi.fn(),
+  })
+);
+
+vi.mock("@/lib/email/envoyer-invitation", () => ({
+  envoyerInvitation: mockEnvoyerInvitation,
+}));
+
 vi.mock("@/lib/supabase/admin", () => ({
   getSupabaseAdmin: vi.fn().mockReturnValue({
     auth: {
       admin: {
-        inviteUserByEmail: vi.fn().mockResolvedValue({ data: { user: { id: "new-1" } }, error: null }),
+        inviteUserByEmail: mockInviteUserByEmail,
+        generateLink: mockGenerateLink,
         createUser: vi.fn().mockResolvedValue({ data: { user: { id: "new-1" } }, error: null }),
         updateUserById: vi.fn().mockResolvedValue({ error: null }),
         deleteUser: vi.fn().mockResolvedValue({ error: null }),
@@ -69,6 +85,21 @@ vi.mock("@/lib/email/send-notification", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockInviteUserByEmail.mockResolvedValue({
+    data: { user: { id: "new-1" } },
+    error: null,
+  });
+  mockEnvoyerInvitation.mockResolvedValue({ envoye: true });
+  mockGenerateLink.mockResolvedValue({
+    data: {
+      user: { id: "new-1" },
+      properties: {
+        action_link:
+          "https://ref.supabase.co/auth/v1/verify?token=jeton-hache&type=invite&redirect_to=https://app.oraujusteprix.fr",
+      },
+    },
+    error: null,
+  });
   mockGetUser.mockResolvedValue({ data: { user: mockUser } });
   mockEqChain.mockReturnValue({
     single: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
@@ -164,6 +195,69 @@ describe("POST /api/users/invite", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+
+  it("envoie l'invitation par courriel, vers l'écran de mot de passe", async () => {
+    const { POST } = await import("@/app/api/users/invite/route");
+    const req = makeNextRequest("POST", "http://localhost/api/users/invite", {
+      email: "vendeur@test.com",
+      firstName: "Test",
+      lastName: "User",
+      mode: "invite",
+    });
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(data.envoye).toBe(true);
+    // Le courriel porte le lien qui passe par le callback : c'est lui qui
+    // verifie le jeton avant de deposer sur le choix du mot de passe.
+    expect(mockEnvoyerInvitation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destinataire: "vendeur@test.com",
+        lien: expect.stringContaining("/auth/callback?token_hash=jeton-hache"),
+      })
+    );
+    expect(data.inviteLink).toContain("next=/reset-password");
+  });
+
+  it("garde le lien à copier quand le courriel ne peut pas partir", async () => {
+    mockEnvoyerInvitation.mockResolvedValueOnce({
+      envoye: false,
+      motif: "The gmail.com domain is not verified",
+    });
+    const { POST } = await import("@/app/api/users/invite/route");
+    const req = makeNextRequest("POST", "http://localhost/api/users/invite", {
+      email: "vendeur@test.com",
+      firstName: "Test",
+      lastName: "User",
+      mode: "invite",
+    });
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.envoye).toBe(false);
+    expect(data.motifNonEnvoi).toContain("not verified");
+    expect(data.inviteLink).toContain("/auth/callback?token_hash=jeton-hache");
+  });
+
+  it("n'echoue pas si l'expéditeur lève une erreur inattendue", async () => {
+    // Sans le filet, une cle absente faisait lever le constructeur de Resend et
+    // la creation du vendeur repondait 500 — alors que le compte, lui, existait.
+    mockEnvoyerInvitation.mockRejectedValueOnce(new Error("Missing API key"));
+    const { POST } = await import("@/app/api/users/invite/route");
+    const req = makeNextRequest("POST", "http://localhost/api/users/invite", {
+      email: "vendeur@test.com",
+      firstName: "Test",
+      lastName: "User",
+      mode: "invite",
+    });
+    const res = await POST(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.envoye).toBe(false);
+    expect(data.inviteLink).toContain("/auth/callback");
   });
 
   it("retourne 400 si password < 6 chars en mode create", async () => {

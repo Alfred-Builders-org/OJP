@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { sensitiveApiLimiter, getClientIp, rateLimitResponse } from "@/lib/rate-limit";
 import { getSiteUrl } from "@/lib/site-url";
+import { envoyerInvitation } from "@/lib/email/envoyer-invitation";
 
 export async function POST(request: NextRequest) {
   // Rate limiting
@@ -47,35 +48,59 @@ export async function POST(request: NextRequest) {
 
   try {
     if (mode === "invite") {
+      const siteUrl = getSiteUrl(request);
+      const metadonnees = {
+        first_name: firstName,
+        last_name: lastName,
+        role: "vendeur",
+        status: "pending",
+      };
+
       const { data, error } = await getSupabaseAdmin().auth.admin.generateLink({
         type: "invite",
         email,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            role: "vendeur",
-            status: "pending",
-          },
-        },
+        options: { data: metadonnees },
       });
 
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 400 });
       }
 
-      // Rewrite Supabase action_link to go through our auth callback
+      // Le lien de Supabase passe par notre callback, qui verifie le jeton puis
+      // depose sur l'ecran de choix du mot de passe.
       const actionLink = data.properties?.action_link ?? "";
       let inviteLink = actionLink;
       if (actionLink) {
         const parsed = new URL(actionLink);
         const token_hash = parsed.searchParams.get("token") ?? "";
         const type = parsed.searchParams.get("type") ?? "invite";
-        const siteUrl = getSiteUrl(request);
         inviteLink = `${siteUrl}/auth/callback?token_hash=${token_hash}&type=${type}&next=/reset-password`;
       }
 
-      return NextResponse.json({ user: data.user, inviteLink });
+      /**
+       * Le courriel part d'ici. `generateLink` fabrique un lien et n'envoie
+       * rien : l'ecran annonçait pourtant un message envoye, et le proprietaire
+       * etait le seul a pouvoir transmettre le lien sans le savoir.
+       *
+       * L'envoi peut echouer — cle d'expedition absente, domaine non verifie.
+       * Le lien reste alors affiche : une invitation a moitie faite serait pire
+       * que pas d'invitation du tout.
+       */
+      const { envoye, motif } = await envoyerInvitation({
+        destinataire: email,
+        lien: inviteLink,
+        origine: siteUrl,
+      }).catch((erreurInattendue: Error) => ({
+        envoye: false,
+        motif: erreurInattendue.message,
+      }));
+
+      return NextResponse.json({
+        user: data.user,
+        inviteLink,
+        envoye,
+        motifNonEnvoi: motif,
+      });
     } else {
       // Create user with password
       if (!password || password.length < 6) {

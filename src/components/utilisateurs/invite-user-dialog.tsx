@@ -40,6 +40,8 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  /** L'invitation est-elle partie par courriel, ou reste-t-elle a transmettre ? */
+  const [envoye, setEnvoye] = useState(false);
   const [copied, setCopied] = useState(false);
 
   function reset() {
@@ -50,6 +52,7 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
     setError(null);
     setSuccess(false);
     setInviteLink(null);
+    setEnvoye(false);
     setCopied(false);
     setMode("invite");
   }
@@ -76,6 +79,7 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
       if (data.inviteLink) {
         setInviteLink(data.inviteLink);
       }
+      setEnvoye(Boolean(data.envoye));
       setSuccess(true);
       router.refresh();
     } finally {
@@ -100,18 +104,29 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Vendeur invité</DialogTitle>
+            <DialogTitle>
+              {mode !== "invite"
+                ? "Vendeur créé"
+                : envoye
+                  ? "Invitation envoyée"
+                  : "Lien d'invitation à transmettre"}
+            </DialogTitle>
+            {/* Le message annonçait un courriel envoye dans tous les cas. Quand
+                aucun expediteur n'est configure, il n'en part aucun : le dire
+                evite d'attendre un message qui ne viendra pas. */}
             <DialogDescription>
-              {mode === "invite"
-                ? `Un email d'invitation a été envoyé à ${email}. Le vendeur pourra créer son mot de passe en cliquant sur le lien.`
-                : `Le compte de ${firstName} ${lastName} a été créé. Communiquez-lui ses identifiants : ${email} / ${password}`}
+              {mode !== "invite"
+                ? `Le compte de ${firstName} ${lastName} a été créé. Communiquez-lui ses identifiants : ${email} / ${password}`
+                : envoye
+                  ? `Un e-mail vient de partir à ${email}. Le vendeur y choisira son mot de passe.`
+                  : `L'e-mail n'a pas pu partir. Transmettez ce lien à ${email} vous-même : il lui permettra de choisir son mot de passe.`}
             </DialogDescription>
           </DialogHeader>
           {inviteLink && (
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground flex items-center gap-1">
                 <LinkIcon size={12} weight="duotone" />
-                Lien d&apos;invitation
+                {envoye ? "Le même lien, si l'e-mail n'arrive pas" : "Lien d'invitation"}
               </Label>
               <div className="flex items-center gap-2">
                 <Input
@@ -124,6 +139,11 @@ export function InviteUserDialog({ open, onOpenChange }: InviteUserDialogProps) 
                   {copied ? <Check size={14} weight="bold" /> : <Copy size={14} weight="bold" />}
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                Valable vingt-quatre heures, et une seule ouverture. Ne l&apos;ouvrez
+                pas vous-même pour vérifier : il serait consommé, et la personne
+                invitée tomberait sur l&apos;écran de connexion.
+              </p>
             </div>
           )}
           <DialogFooter>
