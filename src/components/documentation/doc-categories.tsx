@@ -931,7 +931,7 @@ export const categories: DocCategory[] = [
         icon: Coins,
         content: (
           <div className="space-y-4">
-            <p>Catalogue des pièces et lingots d&apos;or investissement, accessible depuis <AppLink href="/or-investissement">Or investissement</AppLink>.</p>
+            <p>Catalogue des pièces et lingots d&apos;or investissement, accessible depuis <AppLink href="/parametres?section=or-investissement">Paramètres, section Or investissement</AppLink>.</p>
           </div>
         ),
         steps: [

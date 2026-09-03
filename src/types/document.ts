@@ -1,4 +1,4 @@
-export type DocumentType = "quittance_rachat" | "contrat_rachat" | "devis_rachat" | "contrat_depot_vente" | "confie_achat" | "quittance_depot_vente" | "facture_vente" | "facture_acompte" | "facture_solde" | "bon_commande" | "bon_livraison" | "remboursement_retractation";
+export type DocumentType = "quittance_rachat" | "contrat_rachat" | "devis_rachat" | "contrat_depot_vente" | "confie_achat" | "quittance_depot_vente" | "facture_vente" | "facture_acompte" | "facture_solde" | "bon_commande" | "bon_livraison" | "remboursement_retractation" | "facture_reparation";
 
 export type DocumentStatus = "en_attente" | "accepte" | "refuse" | "signe" | "regle" | "emis" | "annule" | "retracte";
 

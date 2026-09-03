@@ -19,6 +19,8 @@ import {
   FolderOpen as PhFolderOpen,
   NotePencil as PhNotePencil,
   User as PhUser,
+  Buildings as PhBuildings,
+  Factory as PhFactory,
   PencilSimple,
   FloppyDisk,
   CheckCircle,
@@ -322,7 +324,18 @@ export function DossierDetailPage({
     }
   }
 
-  const clientName = `${dossier.client.civility === "M" ? "M." : "Mme"} ${dossier.client.first_name} ${dossier.client.last_name}`;
+  // Un dossier peut porter un particulier, un grossiste ou une fonderie.
+  // Les blocs d'affichage s'adaptent au tiers concerné ; les anciens dossiers
+  // sans `tiers_type` sont, par défaut, des dossiers client.
+  const dossierAvecTiers = dossier as typeof dossier & {
+    tiers_type?: "client" | "grossiste" | "fonderie";
+    grossiste?: { id: string; nom: string; raison_sociale: string | null; siret?: string | null } | null;
+    fonderie?: { id: string; nom: string } | null;
+  };
+  const tiersType = dossierAvecTiers.tiers_type ?? "client";
+  const clientName = dossier.client
+    ? `${dossier.client.civility === "M" ? "M." : "Mme"} ${dossier.client.first_name} ${dossier.client.last_name}`
+    : "";
 
   return (
     <>
@@ -410,7 +423,9 @@ export function DossierDetailPage({
             </CardContent>
           </Card>
 
-          {/* Client */}
+          {/* Le tiers du dossier : client, grossiste ou fonderie. Trois cartes
+              qui ne changent que le titre, l'icône et les champs affichés. */}
+          {tiersType === "client" && dossier.client && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -441,6 +456,49 @@ export function DossierDetailPage({
               <DetailRow label="Ville" value={dossier.client.city ?? "—"} />
             </CardContent>
           </Card>
+          )}
+
+          {tiersType === "grossiste" && dossierAvecTiers.grossiste && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <PhBuildings size={20} weight="duotone" />
+                Grossiste
+              </CardTitle>
+              <Button variant="secondary" size="sm" onClick={() => router.push(`/grossistes/${dossierAvecTiers.grossiste!.id}`)}>
+                <ArrowSquareOut size={14} weight="duotone" />
+                Voir le grossiste
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <DetailRow
+                label="Nom"
+                value={dossierAvecTiers.grossiste.raison_sociale ?? dossierAvecTiers.grossiste.nom}
+              />
+              {dossierAvecTiers.grossiste.siret && (
+                <DetailRow label="SIRET" value={dossierAvecTiers.grossiste.siret} />
+              )}
+            </CardContent>
+          </Card>
+          )}
+
+          {tiersType === "fonderie" && dossierAvecTiers.fonderie && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <PhFactory size={20} weight="duotone" />
+                Fonderie
+              </CardTitle>
+              <Button variant="secondary" size="sm" onClick={() => router.push(`/fonderies/${dossierAvecTiers.fonderie!.id}`)}>
+                <ArrowSquareOut size={14} weight="duotone" />
+                Voir la fonderie
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <DetailRow label="Nom" value={dossierAvecTiers.fonderie.nom} />
+            </CardContent>
+          </Card>
+          )}
 
           {/* Action Dashboard */}
           <ActionDashboard
@@ -456,6 +514,7 @@ export function DossierDetailPage({
           <DossierLotsSection
             lots={lots}
             dossierStatus={dossier.status}
+            tiersType={(dossier as { tiers_type?: "client" | "grossiste" | "fonderie" }).tiers_type}
             lotReferences={lotReferences}
             venteLignes={venteLignes}
             fonderieParBdc={fonderieParBdc}

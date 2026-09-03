@@ -1,14 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
   Buildings,
+  CurrencyEur,
   Diamond,
   NotePencil,
   Receipt,
 } from "@phosphor-icons/react";
+import { createClient } from "@/lib/supabase/client";
+import { EncaissementDialog } from "@/components/reglements/encaissement-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,9 +46,27 @@ export function AchatDetailPage({
   articles,
 }: AchatDetailPageProps) {
   const router = useRouter();
+  const [paiementOuvert, setPaiementOuvert] = useState(false);
+  const [regle, setRegle] = useState(0);
 
   const enStock = articles.filter((a) => a.statut === "en_stock").length;
   const vendus = articles.filter((a) => a.statut === "vendu").length;
+
+  // Ce qui a deja ete verse au fournisseur, pour ne pas le payer deux fois.
+  useEffect(() => {
+    let annule = false;
+    createClient()
+      .from("reglements")
+      .select("montant")
+      .eq("achat_grossiste_id", achat.id)
+      .then(({ data }) => {
+        if (annule) return;
+        setRegle((data ?? []).reduce((somme, r) => somme + Number(r.montant), 0));
+      });
+    return () => {
+      annule = true;
+    };
+  }, [achat.id, paiementOuvert]);
 
   return (
     <>
@@ -112,9 +134,46 @@ export function AchatDetailPage({
                 <p className="text-xs text-muted-foreground">Valeur de revente</p>
                 <p className="font-medium">{formatCurrency(achat.montant_revente)}</p>
               </div>
+              {/* Ce qu'on a paye au fournisseur : un decaissement, qui doit
+                  figurer dans la feuille de caisse du jour au meme titre que ce
+                  qu'on verse a un client. */}
+              <div className="space-y-1">
+                <p className="text-xs text-muted-foreground">Réglé</p>
+                <p className="font-medium tabular-nums">
+                  {formatCurrency(regle)}
+                  {achat.montant_total > 0 && regle < achat.montant_total && (
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {" "}
+                      · reste {formatCurrency(achat.montant_total - regle)}
+                    </span>
+                  )}
+                </p>
+                {regle < achat.montant_total && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-1"
+                    onClick={() => setPaiementOuvert(true)}
+                  >
+                    <CurrencyEur size={14} weight="duotone" />
+                    Enregistrer un paiement
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
+
+        <EncaissementDialog
+          open={paiementOuvert}
+          onOpenChange={setPaiementOuvert}
+          titre="Payer le fournisseur"
+          description={`${achat.numero} — ${grossiste.nom}`}
+          type="achat_grossiste"
+          sens="sortant"
+          achatGrossisteId={achat.id}
+          montantSuggere={Math.round((achat.montant_total - regle) * 100) / 100}
+        />
 
         <Card>
           <CardHeader>

@@ -57,6 +57,8 @@ export type RefActionId =
 interface DossierLotsSectionProps {
   lots: Lot[];
   dossierStatus: DossierStatus;
+  /** Nature du tiers, pour ne proposer que les lots qui ont un sens. */
+  tiersType?: "client" | "grossiste" | "fonderie";
   creatingLot: boolean;
   onCreateLot: (type: "rachat" | "vente" | "depot_vente") => void;
   onDeleteLot: (lotId: string) => void;
@@ -70,9 +72,22 @@ interface DossierLotsSectionProps {
   onRefAction?: (actionId: RefActionId, refId: string, lot: Lot) => void;
 }
 
+/**
+ * Types de lots proposés selon le tiers. Un dossier grossiste ne fait que du
+ * rachat (on achète le stock des grossistes) ; une fonderie fait rachat et
+ * vente (on lui vend de l'or à fondre, on lui rachète des lingots) ; un client
+ * couvre les trois cas historiques.
+ */
+function typesAutorises(tiers: "client" | "grossiste" | "fonderie" | undefined): Array<"rachat" | "vente" | "depot_vente"> {
+  if (tiers === "grossiste") return ["rachat"];
+  if (tiers === "fonderie") return ["rachat", "vente"];
+  return ["rachat", "vente", "depot_vente"];
+}
+
 export function DossierLotsSection({
   lots,
   dossierStatus,
+  tiersType,
   creatingLot,
   onCreateLot,
   onDeleteLot,
@@ -122,18 +137,24 @@ export function DossierLotsSection({
               }
             />
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => onCreateLot("rachat")}>
-                <ShoppingCart size={16} weight="duotone" />
-                Rachat
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onCreateLot("vente")}>
-                <Storefront size={16} weight="duotone" />
-                Vente
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onCreateLot("depot_vente")}>
-                <HandCoins size={16} weight="duotone" />
-                Dépôt-vente
-              </DropdownMenuItem>
+              {typesAutorises(tiersType).includes("rachat") && (
+                <DropdownMenuItem onClick={() => onCreateLot("rachat")}>
+                  <ShoppingCart size={16} weight="duotone" />
+                  Rachat
+                </DropdownMenuItem>
+              )}
+              {typesAutorises(tiersType).includes("vente") && (
+                <DropdownMenuItem onClick={() => onCreateLot("vente")}>
+                  <Storefront size={16} weight="duotone" />
+                  Vente
+                </DropdownMenuItem>
+              )}
+              {typesAutorises(tiersType).includes("depot_vente") && (
+                <DropdownMenuItem onClick={() => onCreateLot("depot_vente")}>
+                  <HandCoins size={16} weight="duotone" />
+                  Dépôt-vente
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}

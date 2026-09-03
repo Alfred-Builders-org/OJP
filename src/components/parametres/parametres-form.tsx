@@ -12,6 +12,7 @@ import {
   FileText,
   Bell,
   ArrowsClockwise,
+  Coins,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { useSaveParametres } from "@/hooks/use-save-setting";
@@ -29,12 +30,23 @@ import { SocieteTab } from "@/components/parametres/societe-tab";
 import { ReglesMetierTab } from "@/components/parametres/regles-metier-tab";
 import { DocumentsTab } from "@/components/parametres/documents-tab";
 import { NotificationsTab } from "@/components/parametres/notifications-tab";
+import { OrInvestissementTable } from "@/components/or-investissement/or-investissement-table";
 import type { Parametres } from "@/types/parametres";
 import type { SettingsMap } from "@/types/settings";
+import type { OrInvestissement } from "@/types/or-investissement";
 
 interface ParametresFormProps {
   parametres: Parametres;
   settings: SettingsMap;
+  /**
+   * Catalogue des pieces, charge par la page serveur uniquement quand sa
+   * section est ouverte. `null` partout ailleurs.
+   */
+  catalogue: {
+    items: OrInvestissement[];
+    total: number;
+    canEdit: boolean;
+  } | null;
 }
 
 type Section =
@@ -42,11 +54,13 @@ type Section =
   | "prix"
   | "regles"
   | "documents"
-  | "notifications";
+  | "notifications"
+  | "or-investissement";
 
 const NAV_ITEMS: { key: Section; label: string; icon: React.ReactNode }[] = [
   { key: "societe", label: "Société", icon: <Buildings size={16} weight="duotone" /> },
   { key: "prix", label: "Prix & Coefficients", icon: <CurrencyEur size={16} weight="duotone" /> },
+  { key: "or-investissement", label: "Or investissement", icon: <Coins size={16} weight="duotone" /> },
   { key: "regles", label: "Règles métier", icon: <Gavel size={16} weight="duotone" /> },
   { key: "documents", label: "Documents & PDF", icon: <FileText size={16} weight="duotone" /> },
   { key: "notifications", label: "Notifications", icon: <Bell size={16} weight="duotone" /> },
@@ -60,6 +74,11 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
   prix: {
     title: "Prix & Coefficients",
     description: "Cours des métaux précieux et coefficients de calcul des prix.",
+  },
+  "or-investissement": {
+    title: "Or investissement",
+    description:
+      "Catalogue des pièces et lingots : désignation, titrage, poids et coefficients propres à chaque référence.",
   },
   regles: {
     title: "Règles métier",
@@ -77,7 +96,7 @@ const SECTION_META: Record<Section, { title: string; description: string }> = {
 
 const SECTION_KEYS = NAV_ITEMS.map((item) => item.key) as readonly Section[];
 
-export function ParametresForm({ parametres, settings }: ParametresFormProps) {
+export function ParametresForm({ parametres, settings, catalogue }: ParametresFormProps) {
   const [activeSection, setActiveSection] = useUrlTab<Section>(
     "section",
     "societe",
@@ -267,6 +286,11 @@ export function ParametresForm({ parametres, settings }: ParametresFormProps) {
 
   const sectionMeta = SECTION_META[activeSection];
 
+  // Le catalogue est un tableau, pas un formulaire : il prend la hauteur
+  // disponible et gere lui-meme son defilement, et il n'y a rien a enregistrer
+  // depuis l'en-tete.
+  const sectionTableau = activeSection === "or-investissement";
+
   return (
     <div style={{ height: "100%" }} className="flex overflow-hidden">
       {/* Navigation latérale */}
@@ -292,22 +316,34 @@ export function ParametresForm({ parametres, settings }: ParametresFormProps) {
       </nav>
 
       {/* Contenu */}
-      <div className="min-w-0 flex-1 flex flex-col overflow-y-auto px-6 py-6">
-        <div className="pb-8">
+      <div
+        className={cn(
+          "min-w-0 flex-1 flex flex-col px-6 py-6",
+          sectionTableau ? "overflow-hidden" : "overflow-y-auto"
+        )}
+      >
+        <div className={cn(sectionTableau ? "flex flex-col flex-1 min-h-0" : "pb-8")}>
           {/* En-tête de section avec bouton de sauvegarde global */}
-          <div className="mx-auto max-w-3xl mb-6 flex items-start justify-between gap-4">
+          <div
+            className={cn(
+              "mb-6 flex items-start justify-between gap-4",
+              !sectionTableau && "mx-auto max-w-3xl"
+            )}
+          >
             <div>
               <h2 className="text-lg font-semibold">{sectionMeta.title}</h2>
               <p className="text-sm text-muted-foreground mt-1">{sectionMeta.description}</p>
             </div>
-            <Button
-              onClick={handleGlobalSave}
-              disabled={globalSaving || savingPrix || savingCoeff}
-              className="shrink-0"
-            >
-              <FloppyDisk size={16} weight="duotone" />
-              {globalSaving || savingPrix || savingCoeff ? "Enregistrement..." : "Enregistrer"}
-            </Button>
+            {!sectionTableau && (
+              <Button
+                onClick={handleGlobalSave}
+                disabled={globalSaving || savingPrix || savingCoeff}
+                className="shrink-0"
+              >
+                <FloppyDisk size={16} weight="duotone" />
+                {globalSaving || savingPrix || savingCoeff ? "Enregistrement..." : "Enregistrer"}
+              </Button>
+            )}
           </div>
 
           {/* Société */}
@@ -549,6 +585,15 @@ export function ParametresForm({ parametres, settings }: ParametresFormProps) {
                 </CardContent>
               </Card>
             </div>
+          )}
+
+          {/* Or investissement : le catalogue des pieces */}
+          {activeSection === "or-investissement" && catalogue && (
+            <OrInvestissementTable
+              data={catalogue.items}
+              canEdit={catalogue.canEdit}
+              totalItems={catalogue.total}
+            />
           )}
 
           {/* Règles métier */}

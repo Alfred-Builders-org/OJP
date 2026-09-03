@@ -12,6 +12,9 @@ import {
   Check,
   CaretUpDown,
   CurrencyEur,
+  Receipt,
+  Wallet,
+  Warning,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -29,6 +32,7 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { formatCurrency } from "@/lib/format";
+import { calculerPrixRachatOrInvest } from "@/lib/calculations/prix-rachat";
 import type { OrInvestissement } from "@/types/or-investissement";
 
 interface OrInvestPickerFormProps {
@@ -50,6 +54,8 @@ export function OrInvestPickerForm({ lotId, onClose, coursOrSnapshot, coursArgen
   const [catalogSearch, setCatalogSearch] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [quantite, setQuantite] = useState("1");
+  // Vide : le prix suit le calcul. Rempli : la boutique a negocie.
+  const [prixSaisi, setPrixSaisi] = useState("");
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -72,11 +78,15 @@ export function OrInvestPickerForm({ lotId, onClose, coursOrSnapshot, coursArgen
     return 0;
   }
 
+  // Le coefficient propre a la piece prime sur celui des parametres : un
+  // napoleon et un lingot n'ont ni la meme prime ni la meme liquidite. La fiche
+  // du catalogue applique deja cette regle ; sans elle ici, l'ecran de vente
+  // affichait un prix different de celui de la fiche.
   function calculerPrixVente(item: OrInvestissement): number {
     const cours = getCoursForMetal(item.metal);
     const titre = item.titre ? parseFloat(item.titre) : 0;
-    const poids = item.poids ?? 0;
-    return Math.round(cours * poids * (titre / 1000) * coefficientVenteSnapshot * 100) / 100;
+    const coefficient = item.coefficient_vente ?? coefficientVenteSnapshot;
+    return calculerPrixRachatOrInvest(cours, titre, item.poids ?? 0, coefficient);
   }
 
   const filteredCatalog = useMemo(() => {
@@ -92,8 +102,20 @@ export function OrInvestPickerForm({ lotId, onClose, coursOrSnapshot, coursArgen
 
   const selectedItem = catalog.find((item) => item.id === selectedId);
   const qty = parseInt(quantite) || 1;
-  const prixUnitaire = selectedItem ? calculerPrixVente(selectedItem) : 0;
-  const prixTotal = prixUnitaire * qty;
+
+  // Le prix calcule reste la reference : c'est lui qui s'affiche a la selection
+  // d'un produit, et lui qu'on retrouve en vidant le champ.
+  const prixTheorique = selectedItem ? calculerPrixVente(selectedItem) : 0;
+  const prixUnitaire = prixSaisi.trim() !== "" ? parseFloat(prixSaisi.replace(",", ".")) || 0 : prixTheorique;
+  const prixTotal = Math.round(prixUnitaire * qty * 100) / 100;
+
+  // Un prix negocie n'est pas suspect en soi — une piece abimee part moins
+  // cher, un bon cadeau n'a aucun cours. Passer sous la valeur du metal, en
+  // revanche, merite d'etre vu avant de valider : c'est la que se logent les
+  // fautes de frappe.
+  const prixNegocie = prixSaisi.trim() !== "" && Math.abs(prixUnitaire - prixTheorique) > 0.005;
+  const sousLeCours = prixNegocie && prixTheorique > 0 && prixUnitaire < prixTheorique;
+  const ecart = prixTheorique > 0 ? ((prixUnitaire - prixTheorique) / prixTheorique) * 100 : 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -106,6 +128,11 @@ export function OrInvestPickerForm({ lotId, onClose, coursOrSnapshot, coursArgen
 
     if (qty < 1) {
       setError("La quantité doit être au moins 1.");
+      return;
+    }
+
+    if (prixUnitaire < 0) {
+      setError("Le prix ne peut pas être négatif.");
       return;
     }
 
@@ -123,6 +150,9 @@ export function OrInvestPickerForm({ lotId, onClose, coursOrSnapshot, coursArgen
       quantite: qty,
       prix_unitaire: prixUnitaire,
       prix_total: prixTotal,
+      // Ce que la formule disait, garde a cote de ce qui a ete pratique : sans
+      // lui, plus rien ne distingue une remise consentie d'une faute de frappe.
+      prix_theorique: prixNegocie ? prixTheorique : null,
       taxe_applicable: false,
       montant_taxe: 0,
       fulfillment: "pending",
@@ -248,24 +278,79 @@ export function OrInvestPickerForm({ lotId, onClose, coursOrSnapshot, coursArgen
               />
             </div>
             <div className="space-y-2">
-              <Label>Prix unitaire</Label>
+              <Label htmlFor="prix_or">Prix unitaire</Label>
               <Input
-                value={prixUnitaire ? formatCurrency(prixUnitaire) : "—"}
-                readOnly
-                className="bg-muted"
+                id="prix_or"
+                type="number"
+                step="0.01"
+                min="0"
+                inputMode="decimal"
+                value={prixSaisi}
+                placeholder={prixTheorique ? prixTheorique.toFixed(2) : "—"}
+                onChange={(e) => setPrixSaisi(e.target.value)}
+                disabled={!selectedItem}
               />
             </div>
           </div>
 
+          {/* Le prix se negocie au comptoir. On dit ce que valait le calcul, et
+              de combien on s'en ecarte — dans une boite d'alerte pour que ca se
+              voie, sans jamais l'interdire. */}
+          {selectedItem && prixNegocie && (
+            <div
+              className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${
+                sousLeCours
+                  ? "bg-amber-50 text-amber-700 dark:bg-amber-900/10 dark:text-amber-400"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <Warning size={16} weight="duotone" className="mt-0.5 shrink-0" />
+              <span>
+                Prix calculé : <b>{formatCurrency(prixTheorique)}</b> — écart de{" "}
+                {ecart > 0 ? "+" : ""}
+                {ecart.toFixed(1)} %
+                {sousLeCours && prixTheorique > 0 && ecart < -20
+                  ? " — bien en dessous de la valeur du métal, à vérifier."
+                  : ""}
+              </span>
+            </div>
+          )}
+
+          {/* Meme grille recapitulative que le rachat de bijoux : prix, taxe,
+              net. L'or d'investissement est exonere, la tuile taxe le dit. */}
           {selectedItem && prixTotal > 0 && (
-            <div className="rounded-lg bg-secondary text-secondary-foreground p-3 space-y-1">
-              <p className="text-xs text-secondary-foreground/70 flex items-center gap-1">
-                <CurrencyEur size={12} weight="duotone" />
-                Prix total ({qty} × {formatCurrency(prixUnitaire)})
-              </p>
-              <p className="text-lg font-bold">
-                {formatCurrency(prixTotal)}
-              </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CurrencyEur size={12} weight="duotone" />
+                  Prix total
+                </p>
+                <p className="text-lg font-bold text-foreground tabular-nums">
+                  {formatCurrency(prixTotal)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {qty} × {formatCurrency(prixUnitaire)}
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Receipt size={12} weight="duotone" />
+                  Taxe
+                </p>
+                <p className="text-sm font-medium">Exonéré</p>
+                <p className="text-xs text-muted-foreground">
+                  Or d&apos;investissement (art. 298 sexdecies A)
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Wallet size={12} weight="duotone" />
+                  Net à encaisser
+                </p>
+                <p className="text-lg font-bold tabular-nums">
+                  {formatCurrency(prixTotal)}
+                </p>
+              </div>
             </div>
           )}
 

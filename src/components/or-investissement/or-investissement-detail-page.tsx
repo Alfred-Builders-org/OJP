@@ -10,6 +10,8 @@ import {
   FloppyDisk,
   Wrench,
   CurrencyEur,
+  Tag,
+  TrendUp,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { calculerPrixRachatOrInvest } from "@/lib/calculations/prix-rachat";
@@ -122,12 +124,13 @@ export function OrInvestissementDetailPage({ item, canEdit = true }: { item: OrI
   const coeffRachat = coeffPropreAchat ?? parametres?.coefficient_rachat ?? 0;
   const coeffVente = coeffPropreVente ?? parametres?.coefficient_vente ?? 0;
 
-  // Meme formule que le formulaire de rachat : cours x poids x coefficient. La
-  // fiche appliquait en plus le titrage, si bien qu'une meme piece n'etait pas
-  // valorisee pareil ici et dans un lot. Le poids du catalogue est celui d'or
-  // fin, le titrage n'a donc pas a etre applique une seconde fois.
-  const prixRachat = calculerPrixRachatOrInvest(cours, poidsNum, coeffRachat);
-  const prixVente = calculerPrixRachatOrInvest(cours, poidsNum, coeffVente);
+  // Meme formule partout : cours x titre x poids x coefficient. Le poids du
+  // catalogue est un poids BRUT — un napoleon y pese 6,45 g au titre 900, soit
+  // 5,81 g d'or fin — donc le titre s'applique. La fiche, le formulaire de
+  // rachat et celui de vente passent tous les trois par la meme fonction.
+  const titreNum = item.titre ? parseFloat(item.titre) : 0;
+  const prixRachat = calculerPrixRachatOrInvest(cours, titreNum, poidsNum, coeffRachat);
+  const prixVente = calculerPrixRachatOrInvest(cours, titreNum, poidsNum, coeffVente);
 
   async function handleSave() {
     setSaving(true);
@@ -258,10 +261,45 @@ export function OrInvestissementDetailPage({ item, canEdit = true }: { item: OrI
                 onEditChange={setCoeffVenteLocal}
                 type="number"
               />
-              <DetailRow label="Prix de rachat" value={formatCurrency(prixRachat)} />
-              <DetailRow label="Prix de vente" value={formatCurrency(prixVente)} />
-              {prixVente > 0 && prixRachat > 0 && (
-                <DetailRow label="Marge" value={formatCurrency(prixVente - prixRachat)} />
+              {/* Le prix se lit d'un coup d'oeil : ce qu'on paie, ce qu'on
+                  demande, ce qu'il reste — plutot qu'en trois lignes noyees
+                  parmi les coefficients. La formule est rappelee dessous. */}
+              {cours > 0 && poidsNum > 0 && titreNum > 0 && (
+                <div className="mt-4 space-y-2">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CurrencyEur size={12} weight="duotone" />
+                        Prix de rachat
+                      </p>
+                      <p className="text-lg font-bold text-foreground tabular-nums">
+                        {formatCurrency(prixRachat)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Tag size={12} weight="duotone" />
+                        Prix de vente
+                      </p>
+                      <p className="text-lg font-bold text-foreground tabular-nums">
+                        {formatCurrency(prixVente)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-emerald-600/30 bg-emerald-500/10 p-3 space-y-1 dark:border-emerald-400/30 dark:bg-emerald-500/15">
+                      <p className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                        <TrendUp size={12} weight="duotone" />
+                        Marge
+                      </p>
+                      <p className="text-lg font-bold text-emerald-700 dark:text-emerald-400 tabular-nums">
+                        {formatCurrency(prixVente - prixRachat)}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(cours)}/g × {titreNum}‰ × {poidsNum} g ×{" "}
+                    {coeffRachat} (rachat) / {coeffVente} (vente)
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>

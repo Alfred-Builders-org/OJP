@@ -59,7 +59,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { id: "new-dossier", label: "Nouveau dossier", url: "/dossiers/new", icon: Plus, iconWeight: "regular", shortcut: "Alt+N", group: "actions" },
   { id: "nav-dashboard", label: "Aller au tableau de bord", url: "/dashboard", icon: SquaresFour, shortcut: "Alt+D", group: "navigation" },
   { id: "nav-stock", label: "Aller au stock", url: "/stock", icon: Diamond, shortcut: "Alt+S", group: "navigation" },
-  { id: "nav-or-invest", label: "Aller à l'or d'investissement", url: "/or-investissement", icon: Coins, group: "navigation" },
+  { id: "nav-or-invest", label: "Aller à l'or d'investissement", url: "/parametres?section=or-investissement", icon: Coins, group: "navigation" },
   { id: "nav-clients", label: "Aller aux clients", url: "/clients", icon: UsersThree, shortcut: "Alt+C", group: "navigation" },
   { id: "nav-dossiers", label: "Aller aux dossiers", url: "/dossiers", icon: FolderOpen, shortcut: "Alt+O", group: "navigation" },
 ];

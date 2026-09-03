@@ -36,6 +36,8 @@ interface PhotosUploadProps {
    */
   lotId?: string | null;
   referenceId?: string | null;
+  /** Piece d'identite photographiee. Raccourcit la vie du jeton (R-025). */
+  clientIdentityDocumentId?: string | null;
   /** Affiche sur le telephone, pour savoir ce qu'on photographie. */
   libelle?: string;
   disabled?: boolean;
@@ -60,6 +62,7 @@ export function PhotosUpload({
   bucket = "lot-photos",
   lotId,
   referenceId,
+  clientIdentityDocumentId,
   libelle,
   disabled,
   max = PHOTOS_MAX_PAR_SESSION,
@@ -273,6 +276,7 @@ export function PhotosUpload({
         bucket={bucket}
         lotId={lotId}
         referenceId={referenceId}
+        clientIdentityDocumentId={clientIdentityDocumentId}
         libelle={libelle}
         onPhotos={ajouterChemins}
       />

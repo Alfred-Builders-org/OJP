@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
+import { ouvrirLotFonte } from "@/lib/actions/fournisseur-actions";
 import { generateBonLivraison } from "@/lib/pdf/pdf-actions";
 import { formatDate } from "@/lib/format";
 import type { BijouxStock } from "@/types/bijoux";
@@ -25,24 +26,83 @@ async function fetchCours(): Promise<CoursMap> {
   };
 }
 
-function buildLignesPayload(
+/**
+ * Ce qu'on envoie fondre, quelle qu'en soit la provenance.
+ *
+ * Un bijou de l'inventaire est une piece unique, qui passe au statut « fondu ».
+ * Un produit d'investissement est un compteur : on en envoie une quantite, et
+ * le catalogue diminue d'autant. Les deux se valorisent pareil — poids, titre,
+ * cours — d'ou une forme commune plutot que deux chemins paralleles.
+ */
+export interface ArticleAFondre {
+  id: string;
+  source: "stock" | "or_investissement";
+  designation: string;
+  metal: string | null;
+  titrage: string | null;
+  /** Poids d'un exemplaire, en grammes. */
+  poids: number | null;
+  quantite: number;
+}
+
+/** Un bijou de l'inventaire, vu comme un article a fondre. */
+export function articleDepuisStock(item: BijouxStock): ArticleAFondre {
+  return {
+    id: item.id,
+    source: "stock",
+    designation: item.nom,
+    metal: item.metaux,
+    titrage: item.qualite,
+    poids: item.poids_net ?? item.poids,
+    quantite: 1,
+  };
+}
+
+/**
+ * Un produit du catalogue, vu comme un article a fondre.
+ *
+ * La prime ne survit pas a la fonte : un napoleon envoye au fondeur ne vaut
+ * plus que son or. La valeur estimee ici est donc volontairement celle du
+ * metal, sans coefficient — c'est ce que la fonderie paiera.
+ */
+export function articleDepuisCatalogue(
+  item: { id: string; designation: string; metal: string | null; titre: string | null; poids: number | null },
+  quantite: number
+): ArticleAFondre {
+  return {
+    id: item.id,
+    source: "or_investissement",
+    designation: item.designation,
+    metal: item.metal,
+    titrage: item.titre,
+    poids: item.poids,
+    quantite,
+  };
+}
+
+export function buildLignesPayload(
   bdlId: string,
-  items: BijouxStock[],
+  articles: ArticleAFondre[],
   coursMap: CoursMap
 ) {
-  return items.map((item) => {
-    const coursMetal = coursMap[item.metaux ?? ""] ?? 0;
-    const titrage = parseInt(item.qualite ?? "0") || 0;
+  return articles.map((article) => {
+    const coursMetal = coursMap[article.metal ?? ""] ?? 0;
+    const titrage = parseInt(article.titrage ?? "0") || 0;
     const coursGramme = coursMetal * (titrage / 1000);
-    const valeur = (item.poids_net ?? item.poids ?? 0) * coursGramme;
+    const poidsTotal = (article.poids ?? 0) * article.quantite;
+    const valeur = poidsTotal * coursGramme;
 
     return {
       bon_livraison_id: bdlId,
-      bijoux_stock_id: item.id,
-      designation: item.nom,
-      metal: item.metaux,
-      titrage_declare: item.qualite,
-      poids_declare: item.poids_net ?? item.poids,
+      bijoux_stock_id: article.source === "stock" ? article.id : null,
+      or_investissement_id: article.source === "or_investissement" ? article.id : null,
+      quantite: article.quantite,
+      designation: article.designation,
+      metal: article.metal,
+      titrage_declare: article.titrage,
+      // Le poids declare est celui du paquet : deux napoleons pesent deux fois
+      // un napoleon, et c'est ce total que la fonderie repesera.
+      poids_declare: Math.round(poidsTotal * 100) / 100,
       cours_utilise: Math.round(coursGramme * 100) / 100,
       valeur_estimee: Math.round(valeur * 100) / 100,
     };
@@ -70,7 +130,7 @@ function buildGroupes(lignesPayload: ReturnType<typeof buildLignesPayload>) {
       cours: lp.cours_utilise ?? 0,
       valeur: lp.valeur_estimee ?? 0,
     });
-    group.sousTotal.pieces += 1;
+    group.sousTotal.pieces += lp.quantite ?? 1;
     group.sousTotal.poids += lp.poids_declare ?? 0;
     group.sousTotal.valeur += lp.valeur_estimee ?? 0;
   }
@@ -83,7 +143,7 @@ function buildGroupes(lignesPayload: ReturnType<typeof buildLignesPayload>) {
  */
 export async function createBonLivraison(params: {
   fonderieId: string;
-  items: BijouxStock[];
+  items: ArticleAFondre[];
   fonderie: Fonderie;
   coursMap?: CoursMap;
 }): Promise<{ bdlId: string } | { error: string }> {
@@ -91,11 +151,22 @@ export async function createBonLivraison(params: {
   const supabase = createClient();
   const coursMap = providedCours ?? await fetchCours();
 
+  // Un envoi en fonderie est un lot de fonte, dans le dossier permanent de la
+  // fonderie : c'est ce qui le fait remonter dans les operations. Le BDL reste
+  // le document et le porteur des lignes.
+  const lotFonte = await ouvrirLotFonte(fonderieId);
+  if ("error" in lotFonte) return { error: lotFonte.error };
+
   // Create BDL
   const { data: bdl, error: bdlError } = await mutate(
     supabase
       .from("bons_livraison")
-      .insert({ fonderie_id: fonderieId, numero: "" })
+      .insert({
+        fonderie_id: fonderieId,
+        numero: "",
+        dossier_id: lotFonte.dossierId,
+        lot_id: lotFonte.lotId,
+      })
       .select()
       .single(),
     "Erreur lors de la création du bon de livraison",
@@ -112,16 +183,32 @@ export async function createBonLivraison(params: {
   );
   if (lignesError) return { error: lignesError };
 
-  // Mark stock items as fondu
-  const { error: stockError } = await mutate(
-    supabase
-      .from("bijoux_stock")
-      .update({ statut: "fondu" })
-      .in("id", items.map((i) => i.id)),
-    "Erreur lors de la mise à jour du statut des articles",
-    "Statut des articles mis à jour"
-  );
-  if (stockError) return { error: stockError };
+  // Un bijou de l'inventaire est unique : il passe au statut « fondu ».
+  const idsStock = items.filter((i) => i.source === "stock").map((i) => i.id);
+  if (idsStock.length > 0) {
+    const { error: stockError } = await mutate(
+      supabase.from("bijoux_stock").update({ statut: "fondu" }).in("id", idsStock),
+      "Erreur lors de la mise à jour du statut des articles",
+      "Statut des articles mis à jour"
+    );
+    if (stockError) return { error: stockError };
+  }
+
+  // Un produit du catalogue est un compteur : il diminue de ce qu'on envoie.
+  // La decrementation passe par la base, sous verrou de ligne — deux envois
+  // simultanes lus puis ecrits depuis le navigateur passeraient tous les deux
+  // sous zero, ce que R-021 interdit.
+  for (const article of items.filter((i) => i.source === "or_investissement")) {
+    const { error: sortieError } = await mutate(
+      supabase.rpc("sortir_or_investissement", {
+        p_or_investissement_id: article.id,
+        p_quantite: article.quantite,
+      }),
+      `Stock insuffisant pour ${article.designation}`,
+      "Catalogue mis à jour"
+    );
+    if (sortieError) return { error: sortieError };
+  }
 
   // Generate PDF
   const groupes = buildGroupes(lignesPayload);
@@ -151,7 +238,7 @@ export async function createBonLivraison(params: {
  * Used by bons-livraison-list (assign fonderie per item → generate BDLs).
  */
 export async function createBonsLivraison(params: {
-  groups: Map<string, BijouxStock[]>;
+  groups: Map<string, ArticleAFondre[]>;
   fonderies: Fonderie[];
 }): Promise<{ success: boolean; error?: string }> {
   const { groups, fonderies } = params;

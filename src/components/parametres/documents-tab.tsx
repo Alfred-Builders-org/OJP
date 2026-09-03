@@ -54,6 +54,7 @@ const DOC_TYPE_LABELS: Record<DocumentType, string> = {
   bon_commande: "Bon de commande",
   bon_livraison: "Bon de livraison",
   remboursement_retractation: "Reçu de remboursement",
+  facture_reparation: "Facture de réparation",
 };
 
 type LegalTextKey = Exclude<keyof LegalTextsSettings, "cdv_clauses">;

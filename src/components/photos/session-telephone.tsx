@@ -14,7 +14,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { SESSION_DUREE_MINUTES } from "@/types/photo";
+import { SESSION_DUREE_MINUTES, SESSION_DUREE_MINUTES_IDENTITE } from "@/types/photo";
 
 interface SessionTelephoneProps {
   ouvert: boolean;
@@ -23,6 +23,8 @@ interface SessionTelephoneProps {
   bucket: string;
   lotId?: string | null;
   referenceId?: string | null;
+  /** Piece d'identite photographiee. Raccourcit la vie du jeton. */
+  clientIdentityDocumentId?: string | null;
   libelle?: string;
   /** Appele a chaque arrivee, avec les seuls chemins nouveaux. */
   onPhotos: (chemins: string[]) => void;
@@ -50,6 +52,7 @@ export function SessionTelephone({
   bucket,
   lotId,
   referenceId,
+  clientIdentityDocumentId,
   libelle,
   onPhotos,
 }: SessionTelephoneProps) {
@@ -86,6 +89,14 @@ export function SessionTelephone({
     // tient lieu d'autorisation, il ne doit pas etre devinable.
     const token = `${crypto.randomUUID()}${crypto.randomUUID()}`.replace(/-/g, "");
 
+    // Une piece d'identite se photographie en deux cliches, tout de suite. Le
+    // jeton n'est pas authentifie et il ouvre un depot vers un bucket prive : il
+    // vit le temps du geste, pas la demi-heure d'une seance photo de bijoux.
+    const dureeMinutes = clientIdentityDocumentId
+      ? SESSION_DUREE_MINUTES_IDENTITE
+      : SESSION_DUREE_MINUTES;
+    const expireAt = new Date(Date.now() + dureeMinutes * 60_000).toISOString();
+
     const { data, error } = await supabase
       .from("photo_sessions")
       .insert({
@@ -94,7 +105,9 @@ export function SessionTelephone({
         bucket,
         lot_id: lotId ?? null,
         reference_id: referenceId ?? null,
+        client_identity_document_id: clientIdentityDocumentId ?? null,
         libelle: libelle ?? null,
+        expire_at: expireAt,
         created_by: user.id,
       })
       .select("id, token")
@@ -119,7 +132,7 @@ export function SessionTelephone({
       errorCorrectionLevel: "M",
     });
     setQr(image);
-  }, [prefixe, bucket, lotId, referenceId, libelle]);
+  }, [prefixe, bucket, lotId, referenceId, clientIdentityDocumentId, libelle]);
 
   useEffect(() => {
     if (!ouvert) {

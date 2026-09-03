@@ -12,6 +12,7 @@ import { generateBonCommande } from "./bon-commande";
 import { generateBonLivraison, type BonLivraisonData } from "./bon-livraison";
 import { generateFactureSolde } from "./facture-solde";
 import { generateRemboursementRetractation } from "./remboursement-retractation";
+import { generateFactureReparation } from "./facture-reparation";
 import { refreshSociete } from "./blocks";
 import type { ClientInfo, DossierInfo, ReferenceLigne, TotauxInfo, DepotVenteReferenceLigne, ConfieReferenceLigne, QuittanceDepotVenteLigne, FactureVenteLigne, BonCommandeLigne, FonderieInfo } from "./blocks";
 import type { DocumentType } from "@/types/document";
@@ -29,6 +30,7 @@ const DEFAULT_PREFIX_MAP: Record<DocumentType, string> = {
   bon_commande: "CMDF",
   bon_livraison: "BDL",
   remboursement_retractation: "RBT",
+  facture_reparation: "FACR",
 };
 
 export interface GenerateDocumentParams {
@@ -237,6 +239,70 @@ export async function generateAndStoreDocument(params: GenerateDocumentParams, d
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return fail(`Exception: ${msg}`);
+  }
+}
+
+/**
+ * Génère et range la facture d'une réparation.
+ *
+ * Une réparation n'a ni lot ni dossier : le document se range sous
+ * `reparations/{id}/` et se rattache à la réparation. Le numéro FACR est
+ * réservé par le déclencheur, comme pour un document de lot.
+ */
+export async function generateAndStoreFactureReparation(
+  reparationId: string,
+  data: {
+    client: ClientInfo;
+    dossier: DossierInfo;
+    designation: string;
+    travail?: string;
+    prixTTC: number;
+    modeReglement?: string;
+  },
+): Promise<{ path: string; numero: string } | { error: string }> {
+  try {
+    await refreshSociete();
+    const supabase = await createClient();
+
+    // 1. Réserver le numéro via le déclencheur (numero vide → FACR-YYYY-NNNN).
+    const { data: docRecord, error: insertError } = await supabase
+      .from("documents")
+      .insert({
+        type: "facture_reparation" as DocumentType,
+        numero: "",
+        reparation_id: reparationId,
+        storage_path: "",
+        status: "emis",
+      })
+      .select("id, numero")
+      .single();
+
+    if (insertError || !docRecord) {
+      return { error: insertError?.message ?? "Réservation du numéro impossible" };
+    }
+
+    const numero = docRecord.numero;
+
+    // 2. Générer le PDF.
+    const blob = await generateFactureReparation({ numero, ...data });
+
+    // 3. Ranger le PDF.
+    const storagePath = `reparations/${reparationId}/${numero}.pdf`;
+    const { error: uploadError } = await supabase.storage
+      .from("documents")
+      .upload(storagePath, blob, { contentType: "application/pdf", upsert: false });
+
+    if (uploadError) {
+      await supabase.from("documents").delete().eq("id", docRecord.id);
+      return { error: uploadError.message };
+    }
+
+    // 4. Renseigner le chemin.
+    await supabase.from("documents").update({ storage_path: storagePath }).eq("id", docRecord.id);
+
+    return { path: storagePath, numero };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
   }
 }
 

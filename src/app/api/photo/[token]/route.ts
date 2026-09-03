@@ -126,7 +126,18 @@ export async function POST(
 
   // Cible connue : la photo entre a la galerie sans attendre que le poste la
   // recupere. L'onglet de l'ERP peut avoir ete ferme entre-temps.
-  if (session.lot_id) {
+  if (session.client_identity_document_id) {
+    await admin.from("identity_document_photos").upsert(
+      chemins.map((chemin, i) => ({
+        document_id: session.client_identity_document_id,
+        chemin,
+        bucket: session.bucket,
+        rang: i,
+        created_by: session.created_by,
+      })),
+      { onConflict: "chemin", ignoreDuplicates: true }
+    );
+  } else if (session.lot_id) {
     // La galerie s'ordonne par `created_at, rang` : l'heure de depot separe les
     // envois, le rang departage les cliches d'un meme envoi — ils partagent
     // sinon le meme horodatage a la microseconde.

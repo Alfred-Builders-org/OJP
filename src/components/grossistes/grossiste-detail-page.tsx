@@ -13,7 +13,6 @@ import {
   MapPin,
   NotePencil,
   PencilSimple,
-  Plus,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
@@ -168,12 +167,6 @@ export function GrossisteDetailPage({
           </Button>
         }
       >
-        <Link href={`/grossistes/${grossiste.id}/achats/new`}>
-          <Button size="sm" variant="secondary">
-            <Plus size={16} weight="bold" />
-            Nouvel achat
-          </Button>
-        </Link>
         {editing ? (
           <Button size="sm" disabled={saving} onClick={handleSave}>
             <FloppyDisk size={16} weight="duotone" />

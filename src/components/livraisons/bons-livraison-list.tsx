@@ -8,10 +8,16 @@ import {
   Diamond,
   Package,
   WarningCircle,
+  Coins,
 } from "@phosphor-icons/react";
+import { CataloguePickerFonderie } from "@/components/livraisons/catalogue-picker-fonderie";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
-import { createBonsLivraison } from "@/lib/fonderie/create-bon-livraison";
+import {
+  createBonsLivraison,
+  articleDepuisStock,
+  type ArticleAFondre,
+} from "@/lib/fonderie/create-bon-livraison";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +73,7 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
   const [pageSize, setPageSize] = useState(20);
 
   const [generating, setGenerating] = useState(false);
+  const [catalogueOuvert, setCatalogueOuvert] = useState(false);
 
   // Les articles a fondre s'accumulent et partent par fournees : on les
   // selectionne en lot plutot que de choisir une fonderie ligne par ligne.
@@ -148,7 +155,9 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
     setGenerating(true);
     setChoixFonderie(false);
 
-    const groups = new Map<string, BijouxStock[]>([[fonderieLot, selection]]);
+    const groups = new Map<string, ArticleAFondre[]>([
+      [fonderieLot, selection.map(articleDepuisStock)],
+    ]);
     await createBonsLivraison({ groups, fonderies });
 
     const envoyes = new Set(selection.map((i) => i.id));
@@ -189,7 +198,21 @@ export function BonsLivraisonList({ fonderies, onCountChange }: BonsLivraisonLis
             className="pl-9"
           />
         </div>
+
+        {/* Les lingots et pieces ne sont pas dans ce tableau : ce sont des
+            compteurs, pas des articles uniques. Ils partent par leur propre
+            ecran, ou l'on choisit une quantite. */}
+        <Button variant="outline" size="sm" onClick={() => setCatalogueOuvert(true)}>
+          <Coins size={16} weight="duotone" />
+          Fondre des lingots ou des pièces
+        </Button>
       </div>
+
+      <CataloguePickerFonderie
+        open={catalogueOuvert}
+        onOpenChange={setCatalogueOuvert}
+        fonderies={fonderies}
+      />
 
 
       <div className="flex-1 min-h-0 overflow-auto rounded-lg border bg-white dark:bg-card">

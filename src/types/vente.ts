@@ -17,6 +17,12 @@ export interface VenteLigne {
   prix_unitaire: number;
   prix_total: number;
   /**
+   * Prix unitaire calcule au cours du jour, avant negociation. NULL quand le
+   * prix n'a pas ete touche : c'est ce qui distingue une remise consentie d'une
+   * faute de frappe, longtemps apres la vente.
+   */
+  prix_theorique: number | null;
+  /**
    * Prix unitaire HT facture par la fonderie, releve sur son devis. NULL tant
    * que le devis n'est pas revenu — il n'arrive qu'apres l'envoi de la commande.
    */
