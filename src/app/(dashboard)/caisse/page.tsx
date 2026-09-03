@@ -120,7 +120,7 @@ export default async function CaissePage({
   }));
 
   return (
-    <PageWrapper title="Feuille de caisse">
+    <PageWrapper title="Feuille de caisse" fullHeight>
       <CaissePageClient jour={jour} mouvements={mouvements} />
     </PageWrapper>
   );

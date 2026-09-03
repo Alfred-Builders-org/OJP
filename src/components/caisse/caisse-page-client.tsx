@@ -2,7 +2,19 @@
 
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { CaretLeft, CaretRight, DownloadSimple, Money } from "@phosphor-icons/react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Bank,
+  CaretLeft,
+  CaretRight,
+  Check as CheckIcon,
+  CreditCard,
+  DownloadSimple,
+  Money,
+  Scales,
+} from "@phosphor-icons/react";
+import type { Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,24 +35,22 @@ import {
   type MouvementCaisse,
 } from "@/lib/reglements/caisse";
 import type { LotOutcome } from "@/types/lot";
+import type { ModeReglement } from "@/types/reglement";
 
 interface CaissePageClientProps {
   jour: string;
   mouvements: MouvementCaisse[];
 }
 
-/** Décale la date d'un nombre de jours, sans toucher au fuseau. */
 function decaler(jour: string, jours: number): string {
   const d = new Date(`${jour}T12:00:00`);
   d.setDate(d.getDate() + jours);
   return d.toLocaleDateString("sv-SE");
 }
 
-/** Total encaissé sur la ligne (côté « Encaissements »). */
 function totalLigneEntrant(l: LigneCaisse): number {
   return l.sens === "entrant" ? l.montant : 0;
 }
-/** Total versé sur la ligne (côté « Décaissements »). */
 function totalLigneSortant(l: LigneCaisse): number {
   return l.sens === "sortant" ? l.montant : 0;
 }
@@ -53,6 +63,20 @@ const LABEL_TYPE_LOT: Record<string, string> = {
   reparation: "Réparation",
   achat: "Achat fournisseur",
 };
+
+/** Chaque mode de paiement a son icône, la même pour l'encaissement et le décaissement. */
+const ICONE_MODE: Record<ModeReglement, Icon> = {
+  especes: Money,
+  carte: CreditCard,
+  virement: Bank,
+  cheque: CheckIcon,
+};
+
+/** L'icône d'une colonne, dérivée de son mode. */
+function iconePourColonne(colonne: ColonneCaisse): Icon {
+  const mode = colonne.replace(/^(entrant|sortant)_/, "") as ModeReglement;
+  return ICONE_MODE[mode];
+}
 
 export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
   const router = useRouter();
@@ -88,15 +112,13 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
 
   const nbColonnes = 1 + COLONNES_ENTRANTES.length + 1 + COLONNES_SORTANTES.length + 1;
 
-  // Bordures verticales : bordure droite sur chaque cellule, sauf la dernière
-  // de la table. On sépare visuellement le bloc encaissements du bloc
-  // décaissements par une bordure plus marquée.
   const CELL_BASE = "border-r border-border";
   const CELL_SEP_BLOC = "border-r-2 border-border";
 
   return (
-    <div className="space-y-4">
-      {/* Barre de navigation dans les jours */}
+    // Trois zones fixes, entre lesquelles le tableau prend le reste et scrolle.
+    <div className="flex flex-1 flex-col min-h-0 gap-3">
+      {/* 1. Barre de navigation dans les jours (hauteur fixe) */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon-sm" onClick={() => allerAu(decaler(jour, -1))} aria-label="Jour précédent">
@@ -121,34 +143,42 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
         </Button>
       </div>
 
-      {/* Les trois chiffres du soir */}
+      {/* 2. Trois chiffres du soir — neutres, icônes de flèches (hauteur fixe) */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="shadow-sm border-emerald-500/30">
+        <Card className="shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs text-emerald-700 dark:text-emerald-400">Encaissements</p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ArrowDown size={12} weight="bold" />
+              Encaissements
+            </p>
             <p className="text-xl font-bold tabular-nums">{formatCurrency(totauxEntrant)}</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm border-red-500/30">
+        <Card className="shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs text-red-700 dark:text-red-400">Décaissements</p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ArrowUp size={12} weight="bold" />
+              Décaissements
+            </p>
             <p className="text-xl font-bold tabular-nums">{formatCurrency(totauxSortant)}</p>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground">Mouvement net</p>
+            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Scales size={12} weight="duotone" />
+              Mouvement net
+            </p>
             <p className="text-xl font-bold tabular-nums">{formatCurrency(solde(totaux))}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* La feuille elle-même */}
-      <Card className="shadow-sm">
-        <CardContent className="p-0 overflow-x-auto">
+      {/* 3. Tableau — prend le reste de la place, scrolle à l'intérieur */}
+      <Card className="shadow-sm flex-1 min-h-0 flex flex-col overflow-hidden">
+        <CardContent className="p-0 flex-1 min-h-0 overflow-auto">
           <table className="w-full border-collapse text-sm">
-            <thead>
-              {/* Bandeau supérieur : le bloc encaissements en vert, le bloc décaissements en rouge. */}
+            <thead className="sticky top-0 z-10 bg-background">
               <tr>
                 <th className={`${CELL_SEP_BLOC} bg-muted/40 border-b`} />
                 <th
@@ -164,32 +194,43 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
                   Décaissements
                 </th>
               </tr>
-              {/* En-têtes des colonnes, alignés sur les cellules du corps. */}
               <tr className="border-b">
                 <th className={`${CELL_SEP_BLOC} bg-muted/40 px-3 py-2 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground`}>
                   Lot
                 </th>
-                {COLONNES_ENTRANTES.map((c) => (
-                  <th
-                    key={c}
-                    className={`${CELL_BASE} bg-emerald-50/70 px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400`}
-                  >
-                    {LIBELLES_COLONNES[c]}
-                  </th>
-                ))}
+                {COLONNES_ENTRANTES.map((c) => {
+                  const Ic = iconePourColonne(c);
+                  return (
+                    <th
+                      key={c}
+                      className={`${CELL_BASE} bg-emerald-50/70 px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400`}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Ic size={12} weight="duotone" />
+                        {LIBELLES_COLONNES[c]}
+                      </span>
+                    </th>
+                  );
+                })}
                 <th
                   className={`${CELL_SEP_BLOC} bg-emerald-100/80 px-3 py-2 text-right text-xs font-bold uppercase tracking-wider text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300`}
                 >
                   Total
                 </th>
-                {COLONNES_SORTANTES.map((c) => (
-                  <th
-                    key={c}
-                    className={`${CELL_BASE} bg-red-50/70 px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-red-700 dark:bg-red-950/20 dark:text-red-400`}
-                  >
-                    {LIBELLES_COLONNES[c]}
-                  </th>
-                ))}
+                {COLONNES_SORTANTES.map((c) => {
+                  const Ic = iconePourColonne(c);
+                  return (
+                    <th
+                      key={c}
+                      className={`${CELL_BASE} bg-red-50/70 px-3 py-2 text-right text-xs font-medium uppercase tracking-wider text-red-700 dark:bg-red-950/20 dark:text-red-400`}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <Ic size={12} weight="duotone" />
+                        {LIBELLES_COLONNES[c]}
+                      </span>
+                    </th>
+                  );
+                })}
                 <th
                   className="bg-red-100/80 px-3 py-2 text-right text-xs font-bold uppercase tracking-wider text-red-800 dark:bg-red-900/40 dark:text-red-300"
                 >
@@ -208,7 +249,6 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
               ) : (
                 lignes.map((ligne) => (
                   <tr key={ligne.id} className="border-b last:border-b-0 hover:bg-muted/20">
-                    {/* Lot : statut, numéro, tiers, sur trois lignes visuelles */}
                     <td className={`${CELL_SEP_BLOC} px-3 py-2 align-top`}>
                       <div className="flex flex-col gap-1 min-w-56">
                         <div className="flex items-center gap-2">
@@ -230,7 +270,6 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
                       </div>
                     </td>
 
-                    {/* Encaissements : les 4 modes + le total de la ligne */}
                     {COLONNES_ENTRANTES.map((colonne) => (
                       <td key={colonne} className={`${CELL_BASE} bg-emerald-50/30 px-3 py-2 text-right tabular-nums dark:bg-emerald-950/10`}>
                         {ligne.colonne === colonne ? formatCurrency(ligne.montant) : ""}
@@ -240,7 +279,6 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
                       {totalLigneEntrant(ligne) !== 0 ? formatCurrency(totalLigneEntrant(ligne)) : ""}
                     </td>
 
-                    {/* Décaissements : les 4 modes + le total de la ligne */}
                     {COLONNES_SORTANTES.map((colonne) => (
                       <td key={colonne} className={`${CELL_BASE} bg-red-50/30 px-3 py-2 text-right tabular-nums dark:bg-red-950/10`}>
                         {ligne.colonne === colonne ? formatCurrency(ligne.montant) : ""}
@@ -253,10 +291,18 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
                 ))
               )}
             </tbody>
-            {lignes.length > 0 && (
-              <tfoot>
-                <tr className="border-t-2 border-border bg-muted/50">
-                  <td className={`${CELL_SEP_BLOC} px-3 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground`}>
+          </table>
+        </CardContent>
+      </Card>
+
+      {/* 4. Carte totaux — fixe en bas, ne scrolle pas avec le tableau */}
+      {lignes.length > 0 && (
+        <Card className="shadow-sm">
+          <CardContent className="p-0 overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <tbody>
+                <tr>
+                  <td className={`${CELL_SEP_BLOC} bg-muted/50 px-3 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground`}>
                     Totaux
                   </td>
                   {COLONNES_ENTRANTES.map((colonne) => (
@@ -276,11 +322,11 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
                     {formatCurrency(totauxSortant)}
                   </td>
                 </tr>
-              </tfoot>
-            )}
-          </table>
-        </CardContent>
-      </Card>
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
