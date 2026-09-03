@@ -18,39 +18,41 @@ function mouvement(partiel: Partial<MouvementCaisse>): MouvementCaisse {
     mode: "especes",
     montant: 100,
     date_reglement: "2026-09-03T10:00:00Z",
-    libelle: "Client",
-    reference: null,
-    numero_registre: null,
+    numero_lot: null,
+    lot_status: null,
+    lot_outcome: null,
+    lot_type: null,
+    tiers: "Client",
     ...partiel,
   };
 }
 
 describe("colonnePourMouvement", () => {
   it("range un encaissement client selon son moyen de paiement", () => {
-    expect(colonnePourMouvement({ sens: "entrant", type: "vente", mode: "carte" }))
+    expect(colonnePourMouvement({ sens: "entrant", mode: "carte" }))
       .toBe("entrant_carte");
-    expect(colonnePourMouvement({ sens: "entrant", type: "vente", mode: "especes" }))
+    expect(colonnePourMouvement({ sens: "entrant", mode: "especes" }))
       .toBe("entrant_especes");
   });
 
   it("range un versement au client dans les colonnes sortantes", () => {
-    expect(colonnePourMouvement({ sens: "sortant", type: "rachat", mode: "virement" }))
+    expect(colonnePourMouvement({ sens: "sortant", mode: "virement" }))
       .toBe("sortant_virement");
-    expect(colonnePourMouvement({ sens: "sortant", type: "rachat", mode: "cheque" }))
+    expect(colonnePourMouvement({ sens: "sortant", mode: "cheque" }))
       .toBe("sortant_cheque");
   });
 
-  it("isole les réparations, quel que soit le moyen de paiement", () => {
-    // Le classeur leur donne une colonne à part : c'est ce que l'atelier
-    // rapporte, et on veut le lire d'un coup d'œil.
-    expect(colonnePourMouvement({ sens: "entrant", type: "reparation", mode: "carte" }))
-      .toBe("reparations");
-    expect(colonnePourMouvement({ sens: "entrant", type: "reparation", mode: "especes" }))
-      .toBe("reparations");
+  it("range une réparation dans son mode côté encaissements", () => {
+    // Plus de colonne « Réparations » à part : une réparation payée en carte
+    // tombe dans « carte » des encaissements, comme n'importe quel règlement.
+    expect(colonnePourMouvement({ sens: "entrant", mode: "carte" }))
+      .toBe("entrant_carte");
+    expect(colonnePourMouvement({ sens: "entrant", mode: "especes" }))
+      .toBe("entrant_especes");
   });
 
   it("range un achat grossiste dans les décaissements", () => {
-    expect(colonnePourMouvement({ sens: "sortant", type: "achat_grossiste", mode: "virement" }))
+    expect(colonnePourMouvement({ sens: "sortant", mode: "virement" }))
       .toBe("sortant_virement");
   });
 });
@@ -67,9 +69,9 @@ describe("totaliser", () => {
     const totaux = totaliser(lignes);
 
     expect(totaux.entrant_especes).toBe(50);
-    expect(totaux.entrant_carte).toBe(50);
+    // La réparation carte s'ajoute aux ventes carte : 50 + 40 = 90.
+    expect(totaux.entrant_carte).toBe(90);
     expect(totaux.sortant_cheque).toBe(200);
-    expect(totaux.reparations).toBe(40);
     expect(totaux.sortant_especes).toBe(0);
   });
 
@@ -93,9 +95,11 @@ describe("totaliser", () => {
 
 describe("totaux de la journée", () => {
   it("compte les réparations avec ce qui entre", () => {
+    // Une réparation encaissée ajoute aux encaissements du jour, comme n'importe
+    // quel règlement entrant.
     const totaux = totaliser(
       ventiler([
-        mouvement({ id: "1", type: "reparation", montant: 40 }),
+        mouvement({ id: "1", type: "reparation", sens: "entrant", mode: "especes", montant: 40 }),
         mouvement({ id: "2", sens: "entrant", mode: "carte", montant: 60 }),
       ])
     );

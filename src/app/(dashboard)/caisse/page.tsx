@@ -8,17 +8,12 @@ export const dynamic = "force-dynamic";
 /**
  * La feuille de caisse du jour.
  *
- * Elle remplace le classeur tenu a la main : tous les mouvements d'argent d'une
- * journee, ventiles par moyen de paiement et par sens. Elle ne calcule aucun
- * resultat — elle constate ce qui est passe par le tiroir, comme le faisait la
- * feuille papier qu'on remplissait le soir.
- *
- * Elle lit la table des reglements, et rien d'autre : depuis que celle-ci
- * accueille les reparations et les achats grossistes, elle contient la journee
- * entiere.
+ * Elle remplace le classeur tenu à la main : tous les mouvements d'argent d'une
+ * journée, ventilés par moyen de paiement et par sens. Chaque ligne dit son lot
+ * — statut, numéro, tiers — et le montant tombe dans sa case, avec un total en
+ * regard.
  */
 
-/** Forme des lignes rapportees par la selection ci-dessous. */
 interface ReglementDuJour {
   id: string;
   sens: "entrant" | "sortant";
@@ -26,40 +21,66 @@ interface ReglementDuJour {
   mode: MouvementCaisse["mode"];
   montant: number;
   date_reglement: string;
-  notes: string | null;
-  lot: { numero: string; dossier: { client: { first_name: string; last_name: string } | null } | null } | null;
+  lot: {
+    numero: string;
+    type: string;
+    status: string;
+    outcome: string | null;
+    dossier: {
+      tiers_type: string | null;
+      client: { first_name: string; last_name: string } | null;
+      grossiste: { nom: string; raison_sociale: string | null } | null;
+      fonderie: { nom: string } | null;
+    } | null;
+  } | null;
   client: { first_name: string; last_name: string } | null;
   fonderie: { nom: string } | null;
-  reparation: { designation: string | null; bijou: { nom: string } | null } | null;
-  achat_grossiste: { numero: string; grossiste: { nom: string } | null } | null;
+  reparation: {
+    designation: string | null;
+    bijou: { nom: string } | null;
+    client: { first_name: string; last_name: string } | null;
+  } | null;
+  achat_grossiste: {
+    numero: string;
+    grossiste: { nom: string; raison_sociale: string | null } | null;
+  } | null;
 }
 
 const SELECTION = `
-  id, sens, type, mode, montant, date_reglement, notes,
-  lot:lots(numero, dossier:dossiers(client:clients(first_name, last_name))),
+  id, sens, type, mode, montant, date_reglement,
+  lot:lots(
+    numero, type, status, outcome,
+    dossier:dossiers(
+      tiers_type,
+      client:clients(first_name, last_name),
+      grossiste:grossistes(nom, raison_sociale),
+      fonderie:fonderies(nom)
+    )
+  ),
   client:clients(first_name, last_name),
   fonderie:fonderies(nom),
-  reparation:reparations(designation, bijou:bijoux_stock(nom)),
-  achat_grossiste:achats_grossiste(numero, grossiste:grossistes(nom))
+  reparation:reparations(designation, bijou:bijoux_stock(nom), client:clients(first_name, last_name)),
+  achat_grossiste:achats_grossiste(numero, grossiste:grossistes(nom, raison_sociale))
 `;
 
-/** Qui, ou quoi, se trouve derriere un mouvement. */
-function libellePour(r: ReglementDuJour): string {
-  const client = r.lot?.dossier?.client ?? r.client;
+/** Le tiers d'un règlement, quelle que soit sa nature. */
+function tiersPour(r: ReglementDuJour): string {
+  const d = r.lot?.dossier;
+  if (d) {
+    if (d.tiers_type === "grossiste") return d.grossiste?.raison_sociale ?? d.grossiste?.nom ?? "Grossiste";
+    if (d.tiers_type === "fonderie") return d.fonderie?.nom ?? "Fonderie";
+    if (d.client) return `${d.client.first_name} ${d.client.last_name}`.trim();
+  }
   if (r.type === "reparation") {
-    const objet = r.reparation?.designation ?? r.reparation?.bijou?.nom;
-    return objet ? `Réparation — ${objet}` : "Réparation";
+    if (r.reparation?.client) return `${r.reparation.client.first_name} ${r.reparation.client.last_name}`.trim();
+    return r.reparation?.designation ?? r.reparation?.bijou?.nom ?? "Réparation";
   }
   if (r.type === "achat_grossiste") {
-    return r.achat_grossiste?.grossiste?.nom ?? "Achat fournisseur";
+    return r.achat_grossiste?.grossiste?.raison_sociale ?? r.achat_grossiste?.grossiste?.nom ?? "Fournisseur";
   }
   if (r.type === "fonderie") return r.fonderie?.nom ?? "Fonderie";
-  if (client) return `${client.first_name} ${client.last_name}`.trim();
+  if (r.client) return `${r.client.first_name} ${r.client.last_name}`.trim();
   return "—";
-}
-
-function referencePour(r: ReglementDuJour): string | null {
-  return r.lot?.numero ?? r.achat_grossiste?.numero ?? null;
 }
 
 export default async function CaissePage({
@@ -68,8 +89,6 @@ export default async function CaissePage({
   searchParams: Promise<{ jour?: string }>;
 }) {
   const params = await searchParams;
-  // Sans date demandee, la feuille du jour : c'est celle qu'on ouvre le matin
-  // et qu'on garde sous les yeux.
   const jour = params.jour?.match(/^\d{4}-\d{2}-\d{2}$/)
     ? params.jour
     : new Date().toLocaleDateString("sv-SE");
@@ -86,27 +105,6 @@ export default async function CaissePage({
 
   const reglements = (data ?? []) as unknown as ReglementDuJour[];
 
-  // Le numero d'ordre au livre de police — la colonne « enregistre » du
-  // classeur — se lit sur les references du lot. Une seule requete pour toute
-  // la journee plutot qu'une par ligne.
-  const numerosLot = reglements.map((r) => r.lot?.numero).filter(Boolean) as string[];
-  const registreParLot = new Map<string, number>();
-  if (numerosLot.length > 0) {
-    const { data: entrees } = await supabase
-      .from("registre_objets")
-      .select("numero_ordre, reference")
-      .in("reference", numerosLot);
-    for (const entree of entrees ?? []) {
-      const ref = entree.reference as string;
-      const numero = entree.numero_ordre as number;
-      // Un lot peut poser plusieurs objets au registre : on retient le premier,
-      // celui par lequel l'operation a ete enregistree.
-      if (!registreParLot.has(ref) || registreParLot.get(ref)! > numero) {
-        registreParLot.set(ref, numero);
-      }
-    }
-  }
-
   const mouvements: MouvementCaisse[] = reglements.map((r) => ({
     id: r.id,
     sens: r.sens,
@@ -114,9 +112,11 @@ export default async function CaissePage({
     mode: r.mode,
     montant: Number(r.montant),
     date_reglement: r.date_reglement,
-    libelle: libellePour(r),
-    reference: referencePour(r),
-    numero_registre: r.lot?.numero ? registreParLot.get(r.lot.numero) ?? null : null,
+    numero_lot: r.lot?.numero ?? r.achat_grossiste?.numero ?? null,
+    lot_status: r.lot?.status ?? null,
+    lot_outcome: r.lot?.outcome ?? null,
+    lot_type: r.lot?.type ?? (r.type === "reparation" ? "reparation" : r.type === "achat_grossiste" ? "achat" : null),
+    tiers: tiersPour(r),
   }));
 
   return (

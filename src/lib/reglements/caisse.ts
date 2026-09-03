@@ -13,9 +13,14 @@ import type { ModeReglement, ReglementSens, ReglementType } from "@/types/reglem
  * tombe dans une case et une seule.
  */
 
-/** Les colonnes de la feuille, dans l'ordre du classeur. */
+/**
+ * Les colonnes de la feuille.
+ *
+ * Deux blocs de quatre modes de paiement, un de chaque côté : ce qui rentre, ce
+ * qui sort. Les réparations ne sont plus une colonne à part — c'est un règlement
+ * comme un autre, qui tombe dans son mode côté encaissements.
+ */
 export type ColonneCaisse =
-  | "reparations"
   | "entrant_especes"
   | "entrant_carte"
   | "entrant_virement"
@@ -40,7 +45,6 @@ export const COLONNES_SORTANTES: ColonneCaisse[] = [
 ];
 
 export const LIBELLES_COLONNES: Record<ColonneCaisse, string> = {
-  reparations: "Réparations",
   entrant_especes: "Espèces",
   entrant_carte: "Carte",
   entrant_virement: "Virement",
@@ -59,12 +63,15 @@ export interface MouvementCaisse {
   mode: ModeReglement;
   montant: number;
   date_reglement: string;
-  /** Ce qui s'affiche dans la colonne « Nom » : client, fournisseur, ou objet. */
-  libelle: string;
-  /** Numero de l'operation, quand il y en a une. */
-  reference: string | null;
-  /** Numero d'ordre au livre de police, colonne « enregistre » du classeur. */
-  numero_registre: number | null;
+  /** Numero du lot rattache, quand il y en a un. */
+  numero_lot: string | null;
+  /** Statut du lot rattache, pour le badge de statut. */
+  lot_status: string | null;
+  lot_outcome: string | null;
+  /** Type du lot (rachat, vente, depot_vente, fonte). */
+  lot_type: string | null;
+  /** Nom du tiers de l'operation : client, grossiste ou fonderie. */
+  tiers: string;
 }
 
 /** Une ligne de la feuille : un mouvement, ventile dans sa colonne. */
@@ -75,16 +82,13 @@ export interface LigneCaisse extends MouvementCaisse {
 export type TotauxCaisse = Record<ColonneCaisse, number>;
 
 /**
- * Ou tombe un mouvement.
- *
- * Une reparation a sa colonne quel que soit son moyen de paiement : c'est ainsi
- * que le classeur la traite, et c'est ce qui permet de lire d'un coup d'oeil ce
- * que l'atelier a rapporte dans la journee.
+ * Où tombe un mouvement : à son sens et à son mode de paiement, sans exception.
+ * Une réparation encaissée en carte tombe en carte, un rachat payé en virement
+ * tombe en virement sortant.
  */
 export function colonnePourMouvement(
-  mouvement: Pick<MouvementCaisse, "sens" | "type" | "mode">
+  mouvement: Pick<MouvementCaisse, "sens" | "mode">
 ): ColonneCaisse {
-  if (mouvement.type === "reparation") return "reparations";
   return `${mouvement.sens}_${mouvement.mode}` as ColonneCaisse;
 }
 
@@ -95,7 +99,6 @@ export function ventiler(mouvements: MouvementCaisse[]): LigneCaisse[] {
 
 function totauxVides(): TotauxCaisse {
   return {
-    reparations: 0,
     entrant_especes: 0,
     entrant_carte: 0,
     entrant_virement: 0,
@@ -123,12 +126,14 @@ export function totaliser(lignes: LigneCaisse[]): TotauxCaisse {
   return totaux;
 }
 
-/** Ce que les clients ont verse dans la journee, reparations comprises. */
+/** Ce que les clients ont versé dans la journée. */
 export function totalEntrant(totaux: TotauxCaisse): number {
-  return (
-    totaux.reparations +
-    COLONNES_ENTRANTES.reduce((somme, colonne) => somme + totaux[colonne], 0)
-  );
+  return COLONNES_ENTRANTES.reduce((somme, colonne) => somme + totaux[colonne], 0);
+}
+
+/** Total de la ligne d'un mouvement : sa colonne remplie, les autres vides. */
+export function totalLigne(ligne: LigneCaisse, sens: ReglementSens): number {
+  return ligne.sens === sens ? ligne.montant : 0;
 }
 
 /** Ce que la boutique a verse dans la journee. */
