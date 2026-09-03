@@ -103,8 +103,6 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
     telechargerCsv(contenu, `caisse-${jour}.csv`);
   }
 
-  const nbColonnes = 1 + COLONNES_ENTRANTES.length + 1 + COLONNES_SORTANTES.length + 1;
-
   const CELL_BASE = "border-r border-border";
   const CELL_SEP_BLOC = "border-r-2 border-border";
 
@@ -164,8 +162,25 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
         </Card>
       </div>
 
-      {/* 3. Tableau — prend le reste de la place, scrolle à l'intérieur */}
+      {/* 3. Tableau — prend le reste de la place, scrolle à l'intérieur.
+             Quand la journée est vide, on remplace le tableau par un empty
+             state centré plutôt qu'une seule ligne « aucun mouvement » perdue
+             en haut. La carte des totaux, elle, reste affichée à zéro. */}
       <Card className="shadow-sm flex-1 min-h-0 flex flex-col overflow-hidden py-0">
+        {lignes.length === 0 ? (
+          <CardContent className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+              <Money size={28} weight="duotone" className="text-muted-foreground" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-base font-medium text-foreground">Aucun mouvement ce jour-là</p>
+              <p className="max-w-sm text-sm text-muted-foreground">
+                Rien n&apos;est passé par le tiroir. Les encaissements et
+                décaissements de la journée apparaîtront ici.
+              </p>
+            </div>
+          </CardContent>
+        ) : (
         <CardContent className="p-0 flex-1 min-h-0 overflow-auto">
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-background">
@@ -229,15 +244,7 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
               </tr>
             </thead>
             <tbody>
-              {lignes.length === 0 ? (
-                <tr>
-                  <td colSpan={nbColonnes} className="h-32 text-center text-muted-foreground">
-                    <Money size={24} weight="duotone" className="mx-auto mb-2 opacity-40" />
-                    Aucun mouvement ce jour-là.
-                  </td>
-                </tr>
-              ) : (
-                lignes.map((ligne) => (
+              {lignes.map((ligne) => (
                   <tr key={ligne.id} className="border-b last:border-b-0 hover:bg-muted/20">
                     <td className={`${CELL_SEP_BLOC} px-3 py-2 align-top`}>
                       <div className="flex flex-col gap-1 min-w-56">
@@ -278,17 +285,17 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
                       {totalLigneSortant(ligne) !== 0 ? formatCurrency(totalLigneSortant(ligne)) : ""}
                     </td>
                   </tr>
-                ))
-              )}
+                ))}
             </tbody>
           </table>
         </CardContent>
+        )}
       </Card>
 
-      {/* 4. Carte totaux — fixe en bas, ne scrolle pas avec le tableau */}
-      {lignes.length > 0 && (
-        <Card className="shadow-sm py-0">
-          <CardContent className="p-0 overflow-x-auto">
+      {/* 4. Carte totaux — fixe en bas, toujours affichée (à zéro sur une
+             journée vide), avec un peu de padding pour respirer. */}
+      <Card className="shadow-sm py-1">
+        <CardContent className="p-0 overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <tbody>
                 <tr>
@@ -312,11 +319,10 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
                     {formatCurrency(totauxSortant)}
                   </td>
                 </tr>
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      )}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }
