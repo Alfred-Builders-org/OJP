@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { CurrencyEur, Plus, Wrench } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { Plus, Wrench } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataGrid, type ColonneGrid } from "@/components/ui/data-grid";
-import { EncaissementDialog } from "@/components/reglements/encaissement-dialog";
 import { ReparationCreateDialog } from "@/components/reparations/reparation-create-dialog";
 import { formatDate, formatCurrency } from "@/lib/format";
 import type { ReparationRow } from "@/types/reparation";
@@ -26,8 +26,8 @@ interface ReparationsTableProps {
 }
 
 export function ReparationsTable({ reparations, total }: ReparationsTableProps) {
+  const router = useRouter();
   const [creation, setCreation] = useState(false);
-  const [aEncaisser, setAEncaisser] = useState<ReparationRow | null>(null);
 
   /** Ce qu'on repare : un bijou du stock, ou l'objet decrit par le vendeur. */
   function objet(r: ReparationRow): string {
@@ -118,6 +118,7 @@ export function ReparationsTable({ reparations, total }: ReparationsTableProps) 
         donnees={reparations}
         totalItems={total}
         cleLigne={(r) => r.id}
+        onRowClick={(r) => router.push(`/reparations/${r.id}`)}
         placeholderRecherche="Rechercher un objet..."
         messageVide="Aucune réparation."
         filtres={[{ cle: "statut", label: "Statut", options: STATUT_OPTIONS }]}
@@ -125,32 +126,9 @@ export function ReparationsTable({ reparations, total }: ReparationsTableProps) 
           { cle: "statut", label: "Statut" },
           { cle: "proprietaire", label: "Propriétaire" },
         ]}
-        actions={(r) =>
-          r.prix_facture && resteDu(r) > 0 ? (
-            <Button variant="ghost" size="sm" onClick={() => setAEncaisser(r)}>
-              <CurrencyEur size={14} weight="duotone" />
-              Encaisser
-            </Button>
-          ) : null
-        }
       />
 
       <ReparationCreateDialog open={creation} onOpenChange={setCreation} />
-
-      {aEncaisser && (
-        <EncaissementDialog
-          open={aEncaisser !== null}
-          onOpenChange={(v) => !v && setAEncaisser(null)}
-          titre="Encaisser la réparation"
-          description={`${objet(aEncaisser)} — ${proprietaire(aEncaisser)}`}
-          type="reparation"
-          sens="entrant"
-          reparationId={aEncaisser.id}
-          clientId={aEncaisser.client_id}
-          montantSuggere={resteDu(aEncaisser)}
-          onEnregistre={() => setAEncaisser(null)}
-        />
-      )}
 
       {reparations.length === 0 && (
         <p className="mt-6 flex items-center justify-center gap-2 text-sm text-muted-foreground">

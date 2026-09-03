@@ -12,6 +12,9 @@ import {
   Check,
   CaretUpDown,
   CurrencyEur,
+  Receipt,
+  Wallet,
+  Warning,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -291,29 +294,63 @@ export function OrInvestPickerForm({ lotId, onClose, coursOrSnapshot, coursArgen
           </div>
 
           {/* Le prix se negocie au comptoir. On dit ce que valait le calcul, et
-              de combien on s'en ecarte — sans l'interdire. */}
+              de combien on s'en ecarte — dans une boite d'alerte pour que ca se
+              voie, sans jamais l'interdire. */}
           {selectedItem && prixNegocie && (
-            <p
-              className={`text-xs ${sousLeCours ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}
+            <div
+              className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${
+                sousLeCours
+                  ? "bg-amber-50 text-amber-700 dark:bg-amber-900/10 dark:text-amber-400"
+                  : "bg-muted text-muted-foreground"
+              }`}
             >
-              Prix calculé : {formatCurrency(prixTheorique)} — écart de{" "}
-              {ecart > 0 ? "+" : ""}
-              {ecart.toFixed(1)} %
-              {sousLeCours && prixTheorique > 0 && ecart < -20
-                ? " — bien en dessous de la valeur du métal, à vérifier."
-                : ""}
-            </p>
+              <Warning size={16} weight="duotone" className="mt-0.5 shrink-0" />
+              <span>
+                Prix calculé : <b>{formatCurrency(prixTheorique)}</b> — écart de{" "}
+                {ecart > 0 ? "+" : ""}
+                {ecart.toFixed(1)} %
+                {sousLeCours && prixTheorique > 0 && ecart < -20
+                  ? " — bien en dessous de la valeur du métal, à vérifier."
+                  : ""}
+              </span>
+            </div>
           )}
 
+          {/* Meme grille recapitulative que le rachat de bijoux : prix, taxe,
+              net. L'or d'investissement est exonere, la tuile taxe le dit. */}
           {selectedItem && prixTotal > 0 && (
-            <div className="rounded-lg bg-secondary text-secondary-foreground p-3 space-y-1">
-              <p className="text-xs text-secondary-foreground/70 flex items-center gap-1">
-                <CurrencyEur size={12} weight="duotone" />
-                Prix total ({qty} × {formatCurrency(prixUnitaire)})
-              </p>
-              <p className="text-lg font-bold">
-                {formatCurrency(prixTotal)}
-              </p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <CurrencyEur size={12} weight="duotone" />
+                  Prix total
+                </p>
+                <p className="text-lg font-bold text-foreground tabular-nums">
+                  {formatCurrency(prixTotal)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {qty} × {formatCurrency(prixUnitaire)}
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Receipt size={12} weight="duotone" />
+                  Taxe
+                </p>
+                <p className="text-sm font-medium">Exonéré</p>
+                <p className="text-xs text-muted-foreground">
+                  Or d&apos;investissement (art. 298 sexdecies A)
+                </p>
+              </div>
+              <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Wallet size={12} weight="duotone" />
+                  Net à encaisser
+                </p>
+                <p className="text-lg font-bold tabular-nums">
+                  {formatCurrency(prixTotal)}
+                </p>
+              </div>
             </div>
           )}
 

@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CaretUpDown, MagnifyingGlass, WarningCircle, Wrench } from "@phosphor-icons/react";
+import { Check, CaretUpDown, MagnifyingGlass, Wrench } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -118,27 +119,32 @@ export function ReparationCreateDialog({
 
     setEnregistrement(true);
     const supabase = createClient();
-    const { error } = await mutate(
-      supabase.from("reparations").insert({
-        bijou_id: null,
-        client_id: clientId,
-        designation: designation.trim(),
-        description: description.trim() || null,
-        prix_facture: prix ? parseFloat(prix.replace(",", ".")) : null,
-        cout_estime: coutEstime ? parseFloat(coutEstime.replace(",", ".")) : null,
-        statut: "en_cours",
-      }),
+    const { data, error } = await mutate(
+      supabase
+        .from("reparations")
+        .insert({
+          bijou_id: null,
+          client_id: clientId,
+          designation: designation.trim(),
+          description: description.trim() || null,
+          prix_facture: prix ? parseFloat(prix.replace(",", ".")) : null,
+          cout_estime: coutEstime ? parseFloat(coutEstime.replace(",", ".")) : null,
+          statut: "en_cours",
+        })
+        .select("id")
+        .single(),
       "La réparation n'a pas pu être enregistrée",
       "Réparation enregistrée"
     );
 
     setEnregistrement(false);
-    if (error) {
-      setErreur(error);
+    if (error || !data) {
+      setErreur(error ?? "Erreur inconnue");
       return;
     }
+    // La fiche s'ouvre aussitôt : c'est là qu'on facture et qu'on encaisse.
     changerOuverture(false);
-    router.refresh();
+    router.push(`/reparations/${data.id}`);
   }
 
   return (
@@ -156,7 +162,7 @@ export function ReparationCreateDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label>Propriétaire</Label>
+            <Label required>Propriétaire</Label>
             <Popover open={clientOuvert} onOpenChange={setClientOuvert}>
               <PopoverTrigger
                 render={
@@ -218,7 +224,7 @@ export function ReparationCreateDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="designation_rep">Objet</Label>
+            <Label htmlFor="designation_rep" required>Objet</Label>
             <Input
               id="designation_rep"
               value={designation}
@@ -241,36 +247,43 @@ export function ReparationCreateDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="prix_rep">Prix client</Label>
-              <Input
-                id="prix_rep"
-                type="number"
-                step="0.01"
-                inputMode="decimal"
-                value={prix}
-                onChange={(e) => setPrix(e.target.value)}
-                placeholder="0,00"
-              />
+              <div className="relative">
+                <Input
+                  id="prix_rep"
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={prix}
+                  onChange={(e) => setPrix(e.target.value)}
+                  placeholder="0,00"
+                  className="pr-7"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  €
+                </span>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="cout_rep">Coût atelier</Label>
-              <Input
-                id="cout_rep"
-                type="number"
-                step="0.01"
-                inputMode="decimal"
-                value={coutEstime}
-                onChange={(e) => setCoutEstime(e.target.value)}
-                placeholder="0,00"
-              />
+              <div className="relative">
+                <Input
+                  id="cout_rep"
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={coutEstime}
+                  onChange={(e) => setCoutEstime(e.target.value)}
+                  placeholder="0,00"
+                  className="pr-7"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  €
+                </span>
+              </div>
             </div>
           </div>
 
-          {erreur && (
-            <p className="flex items-center gap-1.5 text-sm text-destructive">
-              <WarningCircle size={14} weight="duotone" />
-              {erreur}
-            </p>
-          )}
+          <FieldError>{erreur}</FieldError>
         </div>
 
         <DialogFooter>

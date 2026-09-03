@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bank, CheckSquare, CreditCard, Money, WarningCircle } from "@phosphor-icons/react";
+import { Bank, CheckSquare, CreditCard, Money } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FieldError } from "@/components/ui/field";
 import {
   Dialog,
   DialogContent,
@@ -137,17 +138,23 @@ export function EncaissementDialog({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="montant_encaissement">Montant</Label>
-              <Input
-                id="montant_encaissement"
-                type="number"
-                step="0.01"
-                inputMode="decimal"
-                value={montant}
-                onChange={(e) => setMontant(e.target.value)}
-                placeholder="0,00"
-                autoFocus
-              />
+              <Label htmlFor="montant_encaissement" required>Montant</Label>
+              <div className="relative">
+                <Input
+                  id="montant_encaissement"
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={montant}
+                  onChange={(e) => setMontant(e.target.value)}
+                  placeholder="0,00"
+                  autoFocus
+                  className="pr-7"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  €
+                </span>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="date_encaissement">Date</Label>
@@ -161,7 +168,7 @@ export function EncaissementDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="mode_encaissement">Moyen de paiement</Label>
+            <Label htmlFor="mode_encaissement" required>Moyen de paiement</Label>
             <Select value={mode} onValueChange={(v) => setMode((v ?? "") as ModeReglement)}>
               <SelectTrigger id="mode_encaissement">
                 {mode ? (
@@ -195,12 +202,7 @@ export function EncaissementDialog({
             </Select>
           </div>
 
-          {erreur && (
-            <p className="flex items-center gap-1.5 text-sm text-destructive">
-              <WarningCircle size={14} weight="duotone" />
-              {erreur}
-            </p>
-          )}
+          <FieldError>{erreur}</FieldError>
         </div>
 
         <DialogFooter>

@@ -41,6 +41,18 @@ function decaler(jour: string, jours: number): string {
   return d.toLocaleDateString("sv-SE");
 }
 
+/**
+ * Fond d'une colonne : vert pour ce qui rentre (réparations et encaissements),
+ * rouge pour ce qui sort. C'est la lecture d'un coup d'oeil que réclamait la
+ * cliente — on distingue une sortie d'une rentrée sans lire le libellé.
+ */
+function fondColonne(colonne: ColonneCaisse): string {
+  if (colonne.startsWith("sortant_")) {
+    return "bg-red-50/70 dark:bg-red-950/20";
+  }
+  return "bg-emerald-50/70 dark:bg-emerald-950/20";
+}
+
 export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
   const router = useRouter();
 
@@ -143,32 +155,32 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
         <CardContent className="p-0 overflow-x-auto">
           <Table>
             <TableHeader>
+              {/* Deux blocs, deux couleurs : ce qui rentre en vert, ce qui sort
+                  en rouge. Les libellés disent qui paie qui, plutôt que le
+                  jargon « ils achètent / j'achète » du classeur papier. */}
+              <TableRow>
+                <TableHead colSpan={2} />
+                <TableHead className="text-center text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400">
+                  Atelier
+                </TableHead>
+                <TableHead colSpan={COLONNES_ENTRANTES.length} className="text-center text-xs font-medium bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400">
+                  Encaissements (le client paie)
+                </TableHead>
+                <TableHead colSpan={COLONNES_SORTANTES.length} className="text-center text-xs font-medium bg-red-50 text-red-700 dark:bg-red-950/20 dark:text-red-400">
+                  Décaissements (on paie)
+                </TableHead>
+              </TableRow>
               <TableRow>
                 <TableHead className="min-w-48">Nom</TableHead>
                 <TableHead className="whitespace-nowrap">Enregistré</TableHead>
-                <TableHead className="text-right whitespace-nowrap">Réparations</TableHead>
-                {COLONNES_ENTRANTES.map((c) => (
-                  <TableHead key={c} className="text-right whitespace-nowrap">
+                {colonnes.map((c) => (
+                  <TableHead
+                    key={c}
+                    className={`text-right whitespace-nowrap ${fondColonne(c)}`}
+                  >
                     {LIBELLES_COLONNES[c]}
                   </TableHead>
                 ))}
-                {COLONNES_SORTANTES.map((c) => (
-                  <TableHead key={c} className="text-right whitespace-nowrap text-muted-foreground">
-                    {LIBELLES_COLONNES[c]}
-                  </TableHead>
-                ))}
-              </TableRow>
-              <TableRow>
-                <TableHead colSpan={2} />
-                <TableHead className="text-right text-xs font-normal text-muted-foreground">
-                  atelier
-                </TableHead>
-                <TableHead colSpan={COLONNES_ENTRANTES.length} className="text-center text-xs font-normal text-muted-foreground">
-                  ils achètent
-                </TableHead>
-                <TableHead colSpan={COLONNES_SORTANTES.length} className="text-center text-xs font-normal text-muted-foreground">
-                  j&apos;achète
-                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -192,7 +204,10 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
                       {ligne.numero_registre ?? ""}
                     </TableCell>
                     {colonnes.map((colonne) => (
-                      <TableCell key={colonne} className="text-right tabular-nums">
+                      <TableCell
+                        key={colonne}
+                        className={`text-right tabular-nums ${fondColonne(colonne)}`}
+                      >
                         {ligne.colonne === colonne ? formatCurrency(ligne.montant) : ""}
                       </TableCell>
                     ))}
@@ -201,13 +216,16 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
               )}
             </TableBody>
             {lignes.length > 0 && (
-              <tfoot className="border-t bg-muted/40">
+              <tfoot className="border-t">
                 <TableRow>
-                  <TableCell colSpan={2} className="font-medium">
+                  <TableCell colSpan={2} className="font-medium bg-muted/40">
                     Totaux
                   </TableCell>
                   {colonnes.map((colonne) => (
-                    <TableCell key={colonne} className="text-right font-medium tabular-nums">
+                    <TableCell
+                      key={colonne}
+                      className={`text-right font-semibold tabular-nums ${fondColonne(colonne)}`}
+                    >
                       {totaux[colonne] !== 0 ? formatCurrency(totaux[colonne]) : "—"}
                     </TableCell>
                   ))}

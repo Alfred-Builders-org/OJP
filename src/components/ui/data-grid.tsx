@@ -38,6 +38,8 @@ export interface ColonneGrid<T> {
   triable?: boolean;
   className?: string;
   headClassName?: string;
+  /** Aligne l'en-tête à droite, comme ses cellules (colonnes de montant). */
+  alignRight?: boolean;
   /** Libellé du groupe auquel appartient la ligne, si groupement sur cette colonne. */
   groupe?: (ligne: T) => string;
 }
@@ -216,7 +218,13 @@ export function DataGrid<T>({
                   {colonne.triable ? (
                     <button
                       type="button"
-                      className="flex h-10 w-full items-center gap-1 px-2 text-left font-medium transition-colors hover:text-foreground"
+                      className={cn(
+                        "flex h-10 w-full items-center gap-1 px-2 font-medium transition-colors hover:text-foreground",
+                        // Une colonne de montant aligne son en-tête à droite,
+                        // sur ses cellules — sans quoi le libellé flotte à
+                        // gauche pendant que les chiffres sont à droite.
+                        colonne.alignRight ? "justify-end text-right" : "text-left"
+                      )}
                       onClick={() => grid.setSort(colonne.cle)}
                     >
                       {colonne.titre}

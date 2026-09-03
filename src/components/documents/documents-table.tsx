@@ -72,6 +72,10 @@ const TYPE_CONFIG: Record<DocumentType, { label: string; className: string }> = 
     label: "Remboursement",
     className: "bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400",
   },
+  facture_reparation: {
+    label: "Facture réparation",
+    className: "bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400",
+  },
 };
 
 const STATUS_CONFIG: Record<DocumentStatus, { label: string; className: string }> = {

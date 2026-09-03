@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Receipt } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { DataGrid, type ColonneGrid } from "@/components/ui/data-grid";
+import { LotStatusBadge } from "@/components/lots/lot-status-badge";
 import { formatDate, formatCurrency } from "@/lib/format";
 import type { OperationRow } from "@/types/operation";
 
@@ -36,17 +37,12 @@ const TYPE_LABELS: Record<OperationRow["type"], string> = {
   depot_vente: "Dépôt-vente",
 };
 
-const STATUT_STYLES: Record<OperationRow["status"], string> = {
-  brouillon: "bg-gray-500/10 text-gray-600 border-gray-600/30 dark:bg-gray-500/20 dark:text-gray-400 dark:border-gray-400/30",
-  en_cours: "bg-amber-500/10 text-amber-600 border-amber-600/30 dark:bg-amber-500/20 dark:text-amber-400 dark:border-amber-400/30",
-  finalise: "bg-emerald-500/10 text-emerald-600 border-emerald-600/30 dark:bg-emerald-500/20 dark:text-emerald-400 dark:border-emerald-400/30",
-};
-
-const ISSUE_LABELS: Record<string, string> = {
-  complete: "Menée à terme",
-  refuse: "Refusée",
-  retracte: "Rétractée",
-  annule: "Annulée",
+// La catégorie se lit en bulle, comme le statut. Une couleur par nature, stable
+// d'un écran à l'autre.
+const TYPE_STYLES: Record<OperationRow["type"], string> = {
+  rachat: "bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/30",
+  vente: "bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/30",
+  depot_vente: "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/30",
 };
 
 interface OperationsTableProps {
@@ -84,9 +80,28 @@ export function OperationsTable({ operations, total }: OperationsTableProps) {
       cellule: (o) => formatDate(o.date_finalisation ?? o.created_at),
     },
     {
+      // Le statut d'abord : c'est ce qu'on cherche du regard. Un lot refusé,
+      // rétracté ou annulé se lit en rouge, pas « finalisé » — le badge partagé
+      // le fait déjà à partir de (status, outcome).
+      cle: "statut",
+      titre: "Statut",
+      triable: true,
+      cellule: (o) => <LotStatusBadge status={o.status} outcome={o.outcome} />,
+      groupe: (o) => {
+        if (o.status === "finalise" && o.outcome && o.outcome !== "complete") {
+          return "Sans suite";
+        }
+        return STATUT_OPTIONS.find((s) => s.value === o.status)?.label ?? o.status;
+      },
+    },
+    {
       cle: "type",
       titre: "Catégorie",
-      cellule: (o) => TYPE_LABELS[o.type],
+      cellule: (o) => (
+        <Badge variant="secondary" className={TYPE_STYLES[o.type]}>
+          {TYPE_LABELS[o.type]}
+        </Badge>
+      ),
       groupe: (o) => TYPE_LABELS[o.type],
     },
     {
@@ -100,24 +115,6 @@ export function OperationsTable({ operations, total }: OperationsTableProps) {
         const c = o.dossier?.client;
         return c ? `${c.first_name} ${c.last_name}`.trim() : "—";
       },
-    },
-    {
-      cle: "statut",
-      titre: "Statut",
-      triable: true,
-      cellule: (o) => (
-        <div className="flex flex-col gap-0.5">
-          <Badge variant="outline" className={STATUT_STYLES[o.status]}>
-            {STATUT_OPTIONS.find((s) => s.value === o.status)?.label ?? o.status}
-          </Badge>
-          {o.outcome && o.outcome !== "complete" && (
-            <span className="text-xs text-muted-foreground">
-              {ISSUE_LABELS[o.outcome]}
-            </span>
-          )}
-        </div>
-      ),
-      groupe: (o) => STATUT_OPTIONS.find((s) => s.value === o.status)?.label ?? o.status,
     },
     {
       cle: "facture",
@@ -142,7 +139,7 @@ export function OperationsTable({ operations, total }: OperationsTableProps) {
       cle: "montant",
       titre: "Montant",
       triable: true,
-      headClassName: "text-right",
+      alignRight: true,
       className: "text-right tabular-nums",
       cellule: (o) => {
         const m = montant(o);
