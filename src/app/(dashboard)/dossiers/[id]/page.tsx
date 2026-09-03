@@ -27,7 +27,7 @@ export default async function DossierDetailRoute({
 
   const { data: dossier } = await supabase
     .from("dossiers")
-    .select("*, client:clients(id, civility, first_name, last_name, email, phone, city, is_valid, address, postal_code)")
+    .select("*, client:clients(id, civility, first_name, last_name, email, phone, city, is_valid, address, postal_code), grossiste:grossistes(id, nom, raison_sociale, siret), fonderie:fonderies(id, nom)")
     .eq("id", id)
     .single();
 

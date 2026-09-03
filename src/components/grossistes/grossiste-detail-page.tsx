@@ -26,7 +26,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Header } from "@/components/dashboard/header";
-import { NouveauRachatBouton } from "@/components/fournisseurs/nouveau-rachat-bouton";
 import { formatDate, formatCurrency } from "@/lib/format";
 import type { Grossiste, AchatGrossisteAvecArticles } from "@/types/grossiste";
 
@@ -168,7 +167,6 @@ export function GrossisteDetailPage({
           </Button>
         }
       >
-        <NouveauRachatBouton tiersType="grossiste" tiersId={grossiste.id} />
         {editing ? (
           <Button size="sm" disabled={saving} onClick={handleSave}>
             <FloppyDisk size={16} weight="duotone" />

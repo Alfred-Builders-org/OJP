@@ -37,7 +37,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Header } from "@/components/dashboard/header";
-import { NouveauRachatBouton } from "@/components/fournisseurs/nouveau-rachat-bouton";
 import { formatDate, formatCurrency } from "@/lib/format";
 import { BDC_STATUS_CONFIG, BDL_STATUS_CONFIG } from "@/lib/fonderie/status-config";
 import type { Fonderie } from "@/types/fonderie";
@@ -186,7 +185,6 @@ export function FonderieDetailPage({
           </Button>
         }
       >
-        <NouveauRachatBouton tiersType="fonderie" tiersId={fonderie.id} libelle="Rachat hors commande" />
         {editing ? (
           <Button size="sm" disabled={saving} onClick={handleSave}>
             <FloppyDisk size={16} weight="duotone" />
