@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { autoProcessExpiredRetractation } from "@/lib/actions/finalize-actions";
 import { LotDetailPage } from "@/components/lots/lot-detail-page";
@@ -23,6 +23,21 @@ export default async function LotPage({ params }: { params: Promise<{ id: string
     .single();
 
   if (!lot) return notFound();
+
+  // Un lot de fonte n'a pas de références : son contenu vit dans le bon de
+  // livraison. On mène donc directement à la fiche de l'envoi, qui porte déjà
+  // les articles, les écarts et le règlement de la fonderie.
+  if (lot.type === "fonte") {
+    const { data: bdl } = await supabase
+      .from("bons_livraison")
+      .select("id")
+      .eq("lot_id", id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (bdl) redirect(`/fonderie/suivi/bdl/${bdl.id}`);
+    return notFound();
+  }
 
   // Un lot de fournisseur (grossiste ou fonderie) n'a ni pièce d'identité, ni
   // devis, ni délai de rétractation : sa fiche est distincte, et la fiche du

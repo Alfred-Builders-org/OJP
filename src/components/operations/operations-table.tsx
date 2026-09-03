@@ -18,6 +18,7 @@ const TYPE_OPTIONS = [
   { value: "rachat", label: "Rachat" },
   { value: "vente", label: "Vente" },
   { value: "depot_vente", label: "Dépôt-vente" },
+  { value: "fonte", label: "Fonte" },
 ] as const;
 
 const STATUT_OPTIONS = [
@@ -35,6 +36,7 @@ const TYPE_LABELS: Record<OperationRow["type"], string> = {
   rachat: "Rachat",
   vente: "Vente",
   depot_vente: "Dépôt-vente",
+  fonte: "Fonte",
 };
 
 // La catégorie se lit en bulle, comme le statut. Une couleur par nature, stable
@@ -43,6 +45,7 @@ const TYPE_STYLES: Record<OperationRow["type"], string> = {
   rachat: "bg-blue-100 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/30",
   vente: "bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-900/30 dark:text-violet-400 dark:hover:bg-violet-900/30",
   depot_vente: "bg-amber-100 text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/30",
+  fonte: "bg-orange-100 text-orange-700 hover:bg-orange-100 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/30",
 };
 
 interface OperationsTableProps {

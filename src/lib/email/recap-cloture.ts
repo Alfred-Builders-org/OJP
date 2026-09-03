@@ -46,6 +46,7 @@ const NATURES: Record<LotType, string> = {
   rachat: "rachat",
   vente: "vente",
   depot_vente: "dépôt-vente",
+  fonte: "fonte",
 };
 
 /**

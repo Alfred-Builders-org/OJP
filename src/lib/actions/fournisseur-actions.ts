@@ -79,6 +79,55 @@ export async function ouvrirRachatFournisseur(
 }
 
 /**
+ * Ouvre (ou réutilise) le dossier d'une fonderie et y crée un lot de fonte.
+ *
+ * Chaque envoi en fonderie devient un lot dans le dossier permanent de la
+ * fonderie — le même dossier que ses rachats éventuels, pour tout suivre au
+ * même endroit. Le contenu de l'envoi reste porté par le bon de livraison ;
+ * le lot n'est que le conteneur qui le fait remonter dans les opérations.
+ */
+export async function ouvrirLotFonte(
+  fonderieId: string,
+): Promise<{ dossierId: string; lotId: string } | { error: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Non authentifié." };
+
+  const { data: existant } = await supabase
+    .from("dossiers")
+    .select("id")
+    .eq("fonderie_id", fonderieId)
+    .limit(1)
+    .maybeSingle();
+
+  let dossierId = existant?.id;
+  if (!dossierId) {
+    const { data: dossier, error } = await supabase
+      .from("dossiers")
+      .insert({ numero: "", tiers_type: "fonderie", fonderie_id: fonderieId, status: "brouillon", created_by: user.id })
+      .select("id")
+      .single();
+    if (error || !dossier) return { error: error?.message ?? "Création du dossier impossible." };
+    dossierId = dossier.id;
+  }
+
+  const { data: lot, error: lotError } = await supabase
+    .from("lots")
+    .insert({
+      numero: "",
+      dossier_id: dossierId,
+      type: "fonte",
+      status: "en_cours",
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (lotError || !lot) return { error: lotError?.message ?? "Création du lot de fonte impossible." };
+  return { dossierId, lotId: lot.id };
+}
+
+/**
  * Finalise un rachat fournisseur : les articles entrent en stock, le lot est
  * clos.
  *

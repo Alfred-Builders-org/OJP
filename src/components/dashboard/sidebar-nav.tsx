@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SquaresFour, Diamond, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings, BookOpen, Money, Wrench } from "@phosphor-icons/react";
+import { SquaresFour, Diamond, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Buildings, BookOpen, Money, Wrench } from "@phosphor-icons/react";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -27,10 +27,12 @@ const stockItems = [
   { title: "Réparations", href: "/reparations", icon: Wrench, disabled: false },
 ];
 
+// Le « Suivi » a disparu du menu : la fonte se lit desormais dans les operations
+// (chaque envoi est un lot de fonte), et le detail d'un bon de livraison s'ouvre
+// depuis la. Le routage reste — c'est la qu'on compose les envois.
 const fonderieItems = [
   { title: "Fonderies", href: "/fonderies", icon: Factory, disabled: false },
   { title: "Routage", href: "/fonderie/routage", icon: ClipboardText, disabled: false },
-  { title: "Suivi", href: "/fonderie/suivi", icon: Fire, disabled: false },
 ];
 
 const comptabiliteItems = [

@@ -1,4 +1,4 @@
-export type LotType = "rachat" | "vente" | "depot_vente";
+export type LotType = "rachat" | "vente" | "depot_vente" | "fonte";
 
 export type LotStatus = "brouillon" | "en_cours" | "finalise";
 

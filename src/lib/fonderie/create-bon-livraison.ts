@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
+import { ouvrirLotFonte } from "@/lib/actions/fournisseur-actions";
 import { generateBonLivraison } from "@/lib/pdf/pdf-actions";
 import { formatDate } from "@/lib/format";
 import type { BijouxStock } from "@/types/bijoux";
@@ -150,11 +151,22 @@ export async function createBonLivraison(params: {
   const supabase = createClient();
   const coursMap = providedCours ?? await fetchCours();
 
+  // Un envoi en fonderie est un lot de fonte, dans le dossier permanent de la
+  // fonderie : c'est ce qui le fait remonter dans les operations. Le BDL reste
+  // le document et le porteur des lignes.
+  const lotFonte = await ouvrirLotFonte(fonderieId);
+  if ("error" in lotFonte) return { error: lotFonte.error };
+
   // Create BDL
   const { data: bdl, error: bdlError } = await mutate(
     supabase
       .from("bons_livraison")
-      .insert({ fonderie_id: fonderieId, numero: "" })
+      .insert({
+        fonderie_id: fonderieId,
+        numero: "",
+        dossier_id: lotFonte.dossierId,
+        lot_id: lotFonte.lotId,
+      })
       .select()
       .single(),
     "Erreur lors de la création du bon de livraison",
