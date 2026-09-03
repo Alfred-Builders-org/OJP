@@ -64,8 +64,16 @@ interface DataGridProps<T> {
   filtres?: FiltreGrid[];
   placeholderRecherche?: string;
   messageVide?: string;
-  /** Colonnes proposées au groupement. Vide, le bouton n'apparaît pas. */
-  groupements?: readonly { cle: string; label: string }[];
+  /**
+   * Groupements proposés. Vide, le bouton n'apparaît pas. Un groupement se
+   * rattache à une colonne de même `cle` (via son `groupe`), ou porte le sien
+   * quand il ne correspond à aucune colonne (ex. « avancement »).
+   */
+  groupements?: readonly { cle: string; label: string; groupe?: (ligne: T) => string }[];
+  /** Groupement appliqué quand l'URL n'en demande aucun. */
+  groupeParDefaut?: string;
+  /** Ordre imposé des sections de groupe (les autres suivent, dans l'ordre d'arrivée). */
+  ordreGroupes?: readonly string[];
 }
 
 /**
@@ -92,6 +100,8 @@ export function DataGrid<T>({
   placeholderRecherche = "Rechercher...",
   messageVide = "Aucun résultat.",
   groupements = [],
+  groupeParDefaut,
+  ordreGroupes,
 }: DataGridProps<T>) {
   const grid = useDataGridState();
   const [saisie, setSaisie] = React.useState(grid.search);
@@ -110,21 +120,39 @@ export function DataGrid<T>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [grid.search]);
 
-  const colonneGroupement = grid.groupBy
-    ? colonnes.find((c) => c.cle === grid.groupBy)
+  // Le groupement actif vient de l'URL, sinon du défaut proposé par la page.
+  const groupActif = grid.groupBy ?? groupeParDefaut ?? null;
+  const groupementDef = groupActif
+    ? groupements.find((g) => g.cle === groupActif)
     : null;
+  // La fonction de regroupement : celle portée par le groupement, sinon celle
+  // de la colonne de même clé.
+  const fnGroupe =
+    groupementDef?.groupe ??
+    (groupActif ? colonnes.find((c) => c.cle === groupActif)?.groupe : undefined);
+  const libelleGroupActif =
+    groupementDef?.label ??
+    (groupActif ? colonnes.find((c) => c.cle === groupActif)?.titre : undefined);
 
   const groupes = React.useMemo(() => {
-    if (!colonneGroupement?.groupe) return null;
+    if (!fnGroupe) return null;
     const carte = new Map<string, T[]>();
     for (const ligne of donnees) {
-      const libelle = colonneGroupement.groupe(ligne);
+      const libelle = fnGroupe(ligne);
       const existant = carte.get(libelle);
       if (existant) existant.push(ligne);
       else carte.set(libelle, [ligne]);
     }
-    return [...carte.entries()];
-  }, [colonneGroupement, donnees]);
+    const entrees = [...carte.entries()];
+    if (ordreGroupes) {
+      entrees.sort(([a], [b]) => {
+        const ia = ordreGroupes.indexOf(a);
+        const ib = ordreGroupes.indexOf(b);
+        return (ia === -1 ? Infinity : ia) - (ib === -1 ? Infinity : ib);
+      });
+    }
+    return entrees;
+  }, [fnGroupe, donnees, ordreGroupes]);
 
   const nbColonnes = colonnes.length + (actions ? 1 : 0);
   const aReinitialiser = grid.filtrageActif || grid.sort !== null || grid.groupBy !== null;
@@ -164,9 +192,9 @@ export function DataGrid<T>({
                 <Button variant="outline" size="sm">
                   <Rows size={16} weight="duotone" />
                   Grouper
-                  {colonneGroupement && (
+                  {libelleGroupActif && (
                     <Badge variant="secondary" className="ml-1">
-                      {colonneGroupement.titre}
+                      {libelleGroupActif}
                     </Badge>
                   )}
                 </Button>
@@ -186,7 +214,7 @@ export function DataGrid<T>({
                   type="button"
                   className={cn(
                     "flex w-full items-center rounded-md px-2 py-1.5 text-sm hover:bg-muted",
-                    grid.groupBy === g.cle && "bg-muted font-medium"
+                    groupActif === g.cle && "bg-muted font-medium"
                   )}
                   onClick={() => grid.setGroupBy(g.cle)}
                 >

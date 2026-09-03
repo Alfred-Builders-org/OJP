@@ -163,11 +163,16 @@ export function OperationsTable({ operations, total }: OperationsTableProps) {
         { cle: "facture", label: "Facture", options: FACTURE_OPTIONS, unique: true },
       ]}
       groupements={[
+        // Deux groupes par défaut : ce qui demande une action en tête, ce qui
+        // est terminé ensuite. C'est la vue que la cliente ouvre le matin.
+        { cle: "avancement", label: "Avancement", groupe: (o) => (o.status === "finalise" ? "Terminées" : "En cours") },
         { cle: "type", label: "Catégorie" },
         { cle: "statut", label: "Statut" },
         { cle: "facture", label: "Facture" },
         { cle: "client", label: "Client" },
       ]}
+      groupeParDefaut="avancement"
+      ordreGroupes={["En cours", "Terminées"]}
     />
   );
 }
