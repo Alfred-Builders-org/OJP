@@ -68,6 +68,21 @@ export function OperationsTable({ operations, total }: OperationsTableProps) {
     return o.type === "rachat" ? o.total_prix_achat : o.total_prix_revente;
   }
 
+  /**
+   * Ce qu'il reste à faire sur une opération en cours. Indication volontairement
+   * courte, dérivée du type et du statut ; le détail fin se lit sur la fiche.
+   */
+  function prochaineAction(o: OperationRow): string | null {
+    if (o.status === "finalise") return null;
+    if (o.status === "brouillon") return "À compléter";
+    // en_cours
+    if (o.type === "rachat") return "À finaliser";
+    if (o.type === "vente") return "Solde attendu";
+    if (o.type === "depot_vente") return "En dépôt";
+    if (o.type === "fonte") return "Retour fonderie attendu";
+    return null;
+  }
+
   /** Le tiers de l'operation : un particulier, un grossiste ou une fonderie. */
   function tiers(o: OperationRow): string {
     const d = o.dossier;
@@ -100,7 +115,17 @@ export function OperationsTable({ operations, total }: OperationsTableProps) {
       cle: "statut",
       titre: "Statut",
       triable: true,
-      cellule: (o) => <LotStatusBadge status={o.status} outcome={o.outcome} />,
+      cellule: (o) => {
+        const action = prochaineAction(o);
+        return (
+          <div className="flex flex-col gap-0.5">
+            <LotStatusBadge status={o.status} outcome={o.outcome} />
+            {action && (
+              <span className="text-xs text-amber-600 dark:text-amber-400">{action}</span>
+            )}
+          </div>
+        );
+      },
       groupe: (o) => {
         if (o.status === "finalise" && o.outcome && o.outcome !== "complete") {
           return "Sans suite";
