@@ -16,7 +16,7 @@ import {
 } from "@phosphor-icons/react";
 import type { Icon } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { DatePicker } from "@/components/ui/date-picker";
 import { Card, CardContent } from "@/components/ui/card";
 import { LotStatusBadge } from "@/components/lots/lot-status-badge";
 import { formatCurrency } from "@/lib/format";
@@ -103,13 +103,6 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
     telechargerCsv(contenu, `caisse-${jour}.csv`);
   }
 
-  const dateLisible = new Date(`${jour}T12:00:00`).toLocaleDateString("fr-FR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-
   const nbColonnes = 1 + COLONNES_ENTRANTES.length + 1 + COLONNES_SORTANTES.length + 1;
 
   const CELL_BASE = "border-r border-border";
@@ -124,17 +117,14 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
           <Button variant="outline" size="icon-sm" onClick={() => allerAu(decaler(jour, -1))} aria-label="Jour précédent">
             <CaretLeft size={14} weight="regular" />
           </Button>
-          <Input
-            type="date"
-            value={jour}
-            onChange={(e) => e.target.value && allerAu(e.target.value)}
-            className="w-auto"
-            aria-label="Jour de la feuille de caisse"
+          <DatePicker
+            value={new Date(`${jour}T12:00:00`)}
+            onChange={(d) => d && allerAu(d.toLocaleDateString("sv-SE"))}
+            className="w-56 first-letter:uppercase"
           />
           <Button variant="outline" size="icon-sm" onClick={() => allerAu(decaler(jour, 1))} aria-label="Jour suivant">
             <CaretRight size={14} weight="regular" />
           </Button>
-          <span className="ml-1 text-sm text-muted-foreground first-letter:uppercase">{dateLisible}</span>
         </div>
 
         <Button variant="outline" size="sm" onClick={exporter} disabled={lignes.length === 0}>
