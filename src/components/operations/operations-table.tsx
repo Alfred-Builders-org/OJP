@@ -65,6 +65,17 @@ export function OperationsTable({ operations, total }: OperationsTableProps) {
     return o.type === "rachat" ? o.total_prix_achat : o.total_prix_revente;
   }
 
+  /** Le tiers de l'operation : un particulier, un grossiste ou une fonderie. */
+  function tiers(o: OperationRow): string {
+    const d = o.dossier;
+    if (!d) return "—";
+    if (d.tiers_type === "grossiste") {
+      return d.grossiste?.raison_sociale ?? d.grossiste?.nom ?? "Grossiste";
+    }
+    if (d.tiers_type === "fonderie") return d.fonderie?.nom ?? "Fonderie";
+    return d.client ? `${d.client.first_name} ${d.client.last_name}`.trim() : "—";
+  }
+
   const colonnes: ColonneGrid<OperationRow>[] = [
     {
       cle: "numero",
@@ -106,15 +117,9 @@ export function OperationsTable({ operations, total }: OperationsTableProps) {
     },
     {
       cle: "client",
-      titre: "Client",
-      cellule: (o) => {
-        const c = o.dossier?.client;
-        return c ? `${c.first_name} ${c.last_name}`.trim() : "—";
-      },
-      groupe: (o) => {
-        const c = o.dossier?.client;
-        return c ? `${c.first_name} ${c.last_name}`.trim() : "—";
-      },
+      titre: "Tiers",
+      cellule: (o) => tiers(o),
+      groupe: (o) => tiers(o),
     },
     {
       cle: "facture",

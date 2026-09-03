@@ -38,7 +38,7 @@ const OPTIONS: OptionsRequete = {
 const SELECTION = `
   id, numero, type, status, outcome, created_at, date_finalisation,
   total_prix_achat, total_prix_revente,
-  dossier:dossiers(id, numero, client:clients(id, first_name, last_name)),
+  dossier:dossiers(id, numero, tiers_type, client:clients(id, first_name, last_name), grossiste:grossistes(id, nom, raison_sociale), fonderie:fonderies(id, nom)),
   factures(id, numero, montant_ttc)
 `;
 

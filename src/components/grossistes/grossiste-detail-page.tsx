@@ -13,7 +13,6 @@ import {
   MapPin,
   NotePencil,
   PencilSimple,
-  Plus,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
 import { mutate } from "@/lib/supabase/mutation";
@@ -27,6 +26,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Header } from "@/components/dashboard/header";
+import { NouveauRachatBouton } from "@/components/fournisseurs/nouveau-rachat-bouton";
 import { formatDate, formatCurrency } from "@/lib/format";
 import type { Grossiste, AchatGrossisteAvecArticles } from "@/types/grossiste";
 
@@ -168,12 +168,7 @@ export function GrossisteDetailPage({
           </Button>
         }
       >
-        <Link href={`/grossistes/${grossiste.id}/achats/new`}>
-          <Button size="sm" variant="secondary">
-            <Plus size={16} weight="bold" />
-            Nouvel achat
-          </Button>
-        </Link>
+        <NouveauRachatBouton tiersType="grossiste" tiersId={grossiste.id} />
         {editing ? (
           <Button size="sm" disabled={saving} onClick={handleSave}>
             <FloppyDisk size={16} weight="duotone" />

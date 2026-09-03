@@ -24,7 +24,10 @@ export interface OperationRow {
   dossier: {
     id: string;
     numero: string;
+    tiers_type?: "client" | "grossiste" | "fonderie" | null;
     client: { id: string; first_name: string; last_name: string } | null;
+    grossiste?: { id: string; nom: string; raison_sociale: string | null } | null;
+    fonderie?: { id: string; nom: string } | null;
   } | null;
   factures: OperationFacture[];
 }
