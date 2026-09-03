@@ -145,7 +145,7 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
 
       {/* 2. Trois chiffres du soir — neutres, icônes de flèches (hauteur fixe) */}
       <div className="grid gap-3 sm:grid-cols-3">
-        <Card className="shadow-sm">
+        <Card className="shadow-sm py-0">
           <CardContent className="p-4">
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <ArrowDown size={12} weight="bold" />
@@ -154,7 +154,7 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
             <p className="text-xl font-bold tabular-nums">{formatCurrency(totauxEntrant)}</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
+        <Card className="shadow-sm py-0">
           <CardContent className="p-4">
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <ArrowUp size={12} weight="bold" />
@@ -163,7 +163,7 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
             <p className="text-xl font-bold tabular-nums">{formatCurrency(totauxSortant)}</p>
           </CardContent>
         </Card>
-        <Card className="shadow-sm">
+        <Card className="shadow-sm py-0">
           <CardContent className="p-4">
             <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Scales size={12} weight="duotone" />
@@ -175,7 +175,7 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
       </div>
 
       {/* 3. Tableau — prend le reste de la place, scrolle à l'intérieur */}
-      <Card className="shadow-sm flex-1 min-h-0 flex flex-col overflow-hidden">
+      <Card className="shadow-sm flex-1 min-h-0 flex flex-col overflow-hidden py-0">
         <CardContent className="p-0 flex-1 min-h-0 overflow-auto">
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-background">
@@ -297,7 +297,7 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
 
       {/* 4. Carte totaux — fixe en bas, ne scrolle pas avec le tableau */}
       {lignes.length > 0 && (
-        <Card className="shadow-sm">
+        <Card className="shadow-sm py-0">
           <CardContent className="p-0 overflow-x-auto">
             <table className="w-full border-collapse text-sm">
               <tbody>
