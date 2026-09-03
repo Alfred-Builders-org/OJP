@@ -112,15 +112,27 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
       {/* 1. Barre de navigation dans les jours (hauteur fixe) */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon-sm" onClick={() => allerAu(decaler(jour, -1))} aria-label="Jour précédent">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => allerAu(decaler(jour, -1))}
+            aria-label="Jour précédent"
+            className="bg-white text-neutral-900 hover:bg-neutral-100 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+          >
             <CaretLeft size={14} weight="regular" />
           </Button>
           <DatePicker
             value={new Date(`${jour}T12:00:00`)}
             onChange={(d) => d && allerAu(d.toLocaleDateString("sv-SE"))}
-            className="w-56 first-letter:uppercase"
+            className="w-56 bg-white first-letter:uppercase dark:bg-white dark:text-foreground dark:hover:bg-white/90"
           />
-          <Button variant="outline" size="icon-sm" onClick={() => allerAu(decaler(jour, 1))} aria-label="Jour suivant">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={() => allerAu(decaler(jour, 1))}
+            aria-label="Jour suivant"
+            className="bg-white text-neutral-900 hover:bg-neutral-100 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-100"
+          >
             <CaretRight size={14} weight="regular" />
           </Button>
         </div>
@@ -131,7 +143,10 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
         </Button>
       </div>
 
-      {/* 2. Trois chiffres du soir — neutres, icônes de flèches (hauteur fixe) */}
+      {/* 2. Trois chiffres du soir — neutres, icônes de flèches (hauteur fixe).
+             Sur une journée vide, on les cache : l'empty state central se
+             suffit et évite les cartes à zéro qui font penser à un trou. */}
+      {lignes.length > 0 && (
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="shadow-sm py-0">
           <CardContent className="p-4">
@@ -161,6 +176,7 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* 3. Tableau — prend le reste de la place, scrolle à l'intérieur.
              Quand la journée est vide, on remplace le tableau par un empty
@@ -292,8 +308,9 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
         )}
       </Card>
 
-      {/* 4. Carte totaux — fixe en bas, toujours affichée (à zéro sur une
-             journée vide), avec un peu de padding pour respirer. */}
+      {/* 4. Carte totaux — fixe en bas, cachée sur une journée vide pour
+             laisser l'empty state central seul. */}
+      {lignes.length > 0 && (
       <Card className="shadow-sm py-1">
         <CardContent className="p-0 overflow-x-auto">
             <table className="w-full border-collapse text-sm">
@@ -323,6 +340,7 @@ export function CaissePageClient({ jour, mouvements }: CaissePageClientProps) {
           </table>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
