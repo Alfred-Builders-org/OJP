@@ -34,6 +34,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { IdentityPhotosCard } from "@/components/photos/identity-photos-card";
 import { identityDocumentSchema } from "@/lib/validations/client";
 import { formatDate, formatDateISO } from "@/lib/format";
 import {
@@ -395,6 +396,21 @@ export function IdentityDocumentSection({
               </ContextMenuTrigger>
               <ContextMenuContent>{actionsPour(doc, ContextMenuItem)}</ContextMenuContent>
             </ContextMenu>
+          )}
+
+          {/* Recto, verso, et ce que le titre de sejour exige en plus. Le QR
+              code ouvre la prise de vue au telephone : le poste du comptoir n'a
+              pas de camera utilisable pour photographier une carte posee. */}
+          {confirmDeleteId !== doc.id && (
+            <div className="mt-2 rounded-lg border border-dashed p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Photos de la pièce
+              </p>
+              <IdentityPhotosCard
+                documentId={doc.id}
+                libelle={`${documentTypeLabels[doc.document_type] ?? doc.document_type} — ${doc.document_number}`}
+              />
+            </div>
           )}
         </div>
       ))}

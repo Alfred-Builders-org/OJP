@@ -122,12 +122,13 @@ export function OrInvestissementDetailPage({ item, canEdit = true }: { item: OrI
   const coeffRachat = coeffPropreAchat ?? parametres?.coefficient_rachat ?? 0;
   const coeffVente = coeffPropreVente ?? parametres?.coefficient_vente ?? 0;
 
-  // Meme formule que le formulaire de rachat : cours x poids x coefficient. La
-  // fiche appliquait en plus le titrage, si bien qu'une meme piece n'etait pas
-  // valorisee pareil ici et dans un lot. Le poids du catalogue est celui d'or
-  // fin, le titrage n'a donc pas a etre applique une seconde fois.
-  const prixRachat = calculerPrixRachatOrInvest(cours, poidsNum, coeffRachat);
-  const prixVente = calculerPrixRachatOrInvest(cours, poidsNum, coeffVente);
+  // Meme formule partout : cours x titre x poids x coefficient. Le poids du
+  // catalogue est un poids BRUT — un napoleon y pese 6,45 g au titre 900, soit
+  // 5,81 g d'or fin — donc le titre s'applique. La fiche, le formulaire de
+  // rachat et celui de vente passent tous les trois par la meme fonction.
+  const titreNum = item.titre ? parseFloat(item.titre) : 0;
+  const prixRachat = calculerPrixRachatOrInvest(cours, titreNum, poidsNum, coeffRachat);
+  const prixVente = calculerPrixRachatOrInvest(cours, titreNum, poidsNum, coeffVente);
 
   async function handleSave() {
     setSaving(true);

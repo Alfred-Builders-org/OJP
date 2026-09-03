@@ -34,3 +34,24 @@ export const PHOTO_TAILLE_MAX = 12 * 1024 * 1024;
 
 /** Duree de vie d'une session de prise de vue, en minutes. */
 export const SESSION_DUREE_MINUTES = 30;
+
+/**
+ * Duree d'une session de piece d'identite.
+ *
+ * Plus courte que les autres, et pour une raison precise : le jeton n'est pas
+ * authentifie, et celui-ci ouvre un depot vers un bucket PRIVE (R-025). Deux
+ * cliches, recto et verso, se prennent en une minute — le jeton n'a aucune
+ * raison de survivre a la demi-heure d'une seance photo de bijoux.
+ */
+export const SESSION_DUREE_MINUTES_IDENTITE = 10;
+
+/** Une photo de la galerie d'une piece d'identite. */
+export interface IdentityDocumentPhoto {
+  id: string;
+  document_id: string;
+  chemin: string;
+  bucket: string;
+  rang: number;
+  created_by: string | null;
+  created_at: string;
+}

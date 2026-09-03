@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { SquaresFour, Diamond, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings, BookOpen } from "@phosphor-icons/react";
+import { SquaresFour, Diamond, UsersThree, FolderOpen, ClipboardText, Factory, UserGear, Receipt, Fire, Buildings, BookOpen, Money, Wrench } from "@phosphor-icons/react";
 import {
   SidebarMenu,
   SidebarMenuItem,
@@ -22,6 +22,9 @@ import type { UserRole } from "@/types/auth";
 const stockItems = [
   { title: "Stock", href: "/stock", icon: Diamond, disabled: false },
   { title: "Grossistes", href: "/grossistes", icon: Buildings, disabled: false },
+  // L'atelier tient ses propres lignes : un bijou apporte par un client n'entre
+  // pas en stock, il n'apparaitrait nulle part ailleurs.
+  { title: "Réparations", href: "/reparations", icon: Wrench, disabled: false },
 ];
 
 const fonderieItems = [
@@ -31,17 +34,23 @@ const fonderieItems = [
 ];
 
 const comptabiliteItems = [
+  // La feuille du jour se consulte le matin et se solde le soir : elle vient
+  // avant les impots, qu'on ne regarde qu'au trimestre.
+  { title: "Caisse", href: "/caisse", icon: Money, disabled: false },
   { title: "Impôts", href: "/impots", icon: Receipt, disabled: false },
   // Le registre des objets mobiliers repond a une obligation penale, pas
   // fiscale — mais c'est aupres de la comptabilite qu'on va le chercher.
   { title: "Registre", href: "/registre", icon: BookOpen, disabled: false },
 ];
 
-// Rachats, ventes et depots-vente se consultent depuis leur dossier : ils n'ont
-// de sens qu'au regard du client et de l'affaire qui les porte.
+// Rachats, ventes et depots-vente se consultent depuis leur dossier — c'est la
+// qu'ils prennent leur sens, au regard du client et de l'affaire qui les porte.
+// « Operations » ouvre la meme matiere par l'autre bout : par l'affaire quand on
+// ne sait plus de quel client elle relevait, ou pour balayer un trimestre.
 const crmItems = [
   { title: "Clients", href: "/clients", icon: UsersThree, disabled: false },
   { title: "Dossiers", href: "/dossiers", icon: FolderOpen, disabled: false },
+  { title: "Opérations", href: "/operations", icon: ClipboardText, disabled: false },
 ];
 
 interface SidebarNavProps {

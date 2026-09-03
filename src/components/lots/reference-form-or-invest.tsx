@@ -164,6 +164,8 @@ export function ReferenceFormOrInvest({
 
   const metal = selectedItem?.metal as "Or" | "Argent" | "Platine" | null;
   const poids = selectedItem?.poids ?? 0;
+  // Le poids du catalogue est un poids brut : le titre le ramene a l'or fin.
+  const titre = selectedItem?.titre ? parseFloat(selectedItem.titre) : 0;
 
   // Une piece peut porter ses propres coefficients : un napoleon et un lingot
   // n'ont ni la meme prime ni la meme liquidite. Sans valeur propre, elle suit
@@ -178,13 +180,13 @@ export function ReferenceFormOrInvest({
   const prixRachat = (() => {
     if (!metal || !poids) return null;
     const cours = getCoursMetalFromSnapshot(metal, liveCoursOr, liveCoursArgent, liveCoursPlatine);
-    return Math.round(calculerPrixRachatOrInvest(cours, poids, coeffAchat) * qty * 100) / 100;
+    return Math.round(calculerPrixRachatOrInvest(cours, titre, poids, coeffAchat) * qty * 100) / 100;
   })();
 
   const prixVente = (() => {
     if (!metal || !poids) return null;
     const cours = getCoursMetalFromSnapshot(metal, liveCoursOr, liveCoursArgent, liveCoursPlatine);
-    return Math.round(calculerPrixRachatOrInvest(cours, poids, coeffVente) * qty * 100) / 100;
+    return Math.round(calculerPrixRachatOrInvest(cours, titre, poids, coeffVente) * qty * 100) / 100;
   })();
 
   const tpvEligible = isTPVEligible(

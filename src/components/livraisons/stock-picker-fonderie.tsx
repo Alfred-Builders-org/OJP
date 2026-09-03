@@ -9,7 +9,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { createClient } from "@/lib/supabase/client";
-import { createBonLivraison } from "@/lib/fonderie/create-bon-livraison";
+import { createBonLivraison, articleDepuisStock } from "@/lib/fonderie/create-bon-livraison";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -117,7 +117,11 @@ export function StockPickerFonderie({ open, onOpenChange, fonderies }: StockPick
     setSaving(true);
 
     const fonderie = fonderies.find((f) => f.id === fonderieId)!;
-    await createBonLivraison({ fonderieId, items: selectedItems, fonderie });
+    await createBonLivraison({
+      fonderieId,
+      items: selectedItems.map(articleDepuisStock),
+      fonderie,
+    });
 
     setSaving(false);
     onOpenChange(false);

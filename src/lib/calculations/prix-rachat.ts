@@ -99,20 +99,33 @@ export function calculerPrixBijou({
 }
 
 /**
- * Calcul du prix de rachat pour l'or investissement.
+ * Calcul du prix d'un produit d'or d'investissement, au rachat comme a la vente.
  *
- * Formule : cours_metal × poids × coefficient
+ * Formule : cours_metal × (titre / 1000) × poids × coefficient
+ *
+ * Le titre s'applique parce que le catalogue porte des poids BRUTS : un
+ * napoleon y pese 6,45 g au titre 900, soit 5,81 g d'or fin ; un souverain
+ * 7,99 g au titre 916. C'est le poids dont parlent les cotations du marche, et
+ * c'est celui qui a ete saisi. Sans le titre, on valorise l'alliage au prix de
+ * l'or — environ 10 % de trop sur toute piece qui n'est pas en metal fin.
+ *
+ * La formule rejoint donc celle des bijoux, a ceci pres que le poids vient du
+ * catalogue et non d'une pesee : ces produits sont normalises. La fonction
+ * reste distincte pour porter cette intention, mais delegue le calcul plutot
+ * que de le dupliquer.
  *
  * @param coursMetalGramme - Prix du gramme du métal pur (snapshot)
- * @param poids - Poids en grammes (du catalogue)
- * @param coefficient - Coefficient d'achat (global ou spécifique)
+ * @param titre - Titre en millièmes (ex: 900 pour un napoléon)
+ * @param poids - Poids brut en grammes (du catalogue)
+ * @param coefficient - Coefficient d'achat ou de vente (global ou spécifique)
  */
 export function calculerPrixRachatOrInvest(
   coursMetalGramme: number,
+  titre: number,
   poids: number,
   coefficient: number
 ): number {
-  return Math.round(safeNum(coursMetalGramme) * safeNum(poids) * safeNum(coefficient) * 100) / 100;
+  return calculerPrixRachatBijoux(coursMetalGramme, titre, poids, coefficient);
 }
 
 /**

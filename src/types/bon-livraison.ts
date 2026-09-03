@@ -6,7 +6,12 @@ export type BonLivraisonStatus = "brouillon" | "envoye" | "recu" | "traite" | "a
 export interface BonLivraisonLigne {
   id: string;
   bon_livraison_id: string;
-  bijoux_stock_id: string;
+  /** Bijou de l'inventaire. Exclusif avec `or_investissement_id`. */
+  bijoux_stock_id: string | null;
+  /** Produit du catalogue d'investissement envoye a la fonte. */
+  or_investissement_id: string | null;
+  /** Exemplaires envoyes. Toujours 1 pour un bijou, qui est unique. */
+  quantite: number;
   designation: string;
   metal: string | null;
   titrage_declare: string | null;
